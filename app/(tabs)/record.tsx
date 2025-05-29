@@ -6,11 +6,11 @@ import { useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 // import { blue } from 'react-native-reanimated/lib/typescript/Colors';
 
-export const unstable_settings = {
-  tabBarIcon: ({ color, size }) => (
-    <Ionicons name="mic" color={black} size={14} />
-  ),
-};
+// export const unstable_settings = {
+//   tabBarIcon: ({ color, size }) => (
+//     <Ionicons name="mic" color={color} size={size} />
+//   ),
+// };
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -79,7 +79,7 @@ export default function RecordScreen() {
 
   const navigateToDetailedReport = () => {
     router.push({
-      pathname: './detailed-report',
+      pathname: '../safety-check',
       params: { audioUri: recordedUri || '' }
     });
   };
@@ -95,8 +95,8 @@ export default function RecordScreen() {
 
       {/* Main content */}
       <View style={styles.content}>
-        <Text style={styles.title}>Record what happened</Text>
-        <Text style={styles.subtitle}>You can describe what happened in your own words</Text>
+        <Text style={styles.title}>Record something happening now</Text>
+        <Text style={styles.subtitle}>You can describe what is happening in your own words</Text>
         
         {/* Recording UI */}
         <TouchableOpacity 
