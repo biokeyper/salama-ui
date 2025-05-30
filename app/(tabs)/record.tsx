@@ -69,7 +69,7 @@ export default function RecordScreen() {
             if (recordedUri) {
               FileSystem.deleteAsync(recordedUri).catch(() => {});
             }
-            router.replace('./fake-calculator');
+            router.replace('../fake-calculator');
           },
         },
       ],
