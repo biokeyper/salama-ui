@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Platform, StyleSheet } from 'react-native';
-
+import { Collapsible } from '@/components/Collapsible';
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
@@ -20,20 +20,17 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome, Msichana!</ThemedText>
         <HelloWave />
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">You Are In Control</ThemedText>
+      <Collapsible title="You Are In Control">
         <ThemedText>
           You are in control of what you choose to share. Your safety and comfort are our top priority throughout this process.
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Your Choices Matter</ThemedText>
+      </Collapsible>
+      <Collapsible title="Your Choices Matter">
         <ThemedText>
           You can skip any question that makes you uncomfortable. There are no wrong answers here - only what you feel ready to share.
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Safety First</ThemedText>
+      </Collapsible>
+      <Collapsible title="Safety First">
         <ThemedText>
           Remember, your safety comes first. At any time, you can exit discreetly using the emergency button.
           {Platform.select({
@@ -43,7 +40,7 @@ export default function HomeScreen() {
           })}
           {' '}if you need immediate assistance.
         </ThemedText>
-      </ThemedView>
+      </Collapsible>
     </ParallaxScrollView>
   );
 }
@@ -53,10 +50,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
   },
   reactLogo: {
     height: 178,

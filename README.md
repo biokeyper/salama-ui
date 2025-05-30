@@ -1,6 +1,23 @@
-# Welcome to your Expo app 👋
+# SafeGirls App UI
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a React Native mobile app built with [Expo](https://expo.dev) and [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).  
+It provides a trauma-informed, privacy-focused user interface for survivors to document and report sexual and gender-based violence (SGBV) incidents.
+
+---
+
+## Project Overview
+
+This repository contains the **user interface (UI)** for SafeGirls.  
+It is **not** the blockchain ("chain end") or smart contract code, but rather the mobile app that interacts with users and can connect to decentralized backends.
+
+**Key Features:**
+- **File-based routing** using [expo-router](https://docs.expo.dev/router/introduction)
+- **Tab navigation** for easy access to Home, Record, and Explore screens
+- **Audio recording** and text reporting flows
+- **Safety-first design:** Emergency exit, safety checks, and trauma-informed language
+- **Custom theming** and reusable UI components
+
+---
 
 ## Get started
 
@@ -25,6 +42,8 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+---
+
 ## Get a fresh project
 
 When you're ready, run:
@@ -34,6 +53,8 @@ npm run reset-project
 ```
 
 This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+
+---
 
 ## Learn more
 
