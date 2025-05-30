@@ -9,14 +9,14 @@ export default function SafetyCheckScreen() {
   const handleYes = () => {
     // Pass along any params (like audioUri) to the detailed report screen
     router.push({
-      pathname: './(tabs)/detailed-report',
+      pathname: './detailed-report',
       params,
     });
   };
 
   const handleNo = () => {
     // You can customize this action (e.g., show resources, go back, etc.)
-    router.push('./resources'); // Or show a modal, or go back, etc.
+    router.push('./(tabs)/record'); // Or show a modal, or go back, etc.
   };
 
   return (
