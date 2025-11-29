@@ -128,7 +128,10 @@ export default function RecordScreen() {
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={styles.playButton}
-              onPress={() => router.push('./audio-player')}
+              onPress={() => router.push({
+                pathname: './audio-player',
+                params: { audioUri: recordedUri || '' }
+              })}
             >
               <MaterialIcons name="play-arrow" size={24} color="white" />
               <Text style={styles.playButtonText}>Listen</Text>
