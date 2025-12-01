@@ -1,22 +1,45 @@
-import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { saveReport } from '@/services/storage';
+import { ReportType } from '@/types/report';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 export default function TextReportScreen() {
   const [report, setReport] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
   const params = useLocalSearchParams();
+  const audioUri = params.audioUri as string | undefined;
+  const reportId = params.reportId as string | undefined;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!report.trim()) {
       Alert.alert('Please enter your report or details.');
       return;
     }
-    // Handle saving/submitting the report, possibly with params.audioUri
-    Alert.alert('Thank you', 'Your report has been saved.');
-    router.replace('/(tabs)');
+
+    setIsSaving(true);
+    try {
+      const reportType: ReportType = audioUri ? 'mixed' : 'text';
+
+      await saveReport({
+        id: reportId,
+        type: reportType,
+        status: 'saved',
+        textContent: report.trim(),
+        audioUri: audioUri || undefined,
+      });
+
+      Alert.alert('Thank you', 'Your report has been saved.');
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Error saving report:', error);
+      Alert.alert('Error', 'Failed to save your report. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -40,8 +63,16 @@ export default function TextReportScreen() {
           onChangeText={setReport}
           textAlignVertical="top"
         />
-        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <ThemedText style={styles.buttonText}>Submit Report</ThemedText>
+        <TouchableOpacity
+          style={[styles.button, isSaving && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <ThemedText style={styles.buttonText}>Save Report</ThemedText>
+          )}
         </TouchableOpacity>
       </ThemedView>
     </KeyboardAvoidingView>
@@ -86,5 +117,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

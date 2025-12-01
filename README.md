@@ -53,6 +53,7 @@ You can start developing by editing the files inside the **app** directory. This
 - **Past event recording:** Document historical incidents with voice narration
 - **Audio playback:** Built-in audio player with play/pause controls, progress tracking, and time display
 - **Flexible input:** Users can choose between audio recording or text input at any point
+- **Auto-save:** Audio reports are automatically saved locally upon stopping the recording to prevent data loss
 
 ### Safety Features
 - **Emergency exit:** Quick exit button that closes the app and clears history
@@ -75,6 +76,252 @@ You can start developing by editing the files inside the **app** directory. This
 - **TypeScript:** 5.9.2
 - **expo-audio:** 1.0.15 (for audio recording and playback)
 - **expo-router:** 6.0.15 (file-based routing)
+- **@react-native-async-storage/async-storage:** 2.2.0 (for local data persistence)
+
+---
+
+## Data Storage
+
+### Local Storage Implementation
+
+The app uses **AsyncStorage** to persist reports locally on the device. All reports are stored with the following structure:
+
+#### Report Data Model
+
+```typescript
+interface Report {
+  id: string;                    // Unique identifier
+  type: 'audio' | 'text' | 'mixed';
+  status: 'draft' | 'saved' | 'submitted' | 'failed';
+  createdAt: string;             // ISO 8601 timestamp
+  updatedAt: string;             // ISO 8601 timestamp
+  
+  // Audio data
+  audioUri?: string;             // File path to audio recording
+  audioDuration?: number;        // Duration in seconds
+  
+  // Text data
+  textContent?: string;          // Text report content
+  
+  // Metadata
+  metadata?: {
+    location?: string;
+    timestamp?: string;          // When incident occurred
+    tags?: string[];
+    notes?: string;
+  };
+  
+  // Backend submission tracking
+  submittedAt?: string;          // ISO 8601 timestamp
+  submissionId?: string;         // Backend-assigned ID
+  submissionError?: string;      // Error message if submission failed
+}
+```
+
+#### Storage Service
+
+The storage service (`services/storage.ts`) provides the following functions:
+
+- `getAllReports()` - Retrieve all stored reports
+- `getReportById(id)` - Get a specific report
+- `saveReport(report)` - Save or update a report
+- `deleteReport(id)` - Delete a report
+- `deleteAllReports()` - Clear all reports
+- `getReportsByStatus(status)` - Filter reports by status
+- `getReportsByType(type)` - Filter reports by type
+- `updateReportStatus(id, status)` - Update report submission status
+
+#### Storage Limits
+
+- **Maximum reports:** 100 reports stored locally (oldest removed when limit exceeded)
+- **Storage location:** Device's AsyncStorage (persists across app restarts)
+- **Audio files:** Stored in temporary file system (managed by expo-audio)
+
+#### Report Lifecycle
+
+1. **Draft** - Initial state when audio is recorded or text is entered
+2. **Saved** - Report is saved locally but not yet submitted
+3. **Submitted** - Successfully sent to backend
+4. **Failed** - Submission attempt failed (can be retried)
+
+---
+
+## Backend Submission Framework
+
+### Overview
+
+The app is designed to connect to decentralized backends (blockchain/smart contracts) or traditional REST APIs. The backend submission framework is documented here for future implementation.
+
+### Architecture
+
+```
+┌─────────────┐
+│   UI Layer  │ (app/ screens)
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│  Storage    │ (services/storage.ts)
+│  Service    │
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│ Submission  │ (services/submission.ts - TO BE IMPLEMENTED)
+│  Service    │
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│   Backend   │ (Blockchain API / REST API)
+│   Endpoint  │
+└─────────────┘
+```
+
+### Implementation Plan
+
+#### 1. Submission Service (`services/submission.ts`)
+
+Create a service to handle backend communication:
+
+```typescript
+// Example structure (to be implemented)
+export interface SubmissionConfig {
+  apiEndpoint: string;
+  apiKey?: string;
+  blockchainNetwork?: string;
+  contractAddress?: string;
+}
+
+export async function submitReport(
+  report: Report,
+  config: SubmissionConfig
+): Promise<{ success: boolean; submissionId?: string; error?: string }> {
+  // Implementation:
+  // 1. Validate report data
+  // 2. Prepare payload (audio file upload, text content, metadata)
+  // 3. Authenticate/authorize request
+  // 4. Submit to backend
+  // 5. Handle response and update report status
+  // 6. Return result
+}
+```
+
+#### 2. Backend API Requirements
+
+##### REST API Endpoint
+
+**POST** `/api/reports`
+
+**Request:**
+```json
+{
+  "type": "audio" | "text" | "mixed",
+  "textContent": "string",
+  "audioFile": "base64 or multipart/form-data",
+  "metadata": {
+    "location": "string",
+    "timestamp": "ISO 8601",
+    "tags": ["string"]
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "submissionId": "unique-id",
+  "timestamp": "ISO 8601"
+}
+```
+
+##### Blockchain Integration
+
+For decentralized backends:
+
+- **Smart Contract Function:** `submitReport(bytes32 reportHash, string metadata)`
+- **IPFS Storage:** Upload audio files to IPFS, store hash on-chain
+- **Encryption:** Encrypt sensitive data before submission
+- **Wallet Integration:** Connect user wallet for transaction signing
+
+#### 3. Submission Queue
+
+Implement an offline queue for failed submissions:
+
+```typescript
+// Queue structure
+interface SubmissionQueue {
+  pending: Report[];
+  retryAttempts: Map<string, number>;
+  maxRetries: number;
+}
+
+// Auto-retry logic
+- Check network connectivity
+- Retry failed submissions on app launch
+- Exponential backoff for retries
+- Mark as permanently failed after max retries
+```
+
+#### 4. Authentication & Security
+
+- **User Authentication:** Implement auth flow (OAuth, JWT, wallet signature)
+- **Data Encryption:** Encrypt reports before submission
+- **Privacy:** Ensure audio/text data is encrypted in transit and at rest
+- **Anonymity:** Consider anonymous submission options
+
+#### 5. Error Handling
+
+```typescript
+// Error scenarios to handle:
+- Network failures (offline, timeout)
+- Authentication errors (expired token, invalid credentials)
+- Backend errors (server error, rate limiting)
+- Validation errors (invalid data format)
+- Storage errors (quota exceeded)
+```
+
+#### 6. Configuration
+
+Create a config file for backend settings:
+
+```typescript
+// config/backend.ts
+export const BACKEND_CONFIG = {
+  apiEndpoint: process.env.EXPO_PUBLIC_API_URL || 'https://api.example.com',
+  blockchainNetwork: process.env.EXPO_PUBLIC_NETWORK || 'mainnet',
+  contractAddress: process.env.EXPO_PUBLIC_CONTRACT_ADDRESS,
+  enableSubmission: process.env.EXPO_PUBLIC_ENABLE_SUBMISSION === 'true',
+};
+```
+
+### Integration Steps
+
+1. **Create submission service** (`services/submission.ts`)
+2. **Add network detection** (use `@react-native-community/netinfo`)
+3. **Implement retry logic** with exponential backoff
+4. **Add submission UI** (progress indicators, success/error messages)
+5. **Create backend configuration** (environment variables)
+6. **Add authentication flow** (if required)
+7. **Implement encryption** (for sensitive data)
+8. **Add submission queue** (for offline support)
+9. **Test with mock backend** before production integration
+
+### Environment Variables
+
+Add to `.env` or `app.json`:
+
+```env
+EXPO_PUBLIC_API_URL=https://api.safegirls.example.com
+EXPO_PUBLIC_ENABLE_SUBMISSION=true
+EXPO_PUBLIC_BLOCKCHAIN_NETWORK=mainnet
+EXPO_PUBLIC_CONTRACT_ADDRESS=0x...
+```
+
+### Testing
+
+- **Mock Backend:** Use tools like MSW (Mock Service Worker) for testing
+- **Offline Testing:** Test submission queue with network disabled
+- **Error Scenarios:** Test all error paths and edge cases
+- **Performance:** Test with large audio files and multiple reports
 
 ---
 

@@ -1,22 +1,17 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
-// import { blue } from 'react-native-reanimated/lib/typescript/Colors';
-
-// export const unstable_settings = {
-//   tabBarIcon: ({ color, size }) => (
-//     <Ionicons name="mic" color={color} size={size} />
-//   ),
-// };
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { saveReport } from '../../services/storage';
 
 export default function RecordScreen() {
   const router = useRouter();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -36,6 +31,7 @@ export default function RecordScreen() {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
       setIsRecording(true);
+      setReportId(null); // Reset report ID for new recording
     } catch (err) {
       Alert.alert('Error', 'Failed to start recording');
     }
@@ -45,8 +41,22 @@ export default function RecordScreen() {
     try {
       await audioRecorder.stop();
       setIsRecording(false);
-      setRecordedUri(audioRecorder.uri ?? null);
-      console.log('Recording saved to:', audioRecorder.uri);
+      const uri = audioRecorder.uri ?? null;
+      setRecordedUri(uri);
+      console.log('Recording saved to:', uri);
+
+      if (uri) {
+        try {
+          const savedReport = await saveReport({
+            type: 'audio',
+            status: 'saved',
+            audioUri: uri,
+          });
+          setReportId(savedReport.id);
+        } catch (error) {
+          console.error('Error auto-saving audio report:', error);
+        }
+      }
     } catch (err) {
       Alert.alert('Error', 'Failed to save recording');
     }
@@ -67,7 +77,7 @@ export default function RecordScreen() {
           onPress: () => {
             // Clear any recordings
             if (recordedUri) {
-              FileSystem.deleteAsync(recordedUri).catch(() => {});
+              FileSystem.deleteAsync(recordedUri).catch(() => { });
             }
             router.replace('../fake-calculator');
           },
@@ -77,10 +87,30 @@ export default function RecordScreen() {
     );
   };
 
-  const navigateToDetailedReport = () => {
+  const navigateToDetailedReport = async () => {
+    // If we haven't saved yet (e.g. auto-save failed), try again
+    let currentReportId = reportId;
+
+    if (recordedUri && !currentReportId) {
+      try {
+        const savedReport = await saveReport({
+          type: 'audio',
+          status: 'saved',
+          audioUri: recordedUri,
+        });
+        currentReportId = savedReport.id;
+      } catch (error) {
+        console.error('Error saving audio report:', error);
+        // Continue navigation even if save fails
+      }
+    }
+
     router.push({
       pathname: '../safety-check',
-      params: { audioUri: recordedUri || '' }
+      params: {
+        audioUri: recordedUri || '',
+        reportId: currentReportId || ''
+      }
     });
   };
 
@@ -97,24 +127,24 @@ export default function RecordScreen() {
       <View style={styles.content}>
         <Text style={styles.title}>Record something happening now</Text>
         <Text style={styles.subtitle}>You can describe what is happening in your own words</Text>
-        
+
         {/* Recording UI */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.recordingButton}
           onPress={isRecording ? stopRecording : startRecording}
-          disabled={!!recordedUri}
+          disabled={!!recordedUri && !isRecording}
         >
-          {recordedUri ? (
+          {recordedUri && !isRecording ? (
             <View style={styles.recordingSaved}>
               <Feather name="check-circle" size={48} color="#4CAF50" />
               <Text style={styles.recordingText}>Recording saved</Text>
             </View>
           ) : (
             <>
-              <Feather 
-                name={isRecording ? "mic" : "mic-off"} 
-                size={48} 
-                color={isRecording ? "#FF3B30" : "#8A4FFF"} 
+              <Feather
+                name={isRecording ? "mic" : "mic-off"}
+                size={48}
+                color={isRecording ? "#FF3B30" : "#8A4FFF"}
               />
               <Text style={styles.recordingText}>
                 {isRecording ? "Recording... Tap to stop" : "Tap to start recording"}
@@ -124,9 +154,9 @@ export default function RecordScreen() {
         </TouchableOpacity>
 
         {/* Playback and continue options */}
-        {recordedUri && (
+        {recordedUri && !isRecording && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.playButton}
               onPress={() => router.push({
                 pathname: './audio-player',
@@ -137,7 +167,7 @@ export default function RecordScreen() {
               <Text style={styles.playButtonText}>Listen</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.continueButton}
               onPress={navigateToDetailedReport}
             >
@@ -149,7 +179,7 @@ export default function RecordScreen() {
       </View>
 
       {/* Emergency exit button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.emergencyButton}
         onPress={handleEmergencyExit}
         accessibilityLabel="Emergency exit button"
@@ -160,8 +190,6 @@ export default function RecordScreen() {
     </View>
   );
 }
-
-// ...styles remain unchanged...
 
 const styles = StyleSheet.create({
   container: {
