@@ -28,16 +28,29 @@ export default function AudioReportItem({
 
   useEffect(() => {
     if (isPlaying && !player.playing && status?.isLoaded) {
-      player.play();
+      try {
+        player.play();
+      } catch (error) {
+        console.error('Error playing:', error);
+      }
     } else if (!isPlaying && player.playing) {
-      player.pause();
+      try {
+        player.pause();
+      } catch (error) {
+        console.error('Error pausing:', error);
+      }
     }
   }, [isPlaying, player, status]);
 
   useEffect(() => {
     return () => {
-      if (player.playing) {
-        player.pause();
+      try {
+        if (player && player.playing) {
+          player.pause();
+        }
+      } catch (error) {
+        // Player already released, ignore
+        console.log('Player cleanup skipped - already released');
       }
     };
   }, [player]);

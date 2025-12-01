@@ -1,10 +1,9 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-import { Collapsible } from '@/components/Collapsible';
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { Image } from 'expo-image';
+import { StyleSheet } from 'react-native';
 
 export default function HomeScreen() {
   return (
@@ -20,27 +19,11 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome, Msichana!</ThemedText>
         <HelloWave />
       </ThemedView>
-      <Collapsible title="You Are In Control">
+      <ThemedView style={styles.stepContainer}>
         <ThemedText>
-          You are in control of what you choose to share. Your safety and comfort are our top priority throughout this process.
+          This is your safe space. You can record incidents, document your feelings, or just take a moment for yourself.
         </ThemedText>
-      </Collapsible>
-      <Collapsible title="Your Choices Matter">
-        <ThemedText>
-          You can skip any question that makes you uncomfortable. There are no wrong answers here - only what you feel ready to share.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Safety First">
-        <ThemedText>
-          Remember, your safety comes first. At any time, you can exit discreetly using the emergency button.
-          {Platform.select({
-            ios: ' On iOS, shake your device',
-            android: ' On Android, press the emergency button',
-            web: ' Press F12 for help',
-          })}
-          {' '}if you need immediate assistance.
-        </ThemedText>
-      </Collapsible>
+      </ThemedView>
     </ParallaxScrollView>
   );
 }
@@ -50,6 +33,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  stepContainer: {
+    gap: 8,
+    marginBottom: 8,
   },
   reactLogo: {
     height: 178,

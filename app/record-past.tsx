@@ -1,9 +1,10 @@
+import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
-import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { saveReport } from '../services/storage';
 
 export default function RecordPastScreen() {
@@ -12,6 +13,31 @@ export default function RecordPastScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
+  const { enterDecoyMode } = useBackgroundRecording();
+
+  // Animation value for pulsing effect
+  const pulseScale = useSharedValue(1);
+
+  const pulseStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: pulseScale.value }],
+    };
+  });
+
+  useEffect(() => {
+    if (isRecording) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.1, { duration: 500 }),
+          withTiming(1, { duration: 500 })
+        ),
+        -1, // Infinite repeat
+        true // Reverse
+      );
+    } else {
+      pulseScale.value = withTiming(1);
+    }
+  }, [isRecording]);
 
   useEffect(() => {
     (async () => {
@@ -20,10 +46,7 @@ export default function RecordPastScreen() {
         Alert.alert('Permission to access microphone was denied');
       }
     })();
-    // Clean up on unmount
-    return () => {
-      audioRecorder.stop();
-    };
+    // No manual cleanup needed - expo-audio handles it
   }, []);
 
   const startRecording = async () => {
@@ -62,29 +85,41 @@ export default function RecordPastScreen() {
     }
   };
 
-  const handleEmergencyExit = () => {
-    Alert.alert(
-      'Exit immediately?',
-      'The app will close and your history will be cleared.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Exit Now',
-          style: 'destructive',
-          onPress: () => {
-            // Clear any recordings
-            if (recordedUri) {
-              FileSystem.deleteAsync(recordedUri).catch(() => { });
-            }
-            router.replace('./fake-calculator');
-          },
-        },
-      ],
-      { cancelable: false }
-    );
+  const handleEmergencyExit = async () => {
+    // 1. Stop recording if active
+    if (isRecording) {
+      try {
+        await audioRecorder.stop();
+        const uri = audioRecorder.uri ?? null;
+
+        // 2. Save the recording
+        if (uri) {
+          await saveReport({
+            type: 'audio',
+            status: 'saved',
+            audioUri: uri,
+          });
+          console.log('Emergency exit: Recording saved');
+        }
+      } catch (error) {
+        console.error('Error saving on emergency exit:', error);
+      }
+    } else if (recordedUri && !reportId) {
+      // If stopped but not yet saved (rare race condition), try to save
+      try {
+        await saveReport({
+          type: 'audio',
+          status: 'saved',
+          audioUri: recordedUri,
+        });
+      } catch (error) {
+        console.error('Error saving existing recording on exit:', error);
+      }
+    }
+
+    // 3. Enter decoy mode and navigate
+    enterDecoyMode();
+    router.replace('./fake-calculator');
   };
 
   const navigateToDetailedReport = async () => {
@@ -130,27 +165,31 @@ export default function RecordPastScreen() {
 
         {/* Recording UI */}
         <TouchableOpacity
-          style={styles.recordingButton}
           onPress={isRecording ? stopRecording : startRecording}
           disabled={!!recordedUri && !isRecording}
+          style={styles.buttonContainer}
         >
-          {recordedUri && !isRecording ? (
-            <View style={styles.recordingSaved}>
-              <Feather name="check-circle" size={48} color="#4CAF50" />
-              <Text style={styles.recordingText}>Recording saved</Text>
-            </View>
-          ) : (
-            <>
+          <Animated.View style={[styles.recordingButton, isRecording && pulseStyle]}>
+            {recordedUri && !isRecording ? (
+              <View style={styles.recordingSaved}>
+                <Feather name="check-circle" size={48} color="#4CAF50" />
+              </View>
+            ) : (
               <Feather
                 name={isRecording ? "mic" : "mic-off"}
                 size={48}
-                color={isRecording ? "#FF3B30" : "#8A4FFF"}
+                color={isRecording ? "white" : "#8A4FFF"}
               />
-              <Text style={styles.recordingText}>
-                {isRecording ? "Recording... Tap to stop" : "Tap to start recording"}
-              </Text>
-            </>
-          )}
+            )}
+          </Animated.View>
+
+          <Text style={styles.recordingText}>
+            {recordedUri && !isRecording
+              ? "Recording saved"
+              : isRecording
+                ? "Recording... Tap to stop"
+                : "Tap to start recording"}
+          </Text>
         </TouchableOpacity>
 
         {/* Playback and continue options */}
@@ -228,22 +267,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: '80%',
   },
+  buttonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   recordingButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#f0e6ff', // Light purple background
     borderWidth: 2,
     borderColor: '#8A4FFF',
-    borderRadius: 20,
-    borderStyle: 'dashed',
-    width: '80%',
+    marginBottom: 16,
+    shadowColor: "#8A4FFF",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
   recordingSaved: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   recordingText: {
-    marginTop: 16,
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
