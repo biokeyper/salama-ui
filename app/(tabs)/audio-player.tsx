@@ -2,7 +2,7 @@ import AudioReportItem from '@/components/AudioReportItem';
 import { deleteReport, getAllReports, updateReportStatus } from '@/services/storage';
 import { Report } from '@/types/report';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {

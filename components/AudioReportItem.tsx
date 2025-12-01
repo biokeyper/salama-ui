@@ -166,7 +166,9 @@ export default function AudioReportItem({
   };
 
   const position = status?.currentTime || 0;
-  const duration = status?.duration || 0;
+  // Use stored duration if player duration is not yet available (lazy loading)
+  // Converting milliseconds to seconds if needed, but assuming stored in seconds based on type definition
+  const duration = status?.duration || (report.audioDuration ? report.audioDuration / 1000 : 0) || 0;
   const progress = duration > 0 ? (position / duration) * 100 : 0;
 
   return (

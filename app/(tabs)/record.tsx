@@ -14,6 +14,7 @@ export default function RecordScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
+  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Animation value for pulsing effect
@@ -26,10 +27,21 @@ export default function RecordScreen() {
   });
 
   useEffect(() => {
+    (async () => {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
+        Alert.alert('Permission needed', 'Please grant microphone permission to record audio.');
+      }
+    })();
+    // No manual cleanup needed - expo-audio handles it
+  }, []);
+
+  // Pulse animation when recording
+  useEffect(() => {
     if (isRecording) {
       pulseScale.value = withRepeat(
         withSequence(
-          withTiming(1.1, { duration: 500 }),
+          withTiming(1.2, { duration: 500 }),
           withTiming(1, { duration: 500 })
         ),
         -1, // Infinite repeat
@@ -40,20 +52,11 @@ export default function RecordScreen() {
     }
   }, [isRecording]);
 
-  useEffect(() => {
-    (async () => {
-      const status = await AudioModule.requestRecordingPermissionsAsync();
-      if (!status.granted) {
-        Alert.alert('Permission to access microphone was denied');
-      }
-    })();
-    // No manual cleanup needed - expo-audio handles it
-  }, []);
-
   const startRecording = async () => {
     try {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
+      setRecordingStartTime(Date.now());
       setIsRecording(true);
       setReportId(null); // Reset report ID for new recording
     } catch (err) {
@@ -64,10 +67,13 @@ export default function RecordScreen() {
   const stopRecording = async () => {
     try {
       await audioRecorder.stop();
+      const endTime = Date.now();
+      const durationMs = recordingStartTime ? (endTime - recordingStartTime) : 0;
+
       setIsRecording(false);
       const uri = audioRecorder.uri ?? null;
       setRecordedUri(uri);
-      console.log('Recording saved to:', uri);
+      console.log('Recording saved to:', uri, 'Duration:', durationMs);
 
       if (uri) {
         try {
@@ -75,6 +81,7 @@ export default function RecordScreen() {
             type: 'audio',
             status: 'saved',
             audioUri: uri,
+            audioDuration: durationMs, // Save duration in milliseconds
           });
           setReportId(savedReport.id);
         } catch (error) {

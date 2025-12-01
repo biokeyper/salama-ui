@@ -17,6 +17,7 @@ export default function FakeCalculatorScreen() {
   const [display, setDisplay] = useState('');
   const [showCursor, setShowCursor] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const router = useRouter();
   const { isInDecoyMode, exitDecoyMode, setBackgroundRecordingUri } = useBackgroundRecording();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -71,6 +72,7 @@ export default function FakeCalculatorScreen() {
 
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
+      setRecordingStartTime(Date.now());
       setIsRecording(true);
       console.log('Background recording started');
     } catch (error) {
@@ -83,6 +85,9 @@ export default function FakeCalculatorScreen() {
 
     try {
       await audioRecorder.stop();
+      const endTime = Date.now();
+      const durationMs = recordingStartTime ? (endTime - recordingStartTime) : 0;
+
       const uri = audioRecorder.uri ?? null;
       setIsRecording(false);
 
@@ -92,6 +97,7 @@ export default function FakeCalculatorScreen() {
           type: 'audio',
           status: 'saved',
           audioUri: uri,
+          audioDuration: durationMs,
         });
         setBackgroundRecordingUri(uri);
         console.log('Background recording saved:', savedReport.id);
@@ -132,10 +138,6 @@ export default function FakeCalculatorScreen() {
   };
 
   const handleClearPressOut = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
   };
 
   const displayText = display || '0';

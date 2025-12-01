@@ -76,6 +76,8 @@ You can start developing by editing the files inside the **app** directory. This
 - **Text Reports Tab:** Fixed crash when switching to text reports tab with improved conditional rendering
 - **Audio Playback:** Resolved "already released" errors with defensive null checks and try-catch blocks
 - **SafeAreaView Deprecation:** Updated all screens to use `react-native-safe-area-context` instead of deprecated React Native SafeAreaView
+- **Audio Duration Display:** Fixed "0:00" issue by tracking recording duration and adding fallback logic
+- **FileSystem Deprecation:** Resolved `deleteAsync` error by migrating to `expo-file-system/legacy`
 
 ### Improvements
 - **Library Features Restored:** Re-implemented Audio and Text tabs with proper filtering logic
