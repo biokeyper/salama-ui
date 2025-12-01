@@ -1,23 +1,44 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
+import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
-import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
-import * as FileSystem from 'expo-file-system';
-import { saveReport } from '@/services/storage';
-// import { blue } from 'react-native-reanimated/lib/typescript/Colors';
-
-// export const unstable_settings = {
-//   tabBarIcon: ({ color, size }) => (
-//     <Ionicons name="mic" color={color} size={size} />
-//   ),
-// };
+import { useEffect, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { saveReport } from '../../services/storage';
 
 export default function RecordScreen() {
   const router = useRouter();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
+  const { enterDecoyMode } = useBackgroundRecording();
+
+  // Animation value for pulsing effect
+  const pulseScale = useSharedValue(1);
+
+  const pulseStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: pulseScale.value }],
+    };
+  });
+
+  useEffect(() => {
+    if (isRecording) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.1, { duration: 500 }),
+          withTiming(1, { duration: 500 })
+        ),
+        -1, // Infinite repeat
+        true // Reverse
+      );
+    } else {
+      pulseScale.value = withTiming(1);
+    }
+  }, [isRecording]);
 
   useEffect(() => {
     (async () => {
@@ -26,10 +47,7 @@ export default function RecordScreen() {
         Alert.alert('Permission to access microphone was denied');
       }
     })();
-    // Clean up on unmount
-    return () => {
-      audioRecorder.stop();
-    };
+    // No manual cleanup needed - expo-audio handles it
   }, []);
 
   const startRecording = async () => {
@@ -37,6 +55,7 @@ export default function RecordScreen() {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
       setIsRecording(true);
+      setReportId(null); // Reset report ID for new recording
     } catch (err) {
       Alert.alert('Error', 'Failed to start recording');
     }
@@ -46,125 +65,161 @@ export default function RecordScreen() {
     try {
       await audioRecorder.stop();
       setIsRecording(false);
-      setRecordedUri(audioRecorder.uri ?? null);
-      console.log('Recording saved to:', audioRecorder.uri);
+      const uri = audioRecorder.uri ?? null;
+      setRecordedUri(uri);
+      console.log('Recording saved to:', uri);
+
+      if (uri) {
+        try {
+          const savedReport = await saveReport({
+            type: 'audio',
+            status: 'saved',
+            audioUri: uri,
+          });
+          setReportId(savedReport.id);
+        } catch (error) {
+          console.error('Error auto-saving audio report:', error);
+        }
+      }
     } catch (err) {
       Alert.alert('Error', 'Failed to save recording');
     }
   };
 
-  const handleEmergencyExit = () => {
-    Alert.alert(
-      'Exit immediately?',
-      'The app will close and your history will be cleared.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Exit Now',
-          style: 'destructive',
-          onPress: () => {
-            // Clear any recordings
-            if (recordedUri) {
-              FileSystem.deleteAsync(recordedUri).catch(() => {});
-            }
-            router.replace('../fake-calculator');
-          },
-        },
-      ],
-      { cancelable: false }
-    );
-  };
+  const handleEmergencyExit = async () => {
+    // 1. Stop recording if active
+    if (isRecording) {
+      try {
+        await audioRecorder.stop();
+        const uri = audioRecorder.uri ?? null;
 
-  const navigateToDetailedReport = async () => {
-    // Save audio report as draft if recording exists
-    if (recordedUri) {
+        // 2. Save the recording
+        if (uri) {
+          await saveReport({
+            type: 'audio',
+            status: 'saved',
+            audioUri: uri,
+          });
+          console.log('Emergency exit: Recording saved');
+        }
+      } catch (error) {
+        console.error('Error saving on emergency exit:', error);
+      }
+    } else if (recordedUri && !reportId) {
+      // If stopped but not yet saved (rare race condition), try to save
       try {
         await saveReport({
           type: 'audio',
-          status: 'draft',
+          status: 'saved',
           audioUri: recordedUri,
         });
+      } catch (error) {
+        console.error('Error saving existing recording on exit:', error);
+      }
+    }
+
+    // 3. Enter decoy mode and navigate
+    try {
+      enterDecoyMode();
+      router.replace('/fake-calculator');
+    } catch (error) {
+      console.error('Error navigating to decoy mode:', error);
+      // Fallback: try to navigate even if context update fails or something else happens
+      router.replace('/fake-calculator');
+    }
+  };
+
+  const navigateToDetailedReport = async () => {
+    // If we haven't saved yet (e.g. auto-save failed), try again
+    let currentReportId = reportId;
+
+    if (recordedUri && !currentReportId) {
+      try {
+        const savedReport = await saveReport({
+          type: 'audio',
+          status: 'saved',
+          audioUri: recordedUri,
+        });
+        currentReportId = savedReport.id;
       } catch (error) {
         console.error('Error saving audio report:', error);
         // Continue navigation even if save fails
       }
     }
-    
+
     router.push({
       pathname: '../safety-check',
-      params: { audioUri: recordedUri || '' }
+      params: {
+        audioUri: recordedUri || '',
+        reportId: currentReportId || ''
+      }
     });
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header with skip option */}
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={navigateToDetailedReport}>
+        <TouchableOpacity onPress={navigateToDetailedReport} style={styles.skipButton}>
+          <Feather name="edit-3" size={16} color="#8A4FFF" />
           <Text style={styles.skipText}>Skip and type instead</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Main content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Record something happening now</Text>
-        <Text style={styles.subtitle}>You can describe what is happening in your own words</Text>
-        
-        {/* Recording UI */}
-        <TouchableOpacity 
-          style={styles.recordingButton}
-          onPress={isRecording ? stopRecording : startRecording}
-          disabled={!!recordedUri}
-        >
-          {recordedUri ? (
+      <Text style={styles.title}>Record something happening now</Text>
+      <Text style={styles.subtitle}>You can describe what is happening in your own words</Text>
+
+      <TouchableOpacity
+        onPress={isRecording ? stopRecording : startRecording}
+        disabled={!!recordedUri && !isRecording}
+        style={styles.buttonContainer}
+      >
+        <Animated.View style={[styles.recordingButton, isRecording && pulseStyle]}>
+          {recordedUri && !isRecording ? (
             <View style={styles.recordingSaved}>
               <Feather name="check-circle" size={48} color="#4CAF50" />
-              <Text style={styles.recordingText}>Recording saved</Text>
             </View>
           ) : (
-            <>
-              <Feather 
-                name={isRecording ? "mic" : "mic-off"} 
-                size={48} 
-                color={isRecording ? "#FF3B30" : "#8A4FFF"} 
-              />
-              <Text style={styles.recordingText}>
-                {isRecording ? "Recording... Tap to stop" : "Tap to start recording"}
-              </Text>
-            </>
+            <Feather
+              name={isRecording ? "mic" : "mic-off"}
+              size={48}
+              color={isRecording ? "white" : "#8A4FFF"}
+            />
           )}
-        </TouchableOpacity>
+        </Animated.View>
 
-        {/* Playback and continue options */}
-        {recordedUri && (
-          <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              style={styles.playButton}
-              onPress={() => router.push({
-                pathname: './audio-player',
-                params: { audioUri: recordedUri || '' }
-              })}
-            >
-              <MaterialIcons name="play-arrow" size={24} color="white" />
-              <Text style={styles.playButtonText}>Listen</Text>
-            </TouchableOpacity>
+        <Text style={styles.recordingText}>
+          {recordedUri && !isRecording
+            ? "Recording saved"
+            : isRecording
+              ? "Recording... Tap to stop"
+              : "Tap to start recording"}
+        </Text>
+      </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.continueButton}
-              onPress={navigateToDetailedReport}
-            >
-              <Text style={styles.continueButtonText}>Continue</Text>
-              <MaterialIcons name="arrow-forward" size={24} color="#8A4FFF" />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+      {recordedUri && !isRecording && (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.playButton}
+            onPress={() => router.push({
+              pathname: './audio-player',
+              params: { audioUri: recordedUri || '' }
+            })}
+          >
+            <MaterialIcons name="play-arrow" size={24} color="white" />
+            <Text style={styles.playButtonText}>Listen</Text>
+          </TouchableOpacity>
 
-      {/* Emergency exit button */}
-      <TouchableOpacity 
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={navigateToDetailedReport}
+          >
+            <Text style={styles.continueButtonText}>Continue</Text>
+            <MaterialIcons name="arrow-forward" size={24} color="#8A4FFF" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <TouchableOpacity
         style={styles.emergencyButton}
         onPress={handleEmergencyExit}
         accessibilityLabel="Emergency exit button"
@@ -172,11 +227,9 @@ export default function RecordScreen() {
       >
         <Text style={styles.emergencyText}>EXIT NOW</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
-
-// ...styles remain unchanged...
 
 const styles = StyleSheet.create({
   container: {
@@ -185,21 +238,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
-    width: '100%',
     alignItems: 'flex-end',
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 20,
+    paddingVertical: 16,
+  },
+  skipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F0FF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E0D0FF',
   },
   skipText: {
     color: '#8A4FFF',
-    fontSize: 16,
-    textDecorationLine: 'underline',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 100,
+    fontSize: 14,
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,
@@ -207,6 +263,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
     textAlign: 'center',
+    marginTop: 20,
   },
   subtitle: {
     fontSize: 16,
@@ -214,23 +271,36 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     textAlign: 'center',
     maxWidth: '80%',
+    alignSelf: 'center',
+  },
+  buttonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   recordingButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#f0e6ff', // Light purple background
     borderWidth: 2,
     borderColor: '#8A4FFF',
-    borderRadius: 20,
-    borderStyle: 'dashed',
-    width: '80%',
+    marginBottom: 16,
+    shadowColor: "#8A4FFF",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
   recordingSaved: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   recordingText: {
-    marginTop: 16,
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
@@ -239,6 +309,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 40,
     gap: 20,
+    justifyContent: 'center',
   },
   playButton: {
     flexDirection: 'row',

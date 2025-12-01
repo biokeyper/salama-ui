@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Report } from '@/types/report';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { Report } from '@/types/report';
+import { useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface AudioReportItemProps {
   report: Report;
@@ -23,31 +23,72 @@ export default function AudioReportItem({
   onResubmit,
   onPlayingChange,
 }: AudioReportItemProps) {
-  const player = useAudioPlayer(report.audioUri || null, { updateInterval: 100 });
+  // Early return if no audio URI - this shouldn't render in the first place
+  if (!report.audioUri) {
+    return null;
+  }
+
+  const player = useAudioPlayer(report.audioUri, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
 
   useEffect(() => {
-    if (isPlaying && !player.playing && status?.isLoaded) {
-      player.play();
-    } else if (!isPlaying && player.playing) {
-      player.pause();
-    }
-  }, [isPlaying, player, status]);
+    if (!player || !report.audioUri) return;
 
+    if (isPlaying) {
+      if (!player.playing) {
+        try {
+          player.play();
+        } catch (err) {
+          console.error('Play failed:', err);
+        }
+      }
+    } else {
+      if (player.playing) {
+        try {
+          player.pause();
+        } catch (err) {
+          // Ignore - player might be released
+        }
+      }
+    }
+  }, [isPlaying, player, report.audioUri]);
+
+  // Auto-stop when playback finishes
+  useEffect(() => {
+    if (!player) return;
+
+    if (status?.currentTime && status?.duration && status.currentTime >= status.duration) {
+      try {
+        player.pause();
+        player.seekTo(0);
+        onPlayingChange(null);
+      } catch (err) {
+        onPlayingChange(null);
+      }
+    }
+  }, [status?.currentTime, status?.duration, player, onPlayingChange]);
+
+  // Cleanup on unmount - but don't manually release, expo-audio handles it
   useEffect(() => {
     return () => {
-      if (player.playing) {
-        player.pause();
+      if (!player) return;
+      try {
+        if (player.playing) {
+          player.pause();
+        }
+      } catch (err) {
+        // Player already released, ignore
       }
     };
   }, [player]);
 
   const handleStopClick = async () => {
+    if (!player) return;
     try {
       if (player.playing) {
         player.pause();
       }
-      await player.seekTo(0);
+      player.seekTo(0);
       onPlayingChange(null);
     } catch (error) {
       console.error('Stop error:', error);
@@ -55,33 +96,25 @@ export default function AudioReportItem({
     }
   };
 
-export default function AudioReportItem({
-  report,
-  isPlaying,
-  onPlayPause,
-  onStop,
-  onDelete,
-  onResubmit,
-  onPlayingChange,
-}: AudioReportItemProps) {
-  const player = useAudioPlayer(report.audioUri || null, { updateInterval: 100 });
-  const status = useAudioPlayerStatus(player);
-
-  useEffect(() => {
-    if (isPlaying && !player.playing && status?.isLoaded) {
-      player.play();
-    } else if (!isPlaying && player.playing) {
-      player.pause();
+  const seekBackward = () => {
+    if (!player || !status) return;
+    try {
+      const newTime = Math.max(0, status.currentTime - 10);
+      player.seekTo(newTime);
+    } catch (err) {
+      console.error('Seek backward failed:', err);
     }
-  }, [isPlaying, player, status]);
+  };
 
-  useEffect(() => {
-    return () => {
-      if (player.playing) {
-        player.pause();
-      }
-    };
-  }, [player]);
+  const seekForward = () => {
+    if (!player || !status) return;
+    try {
+      const newTime = Math.min(status.duration, status.currentTime + 10);
+      player.seekTo(newTime);
+    } catch (err) {
+      console.error('Seek forward failed:', err);
+    }
+  };
 
   const formatTime = (seconds: number | null | undefined): string => {
     if (seconds === null || seconds === undefined || isNaN(seconds) || seconds < 0) return '0:00';
@@ -143,9 +176,9 @@ export default function AudioReportItem({
         <View style={styles.reportInfo}>
           <Text style={styles.reportDate}>{formatDate(report.createdAt)}</Text>
           <View style={styles.statusContainer}>
-            <View 
+            <View
               style={[
-                styles.statusBadge, 
+                styles.statusBadge,
                 { backgroundColor: getStatusColor(report.status) }
               ]}
             >
@@ -163,13 +196,17 @@ export default function AudioReportItem({
 
       {/* Playback Controls */}
       <View style={styles.controlsContainer}>
+        <TouchableOpacity onPress={seekBackward} style={styles.seekButton}>
+          <MaterialIcons name="replay-10" size={28} color="#666" />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.controlButton}
           onPress={() => onPlayPause(report)}
         >
           <MaterialIcons
             name={isPlaying ? "pause-circle-filled" : "play-circle-filled"}
-            size={40}
+            size={48}
             color="#8A4FFF"
           />
         </TouchableOpacity>
@@ -178,14 +215,18 @@ export default function AudioReportItem({
           style={styles.controlButton}
           onPress={handleStopClick}
         >
-          <MaterialIcons name="stop-circle" size={40} color="#666" />
+          <MaterialIcons name="stop-circle" size={48} color="#666" />
         </TouchableOpacity>
 
-        <View style={styles.timeInfo}>
-          <Text style={styles.timeText}>
-            {formatTime(position)} / {formatTime(duration > 0 ? duration : null)}
-          </Text>
-        </View>
+        <TouchableOpacity onPress={seekForward} style={styles.seekButton}>
+          <MaterialIcons name="forward-10" size={28} color="#666" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.timeInfoContainer}>
+        <Text style={styles.timeText}>
+          {formatTime(position)} / {formatTime(duration > 0 ? duration : null)}
+        </Text>
       </View>
 
       {/* Progress Bar */}
@@ -270,13 +311,19 @@ const styles = StyleSheet.create({
   controlsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    marginBottom: 8,
+    gap: 12,
   },
   controlButton: {
-    marginRight: 12,
+    // Main play/pause button
   },
-  timeInfo: {
-    flex: 1,
+  seekButton: {
+    padding: 8,
+  },
+  timeInfoContainer: {
+    alignItems: 'center',
+    marginBottom: 8,
   },
   timeText: {
     fontSize: 12,
@@ -340,4 +387,3 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
 });
-

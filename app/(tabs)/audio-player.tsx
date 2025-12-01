@@ -1,47 +1,43 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  SafeAreaView, 
-  Platform, 
-  Alert, 
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { MaterialIcons, Feather } from '@expo/vector-icons';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { getAllReports, deleteReport, updateReportStatus } from '@/services/storage';
-import { Report } from '@/types/report';
-import * as FileSystem from 'expo-file-system';
 import AudioReportItem from '@/components/AudioReportItem';
+import { deleteReport, getAllReports, updateReportStatus } from '@/services/storage';
+import { Report } from '@/types/report';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function AudioPlayerScreen() {
+export default function LibraryScreen() {
   const router = useRouter();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingReportId, setPlayingReportId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'audio' | 'text'>('audio');
 
   // Load reports on mount and refresh
   const loadReports = async () => {
     try {
       const allReports = await getAllReports();
-      // Filter to only show audio or mixed reports
-      const audioReports = allReports.filter(
-        r => (r.type === 'audio' || r.type === 'mixed') && r.audioUri
-      );
       // Sort by most recent first
-      audioReports.sort((a, b) => 
+      allReports.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      setReports(audioReports);
+      setReports(allReports);
     } catch (error) {
       console.error('Error loading reports:', error);
-      Alert.alert('Error', 'Failed to load audio reports');
+      Alert.alert('Error', 'Failed to load reports');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -52,6 +48,15 @@ export default function AudioPlayerScreen() {
     loadReports();
   }, []);
 
+  const filteredReports = useMemo(() => {
+    return reports.filter(r => {
+      if (activeTab === 'audio') {
+        return (r.type === 'audio' || r.type === 'mixed') && r.audioUri;
+      } else {
+        return r.type === 'text' || (r.type === 'mixed' && r.textContent);
+      }
+    });
+  }, [reports, activeTab]);
 
   const handlePlayPause = (report: Report) => {
     // If clicking on a different report, stop the currently playing one
@@ -83,7 +88,7 @@ export default function AudioPlayerScreen() {
   const handleDelete = (report: Report) => {
     Alert.alert(
       'Delete Report',
-      'Are you sure you want to delete this audio report? This action cannot be undone.',
+      'Are you sure you want to delete this report? This action cannot be undone.',
       [
         {
           text: 'Cancel',
@@ -98,7 +103,7 @@ export default function AudioPlayerScreen() {
               if (playingReportId === report.id) {
                 setPlayingReportId(null);
               }
-              
+
               // Delete audio file if it exists
               if (report.audioUri) {
                 try {
@@ -107,13 +112,13 @@ export default function AudioPlayerScreen() {
                   console.error('Error deleting audio file:', error);
                 }
               }
-              
+
               // Delete report from storage
               await deleteReport(report.id);
-              
+
               // Reload reports
               await loadReports();
-              
+
               Alert.alert('Success', 'Report deleted successfully');
             } catch (error) {
               console.error('Error deleting report:', error);
@@ -151,13 +156,23 @@ export default function AudioPlayerScreen() {
     );
   };
 
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#8A4FFF" />
-          <Text style={styles.loadingText}>Loading audio reports...</Text>
+          <Text style={styles.loadingText}>Loading reports...</Text>
         </View>
       </SafeAreaView>
     );
@@ -171,8 +186,24 @@ export default function AudioPlayerScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={24} color="#8A4FFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Audio Reports</Text>
+          <Text style={styles.headerTitle}>Library</Text>
           <View style={styles.placeholder} />
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'audio' && styles.activeTab]}
+            onPress={() => setActiveTab('audio')}
+          >
+            <Text style={[styles.tabText, activeTab === 'audio' && styles.activeTabText]}>Audio</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'text' && styles.activeTab]}
+            onPress={() => setActiveTab('text')}
+          >
+            <Text style={[styles.tabText, activeTab === 'text' && styles.activeTabText]}>Text Reports</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Reports List */}
@@ -182,25 +213,54 @@ export default function AudioPlayerScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={loadReports} />
           }
         >
-          {reports.length === 0 ? (
+          {filteredReports.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Feather name="mic-off" size={64} color="#CCC" />
-              <Text style={styles.emptyText}>No audio reports found</Text>
-              <Text style={styles.emptySubtext}>Record an incident to see it here</Text>
+              <Feather name={activeTab === 'audio' ? "mic-off" : "file-text"} size={64} color="#CCC" />
+              <Text style={styles.emptyText}>No {activeTab} reports found</Text>
+              <Text style={styles.emptySubtext}>
+                {activeTab === 'audio' ? "Record an incident to see it here" : "Create a text report to see it here"}
+              </Text>
             </View>
           ) : (
-            reports.map((report) => (
-              <AudioReportItem
-                key={report.id}
-                report={report}
-                isPlaying={playingReportId === report.id}
-                onPlayPause={handlePlayPause}
-                onStop={handleStop}
-                onDelete={handleDelete}
-                onResubmit={handleResubmit}
-                onPlayingChange={setPlayingReportId}
-              />
-            ))
+            <>
+              {activeTab === 'audio' ? (
+                filteredReports.map((report) => (
+                  <AudioReportItem
+                    key={report.id}
+                    report={report}
+                    isPlaying={playingReportId === report.id}
+                    onPlayPause={handlePlayPause}
+                    onStop={handleStop}
+                    onDelete={handleDelete}
+                    onResubmit={handleResubmit}
+                    onPlayingChange={setPlayingReportId}
+                  />
+                ))
+              ) : (
+                filteredReports.map((report) => (
+                  <View key={report.id} style={styles.textReportItem}>
+                    <View style={styles.textReportHeader}>
+                      <Text style={styles.textReportDate}>{formatDate(report.createdAt)}</Text>
+                      <TouchableOpacity onPress={() => handleDelete(report)}>
+                        <MaterialIcons name="delete-outline" size={24} color="#FF3B30" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.textReportContent} numberOfLines={3}>
+                      {report.textContent || 'No content'}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.viewButton}
+                      onPress={() => {
+                        // Navigate to detail view (to be implemented)
+                        Alert.alert('Report Details', report.textContent || 'No content');
+                      }}
+                    >
+                      <Text style={styles.viewButtonText}>View Full Report</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </>
           )}
         </ScrollView>
       </View>
@@ -247,6 +307,29 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
+  tabContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  activeTab: {
+    backgroundColor: '#8A4FFF',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#fff',
+  },
   scrollView: {
     flex: 1,
   },
@@ -266,5 +349,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     marginTop: 8,
+  },
+  textReportItem: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  textReportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  textReportDate: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  textReportContent: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  viewButton: {
+    alignSelf: 'flex-start',
+  },
+  viewButtonText: {
+    color: '#8A4FFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

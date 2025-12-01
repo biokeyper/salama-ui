@@ -68,6 +68,23 @@ You can start developing by editing the files inside the **app** directory. This
 
 ---
 
+## Recent Updates (December 2025)
+
+### Bug Fixes
+- **Emergency Exit Navigation:** Fixed crash when pressing "EXIT NOW" button - now correctly saves recording and navigates to fake calculator
+- **Library Screen Stability:** Resolved crashes when loading audio reports by implementing lazy-loading for audio players
+- **Text Reports Tab:** Fixed crash when switching to text reports tab with improved conditional rendering
+- **Audio Playback:** Resolved "already released" errors with defensive null checks and try-catch blocks
+- **SafeAreaView Deprecation:** Updated all screens to use `react-native-safe-area-context` instead of deprecated React Native SafeAreaView
+
+### Improvements
+- **Library Features Restored:** Re-implemented Audio and Text tabs with proper filtering logic
+- **Audio Player Enhancements:** Audio now plays immediately without requiring Stop button first
+- **Error Handling:** Added comprehensive error handling for audio player lifecycle methods
+- **Code Stability:** Improved resource management and cleanup in audio components
+
+---
+
 ## Technical Stack
 
 - **Expo SDK:** 54.0.25
