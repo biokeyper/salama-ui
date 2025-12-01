@@ -51,8 +51,9 @@ You can start developing by editing the files inside the **app** directory. This
 ### Audio Recording & Playback
 - **Real-time recording:** Record incidents as they happen with high-quality audio capture
 - **Past event recording:** Document historical incidents with voice narration
-- **Audio playback:** Built-in audio player with play/pause controls, progress tracking, and time display
-- **Flexible input:** Users can choose between audio recording or text input at any point
+- **Library:** Dedicated tab to manage and filter reports by Audio or Text type
+- **Audio playback:** Built-in player with auto-stop, seek controls (+/- 10s), and progress tracking
+- **Flexible input:** Prominent "Skip and type instead" option for users who prefer text
 
 ### Safety Features
 - **Emergency exit:** Quick exit button that closes the app and clears history
@@ -62,7 +63,7 @@ You can start developing by editing the files inside the **app** directory. This
 
 ### Reporting Flows
 - **Multi-step reporting:** Guided flow from recording/input to detailed report
-- **Voice or text input:** Flexible documentation methods
+- **Voice or text input:** Flexible documentation methods with dedicated Library tabs
 - **Detailed reports:** Comprehensive incident documentation with metadata
 
 ---
