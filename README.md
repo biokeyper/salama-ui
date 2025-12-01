@@ -42,6 +42,27 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+---
+
+## Features
+
+### Audio Recording & Playback
+- **Real-time recording:** Record incidents as they happen with high-quality audio capture
+- **Past event recording:** Document historical incidents with voice narration
+- **Audio playback:** Built-in audio player with play/pause controls, progress tracking, and time display
+- **Flexible input:** Users can choose between audio recording or text input at any point
+
+### Safety Features
+- **Emergency exit:** Quick exit button that closes the app and clears history
+- **Fake calculator screen:** Discreet decoy screen for emergency situations
+- **Safety check:** Pre-report safety assessment before detailed documentation
+- **Trauma-informed design:** User-controlled experience with skip options and supportive language
+
+### Reporting Flows
+- **Multi-step reporting:** Guided flow from recording/input to detailed report
+- **Voice or text input:** Flexible documentation methods
 - **Detailed reports:** Comprehensive incident documentation with metadata
 
 ---

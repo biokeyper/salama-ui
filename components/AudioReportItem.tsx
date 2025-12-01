@@ -1,8 +1,8 @@
-import { Report } from '@/types/report';
+import { useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Report } from '@/types/report';
 
 interface AudioReportItemProps {
   report: Report;
@@ -28,29 +28,16 @@ export default function AudioReportItem({
 
   useEffect(() => {
     if (isPlaying && !player.playing && status?.isLoaded) {
-      try {
-        player.play();
-      } catch (error) {
-        console.error('Error playing:', error);
-      }
+      player.play();
     } else if (!isPlaying && player.playing) {
-      try {
-        player.pause();
-      } catch (error) {
-        console.error('Error pausing:', error);
-      }
+      player.pause();
     }
   }, [isPlaying, player, status]);
 
   useEffect(() => {
     return () => {
-      try {
-        if (player && player.playing) {
-          player.pause();
-        }
-      } catch (error) {
-        // Player already released, ignore
-        console.log('Player cleanup skipped - already released');
+      if (player.playing) {
+        player.pause();
       }
     };
   }, [player]);
@@ -67,6 +54,34 @@ export default function AudioReportItem({
       onPlayingChange(null);
     }
   };
+
+export default function AudioReportItem({
+  report,
+  isPlaying,
+  onPlayPause,
+  onStop,
+  onDelete,
+  onResubmit,
+  onPlayingChange,
+}: AudioReportItemProps) {
+  const player = useAudioPlayer(report.audioUri || null, { updateInterval: 100 });
+  const status = useAudioPlayerStatus(player);
+
+  useEffect(() => {
+    if (isPlaying && !player.playing && status?.isLoaded) {
+      player.play();
+    } else if (!isPlaying && player.playing) {
+      player.pause();
+    }
+  }, [isPlaying, player, status]);
+
+  useEffect(() => {
+    return () => {
+      if (player.playing) {
+        player.pause();
+      }
+    };
+  }, [player]);
 
   const formatTime = (seconds: number | null | undefined): string => {
     if (seconds === null || seconds === undefined || isNaN(seconds) || seconds < 0) return '0:00';
@@ -128,9 +143,9 @@ export default function AudioReportItem({
         <View style={styles.reportInfo}>
           <Text style={styles.reportDate}>{formatDate(report.createdAt)}</Text>
           <View style={styles.statusContainer}>
-            <View
+            <View 
               style={[
-                styles.statusBadge,
+                styles.statusBadge, 
                 { backgroundColor: getStatusColor(report.status) }
               ]}
             >
@@ -325,3 +340,4 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
 });
+

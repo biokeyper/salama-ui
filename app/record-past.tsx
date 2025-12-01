@@ -1,43 +1,16 @@
-import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { saveReport } from '../services/storage';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
+import * as FileSystem from 'expo-file-system';
+import { saveReport } from '@/services/storage';
 
 export default function RecordPastScreen() {
   const router = useRouter();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [reportId, setReportId] = useState<string | null>(null);
-  const { enterDecoyMode } = useBackgroundRecording();
-
-  // Animation value for pulsing effect
-  const pulseScale = useSharedValue(1);
-
-  const pulseStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: pulseScale.value }],
-    };
-  });
-
-  useEffect(() => {
-    if (isRecording) {
-      pulseScale.value = withRepeat(
-        withSequence(
-          withTiming(1.1, { duration: 500 }),
-          withTiming(1, { duration: 500 })
-        ),
-        -1, // Infinite repeat
-        true // Reverse
-      );
-    } else {
-      pulseScale.value = withTiming(1);
-    }
-  }, [isRecording]);
 
   useEffect(() => {
     (async () => {
@@ -46,7 +19,10 @@ export default function RecordPastScreen() {
         Alert.alert('Permission to access microphone was denied');
       }
     })();
-    // No manual cleanup needed - expo-audio handles it
+    // Clean up on unmount
+    return () => {
+      audioRecorder.stop();
+    };
   }, []);
 
   const startRecording = async () => {
@@ -54,7 +30,6 @@ export default function RecordPastScreen() {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
       setIsRecording(true);
-      setReportId(null); // Reset report ID for new recording
     } catch (err) {
       Alert.alert('Error', 'Failed to start recording');
     }
@@ -64,88 +39,56 @@ export default function RecordPastScreen() {
     try {
       await audioRecorder.stop();
       setIsRecording(false);
-      const uri = audioRecorder.uri ?? null;
-      setRecordedUri(uri);
-      console.log('Recording saved to:', uri);
-
-      if (uri) {
-        try {
-          const savedReport = await saveReport({
-            type: 'audio',
-            status: 'saved',
-            audioUri: uri,
-          });
-          setReportId(savedReport.id);
-        } catch (error) {
-          console.error('Error auto-saving audio report:', error);
-        }
-      }
+      setRecordedUri(audioRecorder.uri ?? null);
+      console.log('Recording saved to:', audioRecorder.uri);
     } catch (err) {
       Alert.alert('Error', 'Failed to save recording');
     }
   };
 
-  const handleEmergencyExit = async () => {
-    // 1. Stop recording if active
-    if (isRecording) {
-      try {
-        await audioRecorder.stop();
-        const uri = audioRecorder.uri ?? null;
-
-        // 2. Save the recording
-        if (uri) {
-          await saveReport({
-            type: 'audio',
-            status: 'saved',
-            audioUri: uri,
-          });
-          console.log('Emergency exit: Recording saved');
-        }
-      } catch (error) {
-        console.error('Error saving on emergency exit:', error);
-      }
-    } else if (recordedUri && !reportId) {
-      // If stopped but not yet saved (rare race condition), try to save
-      try {
-        await saveReport({
-          type: 'audio',
-          status: 'saved',
-          audioUri: recordedUri,
-        });
-      } catch (error) {
-        console.error('Error saving existing recording on exit:', error);
-      }
-    }
-
-    // 3. Enter decoy mode and navigate
-    enterDecoyMode();
-    router.replace('./fake-calculator');
+  const handleEmergencyExit = () => {
+    Alert.alert(
+      'Exit immediately?',
+      'The app will close and your history will be cleared.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Exit Now',
+          style: 'destructive',
+          onPress: () => {
+            // Clear any recordings
+            if (recordedUri) {
+              FileSystem.deleteAsync(recordedUri).catch(() => {});
+            }
+            router.replace('./fake-calculator');
+          },
+        },
+      ],
+      { cancelable: false }
+    );
   };
 
   const navigateToDetailedReport = async () => {
-    // If we haven't saved yet (e.g. auto-save failed), try again
-    let currentReportId = reportId;
-
-    if (recordedUri && !currentReportId) {
+    // Save audio report as draft if recording exists
+    if (recordedUri) {
       try {
-        const savedReport = await saveReport({
+        await saveReport({
           type: 'audio',
-          status: 'saved',
+          status: 'draft',
           audioUri: recordedUri,
         });
-        currentReportId = savedReport.id;
       } catch (error) {
         console.error('Error saving audio report:', error);
         // Continue navigation even if save fails
       }
     }
-
+    
     router.push({
       pathname: '../safety-check',
-      params: {
-        audioUri: recordedUri || '',
-        reportId: currentReportId || ''
-      }
+      params: { audioUri: recordedUri || '' }
     });
   };
 
@@ -162,40 +105,36 @@ export default function RecordPastScreen() {
       <View style={styles.content}>
         <Text style={styles.title}>Record what happened in the past</Text>
         <Text style={styles.subtitle}>You can describe what happened in your own words, in your own voice.</Text>
-
+        
         {/* Recording UI */}
-        <TouchableOpacity
+        <TouchableOpacity 
+          style={styles.recordingButton}
           onPress={isRecording ? stopRecording : startRecording}
-          disabled={!!recordedUri && !isRecording}
-          style={styles.buttonContainer}
+          disabled={!!recordedUri}
         >
-          <Animated.View style={[styles.recordingButton, isRecording && pulseStyle]}>
-            {recordedUri && !isRecording ? (
-              <View style={styles.recordingSaved}>
-                <Feather name="check-circle" size={48} color="#4CAF50" />
-              </View>
-            ) : (
-              <Feather
-                name={isRecording ? "mic" : "mic-off"}
-                size={48}
-                color={isRecording ? "white" : "#8A4FFF"}
+          {recordedUri ? (
+            <View style={styles.recordingSaved}>
+              <Feather name="check-circle" size={48} color="#4CAF50" />
+              <Text style={styles.recordingText}>Recording saved</Text>
+            </View>
+          ) : (
+            <>
+              <Feather 
+                name={isRecording ? "mic" : "mic-off"} 
+                size={48} 
+                color={isRecording ? "#FF3B30" : "#8A4FFF"} 
               />
-            )}
-          </Animated.View>
-
-          <Text style={styles.recordingText}>
-            {recordedUri && !isRecording
-              ? "Recording saved"
-              : isRecording
-                ? "Recording... Tap to stop"
-                : "Tap to start recording"}
-          </Text>
+              <Text style={styles.recordingText}>
+                {isRecording ? "Recording... Tap to stop" : "Tap to start recording"}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
 
         {/* Playback and continue options */}
-        {recordedUri && !isRecording && (
+        {recordedUri && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity
+            <TouchableOpacity 
               style={styles.playButton}
               onPress={() => router.push({
                 pathname: './audio-player',
@@ -206,7 +145,7 @@ export default function RecordPastScreen() {
               <Text style={styles.playButtonText}>Listen</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity 
               style={styles.continueButton}
               onPress={navigateToDetailedReport}
             >
@@ -218,7 +157,7 @@ export default function RecordPastScreen() {
       </View>
 
       {/* Emergency exit button */}
-      <TouchableOpacity
+      <TouchableOpacity 
         style={styles.emergencyButton}
         onPress={handleEmergencyExit}
         accessibilityLabel="Emergency exit button"
@@ -267,34 +206,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: '80%',
   },
-  buttonContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   recordingButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#f0e6ff', // Light purple background
+    padding: 30,
     borderWidth: 2,
     borderColor: '#8A4FFF',
-    marginBottom: 16,
-    shadowColor: "#8A4FFF",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    borderRadius: 20,
+    borderStyle: 'dashed',
+    width: '80%',
   },
   recordingSaved: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   recordingText: {
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
     textAlign: 'center',

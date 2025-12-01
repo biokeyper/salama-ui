@@ -1,10 +1,10 @@
+import React, { useState } from 'react';
+import { View, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { saveReport } from '@/services/storage';
 import { ReportType } from '@/types/report';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 export default function TextReportScreen() {
   const [report, setReport] = useState('');
@@ -12,7 +12,6 @@ export default function TextReportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const audioUri = params.audioUri as string | undefined;
-  const reportId = params.reportId as string | undefined;
 
   const handleSubmit = async () => {
     if (!report.trim()) {
@@ -23,9 +22,8 @@ export default function TextReportScreen() {
     setIsSaving(true);
     try {
       const reportType: ReportType = audioUri ? 'mixed' : 'text';
-
+      
       await saveReport({
-        id: reportId,
         type: reportType,
         status: 'saved',
         textContent: report.trim(),
@@ -63,8 +61,8 @@ export default function TextReportScreen() {
           onChangeText={setReport}
           textAlignVertical="top"
         />
-        <TouchableOpacity
-          style={[styles.button, isSaving && styles.buttonDisabled]}
+        <TouchableOpacity 
+          style={[styles.button, isSaving && styles.buttonDisabled]} 
           onPress={handleSubmit}
           disabled={isSaving}
         >

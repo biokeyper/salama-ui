@@ -1,22 +1,23 @@
-import AudioReportItem from '@/components/AudioReportItem';
-import { deleteReport, getAllReports, updateReportStatus } from '@/services/storage';
-import { Report } from '@/types/report';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { deleteAsync } from 'expo-file-system/legacy';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  RefreshControl,
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  SafeAreaView, 
+  Platform, 
+  Alert, 
   ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { getAllReports, deleteReport, updateReportStatus } from '@/services/storage';
+import { Report } from '@/types/report';
+import * as FileSystem from 'expo-file-system';
+import AudioReportItem from '@/components/AudioReportItem';
 
 export default function AudioPlayerScreen() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function AudioPlayerScreen() {
         r => (r.type === 'audio' || r.type === 'mixed') && r.audioUri
       );
       // Sort by most recent first
-      audioReports.sort((a, b) =>
+      audioReports.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setReports(audioReports);
@@ -96,25 +97,23 @@ export default function AudioPlayerScreen() {
               // Stop playback if playing
               if (playingReportId === report.id) {
                 setPlayingReportId(null);
-                // Wait for player to cleanup
-                await new Promise(resolve => setTimeout(resolve, 300));
               }
-
+              
               // Delete audio file if it exists
               if (report.audioUri) {
                 try {
-                  await deleteAsync(report.audioUri);
+                  await FileSystem.deleteAsync(report.audioUri);
                 } catch (error) {
                   console.error('Error deleting audio file:', error);
                 }
               }
-
+              
               // Delete report from storage
               await deleteReport(report.id);
-
+              
               // Reload reports
               await loadReports();
-
+              
               Alert.alert('Success', 'Report deleted successfully');
             } catch (error) {
               console.error('Error deleting report:', error);
