@@ -84,6 +84,11 @@ You can start developing by editing the files inside the **app** directory. This
 - **Audio Player Enhancements:** Audio now plays immediately without requiring Stop button first
 - **Error Handling:** Added comprehensive error handling for audio player lifecycle methods
 - **Code Stability:** Improved resource management and cleanup in audio components
+- **Explore Tab Redesign:** Complete UI overhaul with:
+  - Icon-based app launcher (Fake Calculator, coming soon: Calendar & Tracker)
+  - Support resources for 6 East African countries (Uganda, Kenya, Tanzania, Rwanda, Burundi, South Sudan)
+  - Clickable toll-free helpline numbers with direct dialing
+  - Purple-themed modal design for support information
 
 ---
 
