@@ -3,6 +3,7 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { WavingGirl } from '@/components/WavingGirl';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Linking, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -72,14 +73,11 @@ export default function ExploreScreen() {
 
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerBackgroundColor={{ light: '#F5F3FF', dark: '#1F1B2E' }}
       headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="globe"
-          style={styles.headerImage}
-        />
+        <View style={styles.headerWaveContainer}>
+          <WavingGirl />
+        </View>
       }>
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Explore</ThemedText>
@@ -207,11 +205,11 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  headerWaveContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 40,
   },
   titleContainer: {
     flexDirection: 'row',
