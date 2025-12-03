@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, StyleSheet, SafeAreaView, Platform, TouchableOpacity } from 'react-native';
-import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { ThemedText } from '@/components/ThemedText';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DetailedReportScreen() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function DetailedReportScreen() {
         <ThemedText type="title" style={styles.subtitle}>
           in your own words.
         </ThemedText>
-        
+
         <View style={styles.inputOptionsContainer}>
           {/* Voice Input Button */}
           <TouchableOpacity

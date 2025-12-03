@@ -1,16 +1,31 @@
-import React, { useEffect } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, ImageBackground } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, ImageBackground, StyleSheet, Text, View } from 'react-native';
 
 export default function BootScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace('/(tabs)');
-    }, 5000);
+    const checkOnboarding = async () => {
+      try {
+        const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
 
-    return () => clearTimeout(timer);
+        // Add a small delay for the splash screen effect
+        setTimeout(() => {
+          if (hasSeenOnboarding === 'true') {
+            router.replace('/(tabs)');
+          } else {
+            router.replace('/onboarding');
+          }
+        }, 2000);
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        router.replace('/(tabs)');
+      }
+    };
+
+    checkOnboarding();
   }, []);
 
   return (
