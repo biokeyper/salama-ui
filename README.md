@@ -78,6 +78,7 @@ You can start developing by editing the files inside the **app** directory. This
 - **SafeAreaView Deprecation:** Updated all screens to use `react-native-safe-area-context` instead of deprecated React Native SafeAreaView
 - **Audio Duration Display:** Fixed "0:00" issue by tracking recording duration and adding fallback logic
 - **FileSystem Deprecation:** Resolved `deleteAsync` error by migrating to `expo-file-system/legacy`
+- **Security Vulnerabilities:** Fixed 6 npm package vulnerabilities (1 high, 3 moderate, 2 low) via `npm audit fix`
 
 ### Improvements
 - **Library Features Restored:** Re-implemented Audio and Text tabs with proper filtering logic
