@@ -102,6 +102,11 @@ You can start developing by editing the files inside the **app** directory. This
   - Settings section in Explore tab for theme selection
   - System-wide theme support using React Navigation themes
   - AsyncStorage persistence across app restarts
+- **Splash Screen & App Branding:**
+  - Updated splash screen with 250px logo size
+  - Light purple background (#F5F3FF) matching app theme
+  - Configured native Android build with expo prebuild
+  - Added android/ and ios/ to .gitignore for cleaner repo
 
 ---
 
