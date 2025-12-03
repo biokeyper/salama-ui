@@ -16,7 +16,7 @@ It is **not** the blockchain ("chain end") or smart contract code, but rather th
 - **Audio recording and playback:** Record incidents in real-time or document past events with built-in audio player
 - **Text reporting:** Alternative text-based reporting flow for users who prefer typing
 - **Safety-first design:** Emergency exit, safety checks, and trauma-informed language
-- **Custom theming** and reusable UI components
+- **Custom theming** with Light/Dark/Auto modes and persistent user preferences
 - **Expo SDK 54** with latest React Native 0.81.5
 
 ---
@@ -84,11 +84,23 @@ You can start developing by editing the files inside the **app** directory. This
 - **Audio Player Enhancements:** Audio now plays immediately without requiring Stop button first
 - **Error Handling:** Added comprehensive error handling for audio player lifecycle methods
 - **Code Stability:** Improved resource management and cleanup in audio components
+- **Home Screen Redesign (Concept 3):**
+  - Large centered animated wave (👋) as hero element
+  - Warm welcome message with mood check-in feature
+  - Quick action cards with emoji icons (🎤📚🌍) for easy navigation
+  - Safe space messaging and privacy reminders
+  - Hidden bottom navigation for immersive experience
 - **Explore Tab Redesign:** Complete UI overhaul with:
   - Icon-based app launcher (Fake Calculator, coming soon: Calendar & Tracker)
   - Support resources for 6 East African countries (Uganda, Kenya, Tanzania, Rwanda, Burundi, South Sudan)
   - Clickable toll-free helpline numbers with direct dialing
   - Purple-themed modal design for support information
+  - Waving girl animation (👧) in header for friendly feel
+- **Theme Toggle:**
+  - Light/Dark/Auto theme modes with persistent user preference
+  - Settings section in Explore tab for theme selection
+  - System-wide theme support using React Navigation themes
+  - AsyncStorage persistence across app restarts
 
 ---
 

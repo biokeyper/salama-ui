@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { WavingGirl } from '@/components/WavingGirl';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Linking, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -55,6 +56,7 @@ const SUPPORT_DATA: Record<CountryCode, SupportInfo> = {
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { themeMode, setThemeMode } = useTheme();
   const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null);
 
   const handleSupportPress = (country: CountryCode) => {
@@ -151,6 +153,46 @@ export default function ExploreScreen() {
         <ThemedText style={{ marginTop: 10 }}>
           We believe in privacy, security, and the right to safety for everyone.
         </ThemedText>
+      </Collapsible>
+
+      {/* Settings Section */}
+      <Collapsible title="⚙️ Settings">
+        <ThemedView style={styles.settingsContainer}>
+          <ThemedText type="defaultSemiBold" style={styles.settingLabel}>
+            Theme
+          </ThemedText>
+          <View style={styles.themeOptions}>
+            <TouchableOpacity
+              style={[styles.themeOption, themeMode === 'light' && styles.themeOptionActive]}
+              onPress={() => setThemeMode('light')}
+            >
+              <Text style={styles.themeIcon}>☀️</Text>
+              <ThemedText style={[styles.themeText, themeMode === 'light' && styles.themeTextActive]}>
+                Light
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.themeOption, themeMode === 'dark' && styles.themeOptionActive]}
+              onPress={() => setThemeMode('dark')}
+            >
+              <Text style={styles.themeIcon}>🌙</Text>
+              <ThemedText style={[styles.themeText, themeMode === 'dark' && styles.themeTextActive]}>
+                Dark
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.themeOption, themeMode === 'auto' && styles.themeOptionActive]}
+              onPress={() => setThemeMode('auto')}
+            >
+              <Text style={styles.themeIcon}>🔄</Text>
+              <ThemedText style={[styles.themeText, themeMode === 'auto' && styles.themeTextActive]}>
+                Auto
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </ThemedView>
       </Collapsible>
 
       {/* Support Modal */}
@@ -368,5 +410,42 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Settings styles
+  settingsContainer: {
+    gap: 16,
+  },
+  settingLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  themeOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  themeOption: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(139, 92, 246, 0.05)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  themeOptionActive: {
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderColor: '#8B5CF6',
+  },
+  themeIcon: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  themeText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  themeTextActive: {
+    fontWeight: '700',
+    color: '#8B5CF6',
   },
 });
