@@ -86,7 +86,7 @@ export default function ExploreScreen() {
       </ThemedView>
 
       {/* Apps Section */}
-      <Collapsible title="Apps" defaultOpen={true}>
+      <Collapsible title="📱 Apps" defaultOpen={true}>
         <ThemedText style={styles.sectionDescription}>
           Discreet tools designed for your safety.
         </ThemedText>
@@ -119,7 +119,7 @@ export default function ExploreScreen() {
       </Collapsible>
 
       {/* Support Section */}
-      <Collapsible title="Support & Helplines">
+      <Collapsible title="💜 Support & Helplines">
         <ThemedText style={styles.sectionDescription}>
           Select your country for local support resources.
         </ThemedText>
@@ -146,7 +146,7 @@ export default function ExploreScreen() {
       </Collapsible>
 
       {/* Who We Are Section */}
-      <Collapsible title="Who We Are">
+      <Collapsible title="ℹ️ Who We Are">
         <ThemedText>
           SafeGirls is dedicated to providing discreet, accessible safety tools and resources for women. Our mission is to empower you with technology that protects and supports you in any situation.
         </ThemedText>
