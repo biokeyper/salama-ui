@@ -26,6 +26,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="fake-calculator" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="fake-calendar" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="tracker" options={{ headerShown: false }} />
 
         <Stack.Screen
           name="safety-check"

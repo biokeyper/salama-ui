@@ -51,20 +51,6 @@ You can start developing by editing the files inside the **app** directory. This
 ### Audio Recording & Playback
 - **Real-time recording:** Record incidents as they happen with high-quality audio capture
 - **Past event recording:** Document historical incidents with voice narration
-- **Library:** Dedicated tab to manage and filter reports by Audio or Text type
-- **Audio playback:** Built-in player with auto-stop, seek controls (+/- 10s), and progress tracking
-- **Flexible input:** Prominent "Skip and type instead" option for users who prefer text
-
-### Safety Features
-- **Emergency exit:** Quick exit button that closes the app and clears history
-- **Fake calculator screen:** Discreet decoy screen for emergency situations
-- **Safety check:** Pre-report safety assessment before detailed documentation
-- **Trauma-informed design:** User-controlled experience with skip options and supportive language
-
-### Reporting Flows
-- **Multi-step reporting:** Guided flow from recording/input to detailed report
-- **Voice or text input:** Flexible documentation methods with dedicated Library tabs
-- **Detailed reports:** Comprehensive incident documentation with metadata
 
 ---
 

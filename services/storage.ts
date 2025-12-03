@@ -2,8 +2,8 @@
  * Storage service for managing reports using AsyncStorage
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Report, ReportStorage } from '@/types/report';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@safegirls:reports';
 const MAX_STORAGE_SIZE = 100; // Maximum number of reports to store locally
@@ -51,11 +51,11 @@ export async function getReportById(id: string): Promise<Report | null> {
 export async function saveReport(report: Partial<Report>): Promise<Report> {
   try {
     const reports = await getAllReports();
-    
+
     // If report has an ID, update existing; otherwise create new
     let updatedReport: Report;
     let updatedReports: Report[];
-    
+
     if (report.id) {
       const existingIndex = reports.findIndex(r => r.id === report.id);
       if (existingIndex >= 0) {
@@ -91,21 +91,21 @@ export async function saveReport(report: Partial<Report>): Promise<Report> {
       } as Report;
       updatedReports = [...reports, updatedReport];
     }
-    
+
     // Enforce maximum storage size (remove oldest if exceeded)
     if (updatedReports.length > MAX_STORAGE_SIZE) {
-      updatedReports.sort((a, b) => 
+      updatedReports.sort((a, b) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
       updatedReports = updatedReports.slice(-MAX_STORAGE_SIZE);
     }
-    
+
     // Save to storage
     const storage: ReportStorage = {
       reports: updatedReports,
       lastSyncAt: new Date().toISOString(),
     };
-    
+
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
     return updatedReport;
   } catch (error) {
@@ -121,12 +121,12 @@ export async function deleteReport(id: string): Promise<boolean> {
   try {
     const reports = await getAllReports();
     const filteredReports = reports.filter(report => report.id !== id);
-    
+
     const storage: ReportStorage = {
       reports: filteredReports,
       lastSyncAt: new Date().toISOString(),
     };
-    
+
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
     return true;
   } catch (error) {
@@ -188,7 +188,7 @@ export async function updateReportStatus(
     if (!report) {
       return null;
     }
-    
+
     return await saveReport({
       ...report,
       status,
@@ -202,3 +202,88 @@ export async function updateReportStatus(
   }
 }
 
+// ... existing code ...
+
+/**
+ * Get all health logs
+ */
+export async function getHealthLogs(): Promise<HealthLog[]> {
+  try {
+    const data = await AsyncStorage.getItem(STORAGE_KEY);
+    if (!data) return [];
+
+    const storage: ReportStorage = JSON.parse(data);
+    return storage.healthLogs || [];
+  } catch (error) {
+    console.error('Error getting health logs:', error);
+    return [];
+  }
+}
+
+/**
+ * Save a health log
+ */
+export async function saveHealthLog(log: Partial<HealthLog>): Promise<HealthLog> {
+  try {
+    const data = await AsyncStorage.getItem(STORAGE_KEY);
+    let storage: ReportStorage = data ? JSON.parse(data) : { reports: [], healthLogs: [] };
+
+    const logs = storage.healthLogs || [];
+    let updatedLog: HealthLog;
+    let updatedLogs: HealthLog[];
+
+    if (log.id) {
+      const index = logs.findIndex(l => l.id === log.id);
+      if (index >= 0) {
+        updatedLog = { ...logs[index], ...log, updatedAt: new Date().toISOString() } as HealthLog;
+        updatedLogs = [...logs];
+        updatedLogs[index] = updatedLog;
+      } else {
+        updatedLog = {
+          id: log.id,
+          date: log.date || new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          ...log
+        } as HealthLog;
+        updatedLogs = [...logs, updatedLog];
+      }
+    } else {
+      updatedLog = {
+        id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        date: log.date || new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ...log
+      } as HealthLog;
+      updatedLogs = [...logs, updatedLog];
+    }
+
+    storage.healthLogs = updatedLogs;
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
+    return updatedLog;
+  } catch (error) {
+    console.error('Error saving health log:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a health log
+ */
+export async function deleteHealthLog(id: string): Promise<boolean> {
+  try {
+    const data = await AsyncStorage.getItem(STORAGE_KEY);
+    if (!data) return false;
+
+    const storage: ReportStorage = JSON.parse(data);
+    if (!storage.healthLogs) return false;
+
+    storage.healthLogs = storage.healthLogs.filter(l => l.id !== id);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
+    return true;
+  } catch (error) {
+    console.error('Error deleting health log:', error);
+    return false;
+  }
+}

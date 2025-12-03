@@ -7,7 +7,7 @@ import { WavingGirl } from '@/components/WavingGirl';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Linking, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type CountryCode = 'UG' | 'KE' | 'TZ' | 'RW' | 'BI' | 'SS';
 
@@ -109,11 +109,11 @@ export default function ExploreScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.appIconButton, styles.disabledIconButton]}
-            onPress={() => Alert.alert('Coming Soon', 'Menstruation Tracker is under development.')}
+            style={styles.appIconButton}
+            onPress={() => router.push('/tracker')}
           >
-            <Text style={styles.appEmojiDisabled}>🩸</Text>
-            <Text style={styles.appLabelDisabled}>Tracker</Text>
+            <Text style={styles.appEmoji}>🩸</Text>
+            <Text style={styles.appLabel}>Tracker</Text>
           </TouchableOpacity>
         </View>
       </Collapsible>
