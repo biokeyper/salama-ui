@@ -25,6 +25,37 @@ function RootNavigator() {
 
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="fake-calculator" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="fake-calendar" options={{ headerShown: false, gestureEnabled: false }} />
+
+        <Stack.Screen
+          name="safety-check"
+          options={{
+            title: 'Safety Check',
+            headerBackTitle: 'Back'
+          }}
+        />
+        <Stack.Screen
+          name="detailed-report"
+          options={{
+            title: 'Detailed Report',
+            headerBackTitle: 'Back'
+          }}
+        />
+        <Stack.Screen
+          name="text-report"
+          options={{
+            title: 'Text Report',
+            headerBackTitle: 'Back'
+          }}
+        />
+        <Stack.Screen
+          name="record-past"
+          options={{
+            title: 'Record Past Event',
+            headerBackTitle: 'Back'
+          }}
+        />
+
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

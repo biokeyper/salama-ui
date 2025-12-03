@@ -101,11 +101,11 @@ export default function ExploreScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.appIconButton, styles.disabledIconButton]}
-            onPress={() => Alert.alert('Coming Soon', 'Fake Calendar is under development.')}
+            style={styles.appIconButton}
+            onPress={() => router.push('/fake-calendar')}
           >
-            <Text style={styles.appEmojiDisabled}>📅</Text>
-            <Text style={styles.appLabelDisabled}>Calendar</Text>
+            <Text style={styles.appEmoji}>📅</Text>
+            <Text style={styles.appLabel}>Calendar</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
