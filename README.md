@@ -88,6 +88,12 @@ You can start developing by editing the files inside the **app** directory. This
   - **Fake Calculator:** Updated to start recording immediately on launch for enhanced safety.
   - **Menstrual Tracker:** Privacy-first cycle tracking with "Secret Notes" feature, background recording, cycle history, and daily health tips.
   - **Secret Exit:** Standardized "Long Press" gesture (3s) on header titles to save & exit decoy modes.
+- **Home Tab Enhancements:**
+  - **Pulsating Heart:** The heart emoji below "You are safe here" pulsates continuously to create a living, welcoming feel.
+  - **Functional Mood Icons:** Tapping any mood icon navigates directly to the Menstrual Tracker for quick logging.
+  - **Privacy Policy Link:** Added link to privacy policy at the bottom of the home screen.
+- **Detailed Report Screen:**
+  - **Decoy App Quick Launch:** Added section at the bottom with buttons to quickly launch Calculator, Calendar, or Tracker apps for safety.
 - **Expo SDK:** 54.0.25
 - **React Native:** 0.81.5
 - **React:** 19.1.0

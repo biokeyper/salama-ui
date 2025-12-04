@@ -3,7 +3,8 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -32,6 +33,34 @@ export default function HomeScreen() {
     },
   ];
 
+  // Pulsating Heart Animation
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  const handlePrivacyPolicy = () => {
+    Linking.openURL('https://www.biokeyper.com/privacy-policy');
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#F5F3FF', dark: '#1F1B2E' }}
@@ -46,9 +75,14 @@ export default function HomeScreen() {
         <ThemedText type="title" style={styles.welcomeTitle}>
           Welcome back, Msichana!
         </ThemedText>
-        <ThemedText style={styles.welcomeSubtitle}>
-          You're safe here ❤️
-        </ThemedText>
+        <View style={styles.heartContainer}>
+          <ThemedText style={styles.welcomeSubtitle}>
+            You're safe here{' '}
+          </ThemedText>
+          <Animated.Text style={[styles.heartEmoji, { transform: [{ scale: pulseAnim }] }]}>
+            ❤️
+          </Animated.Text>
+        </View>
       </ThemedView>
 
       {/* Check-in */}
@@ -58,7 +92,7 @@ export default function HomeScreen() {
         </ThemedText>
         <View style={styles.moodRow}>
           {['😊', '😐', '😔', '😰', '😡'].map((emoji, index) => (
-            <TouchableOpacity key={index} style={styles.moodButton}>
+            <TouchableOpacity key={index} style={styles.moodButton} onPress={() => router.push('/tracker')}>
               <Text style={styles.moodEmoji}>{emoji}</Text>
             </TouchableOpacity>
           ))}
@@ -113,6 +147,11 @@ export default function HomeScreen() {
         </View>
       </ThemedView>
 
+      {/* Privacy Policy Link */}
+      <TouchableOpacity style={styles.privacyLink} onPress={handlePrivacyPolicy}>
+        <ThemedText style={styles.privacyLinkText}>Privacy Policy</ThemedText>
+      </TouchableOpacity>
+
     </ParallaxScrollView>
   );
 }
@@ -137,6 +176,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     opacity: 0.8,
     textAlign: 'center',
+  },
+  heartContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heartEmoji: {
+    fontSize: 16,
+    opacity: 0.8,
   },
   checkInSection: {
     paddingVertical: 20,
@@ -244,5 +292,15 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     fontSize: 13,
+  },
+  privacyLink: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  privacyLinkText: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    textDecorationLine: 'underline',
   },
 });
