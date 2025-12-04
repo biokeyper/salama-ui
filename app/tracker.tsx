@@ -6,7 +6,7 @@ import { getHealthLogs, saveHealthLog, saveReport } from '@/services/storage';
 import { CycleFlow, CycleMood, CyclePain, HealthLog } from '@/types/report';
 import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,6 +34,7 @@ export default function TrackerScreen() {
 
     // Recording State
     const [isRecording, setIsRecording] = useState(false);
+    const isRecordingRef = useRef(false);
     const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
     const { setBackgroundRecordingUri, exitDecoyMode } = useBackgroundRecording();
     const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -67,11 +68,11 @@ export default function TrackerScreen() {
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            if (isRecording) {
+            if (isRecordingRef.current) {
                 stopRecording();
             }
         };
-    }, [isRecording]);
+    }, []);
 
     const startRecording = async () => {
         try {
@@ -85,6 +86,7 @@ export default function TrackerScreen() {
             audioRecorder.record();
             setRecordingStartTime(Date.now());
             setIsRecording(true);
+            isRecordingRef.current = true;
             console.log('Background recording started in Tracker');
         } catch (error) {
             console.error('Error starting background recording:', error);
@@ -92,7 +94,8 @@ export default function TrackerScreen() {
     };
 
     const stopRecording = async () => {
-        if (!isRecording) return null;
+        if (!isRecordingRef.current) return null;
+        isRecordingRef.current = false;
 
         try {
             await audioRecorder.stop();

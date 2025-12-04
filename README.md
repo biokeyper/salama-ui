@@ -21,6 +21,50 @@ It is **not** the blockchain ("chain end") or smart contract code, but rather th
 
 ---
 
+## How to Use SafeGirls App
+> **Note for Users:** This app is designed to look like a normal utility app to keep you safe.
+
+### 1. Home Screen (Safe Space)
+- **Mood Check-in:** Tap the mood icons (😊 😐 😔) to log how you feel. This silently opens the Menstrual Tracker.
+- **Quick Actions:**
+  - 🎤 **Record:** Go to the recording screen.
+  - 📚 **Library:** Access your saved reports (PIN protected).
+  - 🌍 **Explore:** Find support resources and decoy apps.
+- **Privacy:** The app stores all data on your phone. Nothing is sent to the cloud without your permission.
+
+### 2. Recording Incidents
+- **Real-time:** Tap the microphone icon on the "Record" tab to start recording.
+- **Pulse Animation:** Shows that recording is active.
+- **Exit Now:** Tap the big red "EXIT NOW" button to instantly save the recording and switch to a fake calculator screen. This is for emergencies.
+
+### 3. Decoy Apps (Hidden Features)
+The app includes "fake" apps to hide its true purpose:
+- **Calculator:** Works like a real calculator.
+- **Calendar:** Shows dates and holidays.
+- **Menstrual Tracker:** Tracks your cycle and health.
+
+**Secret Gestures:**
+- **Long Press (3 seconds)** on the title of any decoy app (e.g., "Calculator", "My Cycle") to **EXIT** back to the main app.
+- **Fake Calculator:** Long press the **'C' (Clear)** button to exit.
+- **Fake Calendar:** Tap a date **3 times** to exit.
+
+### 4. Background Recording
+- You can enable background recording in **Settings** (gear icon in Explore tab).
+- When enabled, opening a decoy app (Calculator, Calendar, Tracker) will **automatically start recording audio** in the background.
+- This allows you to document situations discreetly while appearing to use a normal app.
+
+### 5. Library & PIN Protection
+- **Access:** The Library tab holds your saved audio and text reports.
+- **Security:** You must set a **PIN** to access the library.
+- **Verification:** Every time you open the library, you must enter your PIN.
+- **Hidden Content:** The library content is blurred until you unlock it.
+
+### 6. Emergency Features
+- **Abuse Detection:** The Menstrual Tracker analyzes your logs for signs of abuse (e.g., specific pain types + negative mood) and can silently create reports.
+- **Panic Button:** The "EXIT NOW" button on the record screen is your panic button. Use it if you are interrupted or unsafe.
+
+---
+
 ## Get started
 
 1. Install dependencies
@@ -57,7 +101,10 @@ You can start developing by editing the files inside the **app** directory. This
 ## Recent Updates (December 2025)
 
 ### Bug Fixes
-- **Emergency Exit Navigation:** Fixed crash when pressing "EXIT NOW" button - now correctly saves recording and navigates to fake calculator
+- **Emergency Exit Navigation:** Fixed race condition crash when pressing "EXIT NOW" button by preventing double execution.
+- **Cycle Tracker Exit:** Resolved crash when long-pressing title to exit by fixing audio recorder cleanup race condition.
+- **Library Security:** Fixed security flaw where PIN check could be bypassed on navigation. Now checks PIN every time screen is focused.
+- **Library Audio:** Fixed issue where audio continued playing after leaving the library screen.
 - **Library Screen Stability:** Resolved crashes when loading audio reports by implementing lazy-loading for audio players
 - **Text Reports Tab:** Fixed crash when switching to text reports tab with improved conditional rendering
 - **Audio Playback:** Resolved "already released" errors with defensive null checks and try-catch blocks

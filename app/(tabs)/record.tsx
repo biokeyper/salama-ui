@@ -15,6 +15,7 @@ export default function RecordScreen() {
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
+  const [isExiting, setIsExiting] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Animation value for pulsing effect
@@ -94,10 +95,15 @@ export default function RecordScreen() {
   };
 
   const handleEmergencyExit = async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+
     // 1. Stop recording if active
     if (isRecording) {
       try {
         await audioRecorder.stop();
+        const endTime = Date.now();
+        const durationMs = recordingStartTime ? (endTime - recordingStartTime) : 0;
         const uri = audioRecorder.uri ?? null;
 
         // 2. Save the recording
@@ -106,6 +112,7 @@ export default function RecordScreen() {
             type: 'audio',
             status: 'saved',
             audioUri: uri,
+            audioDuration: durationMs,
           });
           console.log('Emergency exit: Recording saved');
         }

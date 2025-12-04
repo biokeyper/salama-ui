@@ -2,14 +2,34 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { hasPin, removePin, setPin as savePin } from '@/services/security';
+import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
+import { usePinProtection } from '@/contexts/PinProtectionContext';
+import LockScreen from './lock-screen';
+
 
 export default function SettingsScreen() {
     const router = useRouter();
     const { settings, updateSettings, resetSettings } = useSettings();
+    const pinProtection = usePinProtection();
+    const checkPinStatus = pinProtection?.checkPinStatus || (async () => { });
     const [isClearing, setIsClearing] = useState(false);
+    const [pinExists, setPinExists] = useState(false);
+    const [showSetPin, setShowSetPin] = useState(false);
+    const [showVerifyPin, setShowVerifyPin] = useState(false);
+
+    useEffect(() => {
+        checkPin();
+    }, []);
+
+    const checkPin = async () => {
+        const exists = await hasPin();
+        setPinExists(exists);
+    };
 
     const handleClearAllData = () => {
         Alert.alert(
@@ -31,6 +51,70 @@ export default function SettingsScreen() {
                             Alert.alert('Error', 'Failed to clear data. Please try again.');
                         } finally {
                             setIsClearing(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleSetPin = async (pin: string) => {
+        const success = await savePin(pin);
+        if (success) {
+            setPinExists(true);
+            setShowSetPin(false);
+            setShowVerifyPin(false);
+            // Refresh global PIN state
+            await checkPinStatus();
+            Alert.alert('Success', 'PIN has been set successfully');
+        } else {
+            Alert.alert('Error', 'Failed to set PIN. Please try again.');
+        }
+    };
+
+    const handleChangePin = () => {
+        // Show verification modal first
+        setShowVerifyPin(true);
+    };
+
+    const handleVerificationSuccess = () => {
+        // After successful verification, show set PIN modal
+        setShowVerifyPin(false);
+        setShowSetPin(true);
+    };
+
+    const handleRemovePin = () => {
+        Alert.alert(
+            'Remove PIN & Clear Data',
+            'Removing your PIN will also permanently delete all your data for security reasons. This action cannot be undone. Are you sure?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove & Clear',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            // Clear all data from database
+                            await deleteAllReports();
+                            await deleteAllHealthLogs();
+                            // Clear AsyncStorage
+                            await AsyncStorage.clear();
+                            // Remove PIN
+                            const pinRemoved = await removePin();
+                            if (pinRemoved) {
+                                setPinExists(false);
+                                // Refresh global PIN state
+                                await checkPinStatus();
+                                Alert.alert(
+                                    'Complete',
+                                    'PIN removed and all data has been cleared.',
+                                    [{ text: 'OK', onPress: () => router.back() }]
+                                );
+                            } else {
+                                Alert.alert('Error', 'Failed to remove PIN. Please try again.');
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to clear data. Please try again.');
                         }
                     },
                 },
@@ -108,6 +192,41 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
+                {/* App Lock Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>🔒 App Lock</Text>
+                    <Text style={styles.sectionDescription}>
+                        Protect your data with a PIN. When enabled, you'll need to enter your PIN to access your library.
+                    </Text>
+
+                    {!pinExists ? (
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() => setShowSetPin(true)}
+                        >
+                            <Feather name="lock" size={20} color="#8B5CF6" />
+                            <Text style={styles.primaryButtonText}>Set PIN</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.buttonGroup}>
+                            <TouchableOpacity
+                                style={styles.secondaryButton}
+                                onPress={handleChangePin}
+                            >
+                                <Feather name="edit-2" size={18} color="#6B7280" />
+                                <Text style={styles.secondaryButtonText}>Change PIN</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.secondaryButton}
+                                onPress={handleRemovePin}
+                            >
+                                <Feather name="unlock" size={18} color="#6B7280" />
+                                <Text style={styles.secondaryButtonText}>Remove PIN</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+
                 {/* Safety Features Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Safety Features</Text>
@@ -159,6 +278,36 @@ export default function SettingsScreen() {
                     </Text>
                 </View>
             </ScrollView>
+
+            {/* PIN Verification Modal (for changing PIN) */}
+            <Modal visible={showVerifyPin} animationType="slide" transparent={false}>
+                <LockScreen
+                    mode="verify"
+                    onUnlock={handleVerificationSuccess}
+                    onSetPin={() => { }}
+                />
+                <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setShowVerifyPin(false)}
+                >
+                    <Feather name="x" size={24} color="#666" />
+                </TouchableOpacity>
+            </Modal>
+
+            {/* PIN Setup Modal */}
+            <Modal visible={showSetPin} animationType="slide" transparent={false}>
+                <LockScreen
+                    mode="set"
+                    onSetPin={handleSetPin}
+                    onUnlock={() => { }}
+                />
+                <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setShowSetPin(false)}
+                >
+                    <Feather name="x" size={24} color="#666" />
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -262,5 +411,55 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#6B7280',
         lineHeight: 20,
+    },
+    primaryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F5F3FF',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E9D5FF',
+        gap: 10,
+    },
+    primaryButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#8B5CF6',
+    },
+    buttonGroup: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    secondaryButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F9FAFB',
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        gap: 8,
+    },
+    secondaryButtonText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#6B7280',
+    },
+    modalCloseButton: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        padding: 10,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
 });

@@ -2,12 +2,15 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { BackgroundRecordingProvider } from '@/contexts/BackgroundRecordingContext';
+import { PinProtectionProvider } from '@/contexts/PinProtectionContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
 import { ThemeProvider as CustomThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { initDatabase } from '@/services/database';
 
 function RootNavigator() {
   const colorScheme = useColorScheme();
@@ -23,6 +26,7 @@ function RootNavigator() {
             animation: 'fade_from_bottom',
           }}
         />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
 
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="fake-calculator" options={{ headerShown: false, gestureEnabled: false }} />
@@ -77,6 +81,11 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
+  // Initialize database on app launch
+  useEffect(() => {
+    initDatabase().catch(console.error);
+  }, []);
+
   if (!loaded) {
     // Async font loading only occurs in development.
     return null;
@@ -84,11 +93,13 @@ export default function RootLayout() {
 
   return (
     <CustomThemeProvider>
-      <SettingsProvider>
-        <BackgroundRecordingProvider>
-          <RootNavigator />
-        </BackgroundRecordingProvider>
-      </SettingsProvider>
+      <PinProtectionProvider>
+        <SettingsProvider>
+          <BackgroundRecordingProvider>
+            <RootNavigator />
+          </BackgroundRecordingProvider>
+        </SettingsProvider>
+      </PinProtectionProvider>
     </CustomThemeProvider>
   );
 }

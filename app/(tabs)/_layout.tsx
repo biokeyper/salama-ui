@@ -6,10 +6,12 @@ import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
+import { usePinProtection } from '@/contexts/PinProtectionContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { isPinSet } = usePinProtection();
 
   return (
     <Tabs
@@ -41,6 +43,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="mic.fill" color={color} />,
         }}
       />
+      {/* Library tab - always visible, but protected by PIN modal in the screen */}
       <Tabs.Screen
         name="audio-player"
         options={{
