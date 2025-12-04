@@ -242,6 +242,14 @@ export default function ExploreScreen() {
         </Pressable>
       </Modal>
 
+      {/* Privacy Policy Link */}
+      <TouchableOpacity
+        style={styles.privacyLink}
+        onPress={() => Linking.openURL('https://www.biokeyper.com/privacy-policy')}
+      >
+        <ThemedText style={styles.privacyLinkText}>Privacy Policy</ThemedText>
+      </TouchableOpacity>
+
     </ParallaxScrollView>
   );
 }
@@ -447,5 +455,15 @@ const styles = StyleSheet.create({
   themeTextActive: {
     fontWeight: '700',
     color: '#8B5CF6',
+  },
+  privacyLink: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  privacyLinkText: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    textDecorationLine: 'underline',
   },
 });
