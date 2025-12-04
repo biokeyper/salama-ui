@@ -287,3 +287,4 @@ export async function deleteHealthLog(id: string): Promise<boolean> {
     return false;
   }
 }
+

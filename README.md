@@ -78,11 +78,16 @@ You can start developing by editing the files inside the **app** directory. This
   - Safe space messaging and privacy reminders
   - Hidden bottom navigation for immersive experience
 - **Explore Tab Redesign:** Complete UI overhaul with:
-  - Icon-based app launcher (Fake Calculator, coming soon: Calendar & Tracker)
+  - Icon-based app launcher (Fake Calculator, Fake Calendar, Menstrual Tracker)
   - Support resources for 6 East African countries (Uganda, Kenya, Tanzania, Rwanda, Burundi, South Sudan)
   - Clickable toll-free helpline numbers with direct dialing
   - Purple-themed modal design for support information
   - Waving girl animation (👧) in header for friendly feel
+- **Decoy Apps & Safety:**
+  - **Fake Calendar:** Fully functional calendar with holiday display and background recording on launch.
+  - **Fake Calculator:** Updated to start recording immediately on launch for enhanced safety.
+  - **Menstrual Tracker:** Privacy-first cycle tracking with "Secret Notes" feature, background recording, cycle history, and daily health tips.
+  - **Secret Exit:** Standardized "Long Press" gesture (3s) on header titles to save & exit decoy modes.
 - **Expo SDK:** 54.0.25
 - **React Native:** 0.81.5
 - **React:** 19.1.0
