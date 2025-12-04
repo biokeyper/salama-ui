@@ -158,6 +158,19 @@ export default function ExploreScreen() {
       {/* Settings Section */}
       <Collapsible title="⚙️ Settings">
         <ThemedView style={styles.settingsContainer}>
+          <TouchableOpacity
+            style={styles.settingsLink}
+            onPress={() => router.push('/settings')}
+          >
+            <IconSymbol name="gearshape.fill" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.settingsLinkText}>App Settings</ThemedText>
+            <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          <ThemedText style={styles.settingDescription}>
+            Configure background recording, safety features, and privacy options.
+          </ThemedText>
+
           <ThemedText type="defaultSemiBold" style={styles.settingLabel}>
             Theme
           </ThemedText>
@@ -465,5 +478,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8B5CF6',
     textDecorationLine: 'underline',
+  },
+  settingsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(139, 92, 246, 0.05)',
+    borderRadius: 12,
+    gap: 12,
+    marginBottom: 16,
+  },
+  settingsLinkText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 18,
   },
 });

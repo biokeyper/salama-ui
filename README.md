@@ -65,6 +65,8 @@ You can start developing by editing the files inside the **app** directory. This
 - **Audio Duration Display:** Fixed "0:00" issue by tracking recording duration and adding fallback logic
 - **FileSystem Deprecation:** Resolved `deleteAsync` error by migrating to `expo-file-system/legacy`
 - **Security Vulnerabilities:** Fixed 6 npm package vulnerabilities (1 high, 3 moderate, 2 low) via `npm audit fix`
+- **Decoy App Settings:** Fixed issue where decoy apps (Calculator, Calendar) were ignoring background recording settings.
+- **Package Updates:** Updated `expo`, `expo-audio`, and `expo-router` to recommended versions for stability.
 
 ### Improvements
 - **Library Features Restored:** Re-implemented Audio and Text tabs with proper filtering logic
@@ -94,6 +96,15 @@ You can start developing by editing the files inside the **app** directory. This
   - **Privacy Policy Link:** Added link to privacy policy at the bottom of the home screen.
 - **Detailed Report Screen:**
   - **Decoy App Quick Launch:** Added section at the bottom with buttons to quickly launch Calculator, Calendar, or Tracker apps for safety.
+- **Abuse Detection System:**
+  - **Aggressive Detection:** Automatically flags cycle tracker entries with severe pain + negative mood, multiple pain types, or concerning keywords in notes.
+  - **Silent Reporting:** Creates private text reports for evidence without alerting the user or potential abusers.
+  - **Expanded Keywords:** Detects 30+ terms related to violence, coercion, threats, and injury.
+- **Settings & Privacy:**
+  - **Background Recording Toggles:** Users can now enable/disable background recording for each decoy app (Calculator, Calendar, Tracker) individually.
+  - **Abuse Detection Toggle:** Option to enable/disable automatic abuse detection.
+  - **Data Management:** "Clear All Data" option to permanently delete all local data.
+  - **Settings Screen:** Accessible via the Explore tab.
 - **Expo SDK:** 54.0.25
 - **React Native:** 0.81.5
 - **React:** 19.1.0
@@ -101,6 +112,27 @@ You can start developing by editing the files inside the **app** directory. This
 - **expo-audio:** 1.0.15 (for audio recording and playback)
 - **expo-router:** 6.0.15 (file-based routing)
 - **@react-native-async-storage/async-storage:** 2.2.0 (for local data persistence)
+
+---
+
+## Secret Gestures & Safety Features
+
+### 🤫 Secret Gestures
+- **Emergency Exit (Decoy Apps):** Long press (3 seconds) on the header title (e.g., "Calculator", "Calendar", "My Cycle") to save any recording and exit to the home screen.
+- **Fake Calculator:**
+  - **Clear (C) Button:** Long press (3s) to save recording and exit.
+  - **Standard Use:** Works as a normal calculator.
+- **Fake Calendar:**
+  - **Triple Tap Date:** Tap the same date 3 times to trigger emergency exit.
+  - **Holiday Info:** Tap dates to see holidays.
+- **Home Screen:**
+  - **Mood Icons:** Tapping any mood icon silently navigates to the Menstrual Tracker.
+
+### 🛡️ Trauma-Informed Features
+- **Background Recording:** Decoy apps (Calculator, Calendar, Tracker) can record audio in the background while appearing to be normal apps. Configurable in Settings.
+- **Abuse Detection:** The Menstrual Tracker analyzes symptoms and notes for signs of abuse (e.g., "hit", "forced", "scared") and silently creates evidence reports.
+- **Local-Only Storage:** All data is stored on the device. No cloud sync ensures data never leaves the user's possession without explicit action.
+- **Discreet Interface:** The app appears as a generic "SafeGirls" or utility app. The "Explore" tab disguises safety tools as common utilities.
 
 ---
 

@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { BackgroundRecordingProvider } from '@/contexts/BackgroundRecordingContext';
+import { SettingsProvider } from '@/contexts/SettingsContext';
 import { ThemeProvider as CustomThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
@@ -57,6 +58,13 @@ function RootNavigator() {
           }}
         />
 
+        <Stack.Screen
+          name="settings"
+          options={{
+            headerShown: false
+          }}
+        />
+
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
@@ -76,9 +84,11 @@ export default function RootLayout() {
 
   return (
     <CustomThemeProvider>
-      <BackgroundRecordingProvider>
-        <RootNavigator />
-      </BackgroundRecordingProvider>
+      <SettingsProvider>
+        <BackgroundRecordingProvider>
+          <RootNavigator />
+        </BackgroundRecordingProvider>
+      </SettingsProvider>
     </CustomThemeProvider>
   );
 }

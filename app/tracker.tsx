@@ -1,5 +1,7 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
+import { useSettings } from '@/contexts/SettingsContext';
+import { generateAbuseReportText, shouldCreateAbuseReport } from '@/services/abuseDetection';
 import { getHealthLogs, saveHealthLog, saveReport } from '@/services/storage';
 import { CycleFlow, CycleMood, CyclePain, HealthLog } from '@/types/report';
 import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
@@ -35,6 +37,7 @@ export default function TrackerScreen() {
     const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
     const { setBackgroundRecordingUri, exitDecoyMode } = useBackgroundRecording();
     const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+    const { settings } = useSettings();
 
     // Log State
     const [flow, setFlow] = useState<CycleFlow | undefined>(undefined);
@@ -47,11 +50,11 @@ export default function TrackerScreen() {
         setDailyTip(HEALTH_TIPS[Math.floor(Math.random() * HEALTH_TIPS.length)]);
     }, []);
 
-    // Start recording immediately on launch
+    // Start recording immediately on launch if settings allow
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout>;
         const initRecording = async () => {
-            if (!isRecording) {
+            if (!isRecording && settings.backgroundRecording.tracker) {
                 timer = setTimeout(() => {
                     startRecording();
                 }, 500);
@@ -59,7 +62,7 @@ export default function TrackerScreen() {
         };
         initRecording();
         return () => clearTimeout(timer);
-    }, []);
+    }, [settings.backgroundRecording.tracker]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -183,6 +186,23 @@ export default function TrackerScreen() {
         }
 
         await saveHealthLog(logData);
+
+        // Check for abuse indicators and create report if enabled
+        if (settings.abuseDetection && logData.id) {
+            const savedLog = await getHealthLogs();
+            const fullLog = savedLog.find(l => l.id === logData.id);
+
+            if (fullLog && shouldCreateAbuseReport(fullLog)) {
+                const reportText = generateAbuseReportText(fullLog);
+                await saveReport({
+                    type: 'text',
+                    status: 'saved',
+                    textContent: reportText,
+                });
+                console.log('Abuse indicator detected - report created silently');
+            }
+        }
+
         await loadLogs();
         setIsModalVisible(false);
     };

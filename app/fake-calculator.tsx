@@ -1,4 +1,5 @@
 import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { saveReport } from '@/services/storage';
 import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
@@ -21,13 +22,14 @@ export default function FakeCalculatorScreen() {
   const router = useRouter();
   const { exitDecoyMode, setBackgroundRecordingUri } = useBackgroundRecording();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const { settings } = useSettings();
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Start recording immediately on launch
+  // Start recording immediately on launch if settings allow
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     const initRecording = async () => {
-      if (!isRecording) {
+      if (!isRecording && settings.backgroundRecording.calculator) {
         timer = setTimeout(() => {
           startRecording();
         }, 500);
@@ -35,7 +37,7 @@ export default function FakeCalculatorScreen() {
     };
     initRecording();
     return () => clearTimeout(timer);
-  }, []);
+  }, [settings.backgroundRecording.calculator]);
 
   // Cleanup on unmount
   useEffect(() => {
