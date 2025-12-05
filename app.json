@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "safegirl-app",
+    "name": "Salama Msichana",
     "slug": "salama-msichana",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -34,13 +34,15 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 250,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#F5F3FF"
         }
       ],
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      "expo-sqlite",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

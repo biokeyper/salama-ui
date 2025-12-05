@@ -2,16 +2,89 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { BackgroundRecordingProvider } from '@/contexts/BackgroundRecordingContext';
+import { PinProtectionProvider } from '@/contexts/PinProtectionContext';
+import { SettingsProvider } from '@/contexts/SettingsContext';
+import { ThemeProvider as CustomThemeProvider } from '@/contexts/ThemeContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { initDatabase } from '@/services/database';
+
+function RootNavigator() {
+  const colorScheme = useColorScheme();
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen
+          name="index"
+          options={{
+            headerShown: false,
+            title: 'SafeGirls',
+            animation: 'fade_from_bottom',
+          }}
+        />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="fake-calculator" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="fake-calendar" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="tracker" options={{ headerShown: false }} />
+
+        <Stack.Screen
+          name="safety-check"
+          options={{
+            title: 'Safety Check',
+            headerBackTitle: 'Back'
+          }}
+        />
+        <Stack.Screen
+          name="detailed-report"
+          options={{
+            title: 'Detailed Report',
+            headerBackTitle: 'Back'
+          }}
+        />
+        <Stack.Screen
+          name="text-report"
+          options={{
+            title: 'Text Report',
+            headerBackTitle: 'Back'
+          }}
+        />
+        <Stack.Screen
+          name="record-past"
+          options={{
+            title: 'Record Past Event',
+            headerBackTitle: 'Back'
+          }}
+        />
+
+        <Stack.Screen
+          name="settings"
+          options={{
+            headerShown: false
+          }}
+        />
+
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style="auto" />
+    </ThemeProvider>
+  );
+}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  // Initialize database on app launch
+  useEffect(() => {
+    initDatabase().catch(console.error);
+  }, []);
 
   if (!loaded) {
     // Async font loading only occurs in development.
@@ -19,24 +92,14 @@ export default function RootLayout() {
   }
 
   return (
-    <BackgroundRecordingProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen
-            name="index"
-            options={{
-              headerShown: false,
-              title: 'SafeGirls',
-              animation: 'fade_from_bottom',
-            }}
-          />
-
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="fake-calculator" options={{ headerShown: false, gestureEnabled: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </BackgroundRecordingProvider>
+    <CustomThemeProvider>
+      <PinProtectionProvider>
+        <SettingsProvider>
+          <BackgroundRecordingProvider>
+            <RootNavigator />
+          </BackgroundRecordingProvider>
+        </SettingsProvider>
+      </PinProtectionProvider>
+    </CustomThemeProvider>
   );
 }

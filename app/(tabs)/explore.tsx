@@ -4,9 +4,10 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { WavingGirl } from '@/components/WavingGirl';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Linking, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type CountryCode = 'UG' | 'KE' | 'TZ' | 'RW' | 'BI' | 'SS';
 
@@ -55,6 +56,7 @@ const SUPPORT_DATA: Record<CountryCode, SupportInfo> = {
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { themeMode, setThemeMode } = useTheme();
   const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null);
 
   const handleSupportPress = (country: CountryCode) => {
@@ -84,7 +86,7 @@ export default function ExploreScreen() {
       </ThemedView>
 
       {/* Apps Section */}
-      <Collapsible title="Apps" defaultOpen={true}>
+      <Collapsible title="📱 Apps" defaultOpen={true}>
         <ThemedText style={styles.sectionDescription}>
           Discreet tools designed for your safety.
         </ThemedText>
@@ -99,25 +101,25 @@ export default function ExploreScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.appIconButton, styles.disabledIconButton]}
-            onPress={() => Alert.alert('Coming Soon', 'Fake Calendar is under development.')}
+            style={styles.appIconButton}
+            onPress={() => router.push('/fake-calendar')}
           >
-            <Text style={styles.appEmojiDisabled}>📅</Text>
-            <Text style={styles.appLabelDisabled}>Calendar</Text>
+            <Text style={styles.appEmoji}>📅</Text>
+            <Text style={styles.appLabel}>Calendar</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.appIconButton, styles.disabledIconButton]}
-            onPress={() => Alert.alert('Coming Soon', 'Menstruation Tracker is under development.')}
+            style={styles.appIconButton}
+            onPress={() => router.push('/tracker')}
           >
-            <Text style={styles.appEmojiDisabled}>🩸</Text>
-            <Text style={styles.appLabelDisabled}>Tracker</Text>
+            <Text style={styles.appEmoji}>🩸</Text>
+            <Text style={styles.appLabel}>Tracker</Text>
           </TouchableOpacity>
         </View>
       </Collapsible>
 
       {/* Support Section */}
-      <Collapsible title="Support & Helplines">
+      <Collapsible title="💜 Support & Helplines">
         <ThemedText style={styles.sectionDescription}>
           Select your country for local support resources.
         </ThemedText>
@@ -144,13 +146,66 @@ export default function ExploreScreen() {
       </Collapsible>
 
       {/* Who We Are Section */}
-      <Collapsible title="Who We Are">
+      <Collapsible title="ℹ️ Who We Are">
         <ThemedText>
           SafeGirls is dedicated to providing discreet, accessible safety tools and resources for women. Our mission is to empower you with technology that protects and supports you in any situation.
         </ThemedText>
         <ThemedText style={{ marginTop: 10 }}>
           We believe in privacy, security, and the right to safety for everyone.
         </ThemedText>
+      </Collapsible>
+
+      {/* Settings Section */}
+      <Collapsible title="⚙️ Settings">
+        <ThemedView style={styles.settingsContainer}>
+          <TouchableOpacity
+            style={styles.settingsLink}
+            onPress={() => router.push('/settings')}
+          >
+            <IconSymbol name="gearshape.fill" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.settingsLinkText}>App Settings</ThemedText>
+            <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          <ThemedText style={styles.settingDescription}>
+            Configure background recording, safety features, and privacy options.
+          </ThemedText>
+
+          <ThemedText type="defaultSemiBold" style={styles.settingLabel}>
+            Theme
+          </ThemedText>
+          <View style={styles.themeOptions}>
+            <TouchableOpacity
+              style={[styles.themeOption, themeMode === 'light' && styles.themeOptionActive]}
+              onPress={() => setThemeMode('light')}
+            >
+              <Text style={styles.themeIcon}>☀️</Text>
+              <ThemedText style={[styles.themeText, themeMode === 'light' && styles.themeTextActive]}>
+                Light
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.themeOption, themeMode === 'dark' && styles.themeOptionActive]}
+              onPress={() => setThemeMode('dark')}
+            >
+              <Text style={styles.themeIcon}>🌙</Text>
+              <ThemedText style={[styles.themeText, themeMode === 'dark' && styles.themeTextActive]}>
+                Dark
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.themeOption, themeMode === 'auto' && styles.themeOptionActive]}
+              onPress={() => setThemeMode('auto')}
+            >
+              <Text style={styles.themeIcon}>🔄</Text>
+              <ThemedText style={[styles.themeText, themeMode === 'auto' && styles.themeTextActive]}>
+                Auto
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </ThemedView>
       </Collapsible>
 
       {/* Support Modal */}
@@ -199,6 +254,14 @@ export default function ExploreScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Privacy Policy Link */}
+      <TouchableOpacity
+        style={styles.privacyLink}
+        onPress={() => Linking.openURL('https://www.biokeyper.com/privacy-policy')}
+      >
+        <ThemedText style={styles.privacyLinkText}>Privacy Policy</ThemedText>
+      </TouchableOpacity>
 
     </ParallaxScrollView>
   );
@@ -368,5 +431,73 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Settings styles
+  settingsContainer: {
+    gap: 16,
+  },
+  settingLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  themeOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  themeOption: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(139, 92, 246, 0.05)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  themeOptionActive: {
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderColor: '#8B5CF6',
+  },
+  themeIcon: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  themeText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  themeTextActive: {
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  privacyLink: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  privacyLinkText: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    textDecorationLine: 'underline',
+  },
+  settingsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(139, 92, 246, 0.05)',
+    borderRadius: 12,
+    gap: 12,
+    marginBottom: 16,
+  },
+  settingsLinkText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 18,
   },
 });

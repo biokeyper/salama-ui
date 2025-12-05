@@ -1,4 +1,5 @@
 import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { saveReport } from '@/services/storage';
 import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
@@ -19,35 +20,37 @@ export default function FakeCalculatorScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const router = useRouter();
-  const { isInDecoyMode, exitDecoyMode, setBackgroundRecordingUri } = useBackgroundRecording();
+  const { exitDecoyMode, setBackgroundRecordingUri } = useBackgroundRecording();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const { settings } = useSettings();
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Start recording when in decoy mode - with delay to allow previous recorder to cleanup
+  // Start recording immediately on launch if settings allow
   useEffect(() => {
-    if (isInDecoyMode && !isRecording) {
-      // Wait 500ms for previous recorder to cleanup
-      const timer = setTimeout(() => {
-        startRecording();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isInDecoyMode]);
+    let timer: ReturnType<typeof setTimeout>;
+    const initRecording = async () => {
+      if (!isRecording && settings.backgroundRecording.calculator) {
+        timer = setTimeout(() => {
+          startRecording();
+        }, 500);
+      }
+    };
+    initRecording();
+    return () => clearTimeout(timer);
+  }, [settings.backgroundRecording.calculator]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Use state variable instead of audioRecorder.isRecording to avoid accessing released object
       if (isRecording) {
         try {
           audioRecorder.stop().catch(() => { });
         } catch (error) {
-          // Recorder already released, ignore
           console.log('Recorder cleanup skipped - already released');
         }
       }
     };
-  }, [isRecording]); // Depend on isRecording state, not audioRecorder
+  }, [isRecording]);
 
   // Blinking cursor effect
   useEffect(() => {
@@ -55,9 +58,9 @@ export default function FakeCalculatorScreen() {
       if (isRecording) {
         setShowCursor((prev) => !prev);
       } else {
-        setShowCursor(true); // Static cursor when not recording
+        setShowCursor(true);
       }
-    }, 500); // Blink every 500ms
+    }, 500);
 
     return () => clearInterval(interval);
   }, [isRecording]);
@@ -92,12 +95,13 @@ export default function FakeCalculatorScreen() {
       setIsRecording(false);
 
       if (uri) {
-        // Save the background recording
         const savedReport = await saveReport({
           type: 'audio',
           status: 'saved',
           audioUri: uri,
           audioDuration: durationMs,
+          createdAt: new Date().toISOString(),
+          metadata: { notes: 'Background recording from calculator' },
         });
         setBackgroundRecordingUri(uri);
         console.log('Background recording saved:', savedReport.id);
@@ -113,7 +117,6 @@ export default function FakeCalculatorScreen() {
   const handlePress = (value: string) => {
     if (value === '=') {
       try {
-        // Evaluate the expression (very basic, not for real calculator use)
         // eslint-disable-next-line no-eval
         const result = eval(display);
         setDisplay(String(result));
@@ -130,14 +133,17 @@ export default function FakeCalculatorScreen() {
   // Secret gesture: Long press "C" button for 3 seconds
   const handleClearPressIn = () => {
     longPressTimer.current = setTimeout(async () => {
-      // Secret exit triggered - save recording and return to app
       await stopRecording();
       exitDecoyMode();
       router.replace('/(tabs)');
-    }, 3000); // 3 seconds
+    }, 3000);
   };
 
   const handleClearPressOut = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
   };
 
   const displayText = display || '0';

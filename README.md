@@ -16,8 +16,52 @@ It is **not** the blockchain ("chain end") or smart contract code, but rather th
 - **Audio recording and playback:** Record incidents in real-time or document past events with built-in audio player
 - **Text reporting:** Alternative text-based reporting flow for users who prefer typing
 - **Safety-first design:** Emergency exit, safety checks, and trauma-informed language
-- **Custom theming** and reusable UI components
+- **Custom theming** with Light/Dark/Auto modes and persistent user preferences
 - **Expo SDK 54** with latest React Native 0.81.5
+
+---
+
+## How to Use SafeGirls App
+> **Note for Users:** This app is designed to look like a normal utility app to keep you safe.
+
+### 1. Home Screen (Safe Space)
+- **Mood Check-in:** Tap the mood icons (😊 😐 😔) to log how you feel. This silently opens the Menstrual Tracker.
+- **Quick Actions:**
+  - 🎤 **Record:** Go to the recording screen.
+  - 📚 **Library:** Access your saved reports (PIN protected).
+  - 🌍 **Explore:** Find support resources and decoy apps.
+- **Privacy:** The app stores all data on your phone. Nothing is sent to the cloud without your permission.
+
+### 2. Recording Incidents
+- **Real-time:** Tap the microphone icon on the "Record" tab to start recording.
+- **Pulse Animation:** Shows that recording is active.
+- **Exit Now:** Tap the big red "EXIT NOW" button to instantly save the recording and switch to a fake calculator screen. This is for emergencies.
+
+### 3. Decoy Apps (Hidden Features)
+The app includes "fake" apps to hide its true purpose:
+- **Calculator:** Works like a real calculator.
+- **Calendar:** Shows dates and holidays.
+- **Menstrual Tracker:** Tracks your cycle and health.
+
+**Secret Gestures:**
+- **Long Press (3 seconds)** on the title of any decoy app (e.g., "Calculator", "My Cycle") to **EXIT** back to the main app.
+- **Fake Calculator:** Long press the **'C' (Clear)** button to exit.
+- **Fake Calendar:** Tap a date **3 times** to exit.
+
+### 4. Background Recording
+- You can enable background recording in **Settings** (gear icon in Explore tab).
+- When enabled, opening a decoy app (Calculator, Calendar, Tracker) will **automatically start recording audio** in the background.
+- This allows you to document situations discreetly while appearing to use a normal app.
+
+### 5. Library & PIN Protection
+- **Access:** The Library tab holds your saved audio and text reports.
+- **Security:** You must set a **PIN** to access the library.
+- **Verification:** Every time you open the library, you must enter your PIN.
+- **Hidden Content:** The library content is blurred until you unlock it.
+
+### 6. Emergency Features
+- **Abuse Detection:** The Menstrual Tracker analyzes your logs for signs of abuse (e.g., specific pain types + negative mood) and can silently create reports.
+- **Panic Button:** The "EXIT NOW" button on the record screen is your panic button. Use it if you are interrupted or unsafe.
 
 ---
 
@@ -51,49 +95,63 @@ You can start developing by editing the files inside the **app** directory. This
 ### Audio Recording & Playback
 - **Real-time recording:** Record incidents as they happen with high-quality audio capture
 - **Past event recording:** Document historical incidents with voice narration
-- **Library:** Dedicated tab to manage and filter reports by Audio or Text type
-- **Audio playback:** Built-in player with auto-stop, seek controls (+/- 10s), and progress tracking
-- **Flexible input:** Prominent "Skip and type instead" option for users who prefer text
-
-### Safety Features
-- **Emergency exit:** Quick exit button that closes the app and clears history
-- **Fake calculator screen:** Discreet decoy screen for emergency situations
-- **Safety check:** Pre-report safety assessment before detailed documentation
-- **Trauma-informed design:** User-controlled experience with skip options and supportive language
-
-### Reporting Flows
-- **Multi-step reporting:** Guided flow from recording/input to detailed report
-- **Voice or text input:** Flexible documentation methods with dedicated Library tabs
-- **Detailed reports:** Comprehensive incident documentation with metadata
 
 ---
 
 ## Recent Updates (December 2025)
 
 ### Bug Fixes
-- **Emergency Exit Navigation:** Fixed crash when pressing "EXIT NOW" button - now correctly saves recording and navigates to fake calculator
+- **Emergency Exit Navigation:** Fixed race condition crash when pressing "EXIT NOW" button by preventing double execution.
+- **Cycle Tracker Exit:** Resolved crash when long-pressing title to exit by fixing audio recorder cleanup race condition.
+- **Library Security:** Fixed security flaw where PIN check could be bypassed on navigation. Now checks PIN every time screen is focused.
+- **Library Audio:** Fixed issue where audio continued playing after leaving the library screen.
 - **Library Screen Stability:** Resolved crashes when loading audio reports by implementing lazy-loading for audio players
 - **Text Reports Tab:** Fixed crash when switching to text reports tab with improved conditional rendering
 - **Audio Playback:** Resolved "already released" errors with defensive null checks and try-catch blocks
 - **SafeAreaView Deprecation:** Updated all screens to use `react-native-safe-area-context` instead of deprecated React Native SafeAreaView
 - **Audio Duration Display:** Fixed "0:00" issue by tracking recording duration and adding fallback logic
 - **FileSystem Deprecation:** Resolved `deleteAsync` error by migrating to `expo-file-system/legacy`
+- **Security Vulnerabilities:** Fixed 6 npm package vulnerabilities (1 high, 3 moderate, 2 low) via `npm audit fix`
+- **Decoy App Settings:** Fixed issue where decoy apps (Calculator, Calendar) were ignoring background recording settings.
+- **Package Updates:** Updated `expo`, `expo-audio`, and `expo-router` to recommended versions for stability.
 
 ### Improvements
 - **Library Features Restored:** Re-implemented Audio and Text tabs with proper filtering logic
 - **Audio Player Enhancements:** Audio now plays immediately without requiring Stop button first
 - **Error Handling:** Added comprehensive error handling for audio player lifecycle methods
 - **Code Stability:** Improved resource management and cleanup in audio components
+- **Home Screen Redesign (Concept 3):**
+  - Large centered animated wave (👋) as hero element
+  - Warm welcome message with mood check-in feature
+  - Quick action cards with emoji icons (🎤📚🌍) for easy navigation
+  - Safe space messaging and privacy reminders
+  - Hidden bottom navigation for immersive experience
 - **Explore Tab Redesign:** Complete UI overhaul with:
-  - Icon-based app launcher (Fake Calculator, coming soon: Calendar & Tracker)
+  - Icon-based app launcher (Fake Calculator, Fake Calendar, Menstrual Tracker)
   - Support resources for 6 East African countries (Uganda, Kenya, Tanzania, Rwanda, Burundi, South Sudan)
   - Clickable toll-free helpline numbers with direct dialing
   - Purple-themed modal design for support information
-
----
-
-## Technical Stack
-
+  - Waving girl animation (👧) in header for friendly feel
+- **Decoy Apps & Safety:**
+  - **Fake Calendar:** Fully functional calendar with holiday display and background recording on launch.
+  - **Fake Calculator:** Updated to start recording immediately on launch for enhanced safety.
+  - **Menstrual Tracker:** Privacy-first cycle tracking with "Secret Notes" feature, background recording, cycle history, and daily health tips.
+  - **Secret Exit:** Standardized "Long Press" gesture (3s) on header titles to save & exit decoy modes.
+- **Home Tab Enhancements:**
+  - **Pulsating Heart:** The heart emoji below "You are safe here" pulsates continuously to create a living, welcoming feel.
+  - **Functional Mood Icons:** Tapping any mood icon navigates directly to the Menstrual Tracker for quick logging.
+  - **Privacy Policy Link:** Added link to privacy policy at the bottom of the home screen.
+- **Detailed Report Screen:**
+  - **Decoy App Quick Launch:** Added section at the bottom with buttons to quickly launch Calculator, Calendar, or Tracker apps for safety.
+- **Abuse Detection System:**
+  - **Aggressive Detection:** Automatically flags cycle tracker entries with severe pain + negative mood, multiple pain types, or concerning keywords in notes.
+  - **Silent Reporting:** Creates private text reports for evidence without alerting the user or potential abusers.
+  - **Expanded Keywords:** Detects 30+ terms related to violence, coercion, threats, and injury.
+- **Settings & Privacy:**
+  - **Background Recording Toggles:** Users can now enable/disable background recording for each decoy app (Calculator, Calendar, Tracker) individually.
+  - **Abuse Detection Toggle:** Option to enable/disable automatic abuse detection.
+  - **Data Management:** "Clear All Data" option to permanently delete all local data.
+  - **Settings Screen:** Accessible via the Explore tab.
 - **Expo SDK:** 54.0.25
 - **React Native:** 0.81.5
 - **React:** 19.1.0
@@ -101,6 +159,27 @@ You can start developing by editing the files inside the **app** directory. This
 - **expo-audio:** 1.0.15 (for audio recording and playback)
 - **expo-router:** 6.0.15 (file-based routing)
 - **@react-native-async-storage/async-storage:** 2.2.0 (for local data persistence)
+
+---
+
+## Secret Gestures & Safety Features
+
+### 🤫 Secret Gestures
+- **Emergency Exit (Decoy Apps):** Long press (3 seconds) on the header title (e.g., "Calculator", "Calendar", "My Cycle") to save any recording and exit to the home screen.
+- **Fake Calculator:**
+  - **Clear (C) Button:** Long press (3s) to save recording and exit.
+  - **Standard Use:** Works as a normal calculator.
+- **Fake Calendar:**
+  - **Triple Tap Date:** Tap the same date 3 times to trigger emergency exit.
+  - **Holiday Info:** Tap dates to see holidays.
+- **Home Screen:**
+  - **Mood Icons:** Tapping any mood icon silently navigates to the Menstrual Tracker.
+
+### 🛡️ Trauma-Informed Features
+- **Background Recording:** Decoy apps (Calculator, Calendar, Tracker) can record audio in the background while appearing to be normal apps. Configurable in Settings.
+- **Abuse Detection:** The Menstrual Tracker analyzes symptoms and notes for signs of abuse (e.g., "hit", "forced", "scared") and silently creates evidence reports.
+- **Local-Only Storage:** All data is stored on the device. No cloud sync ensures data never leaves the user's possession without explicit action.
+- **Discreet Interface:** The app appears as a generic "SafeGirls" or utility app. The "Explore" tab disguises safety tools as common utilities.
 
 ---
 

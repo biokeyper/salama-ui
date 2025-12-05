@@ -17,6 +17,8 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+android 
+ios
 
 # Metro
 .metro-health-check*
@@ -37,3 +39,6 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Google Play Store Credentials
+google-play-key.json

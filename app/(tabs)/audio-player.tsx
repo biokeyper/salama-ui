@@ -1,13 +1,17 @@
+import LockScreen from '@/app/lock-screen';
 import AudioReportItem from '@/components/AudioReportItem';
+import { hasPin } from '@/services/security';
 import { deleteReport, getAllReports, updateReportStatus } from '@/services/storage';
 import { Report } from '@/types/report';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
@@ -25,6 +29,39 @@ export default function LibraryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [playingReportId, setPlayingReportId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'audio' | 'text'>('audio');
+  const [showPinRequired, setShowPinRequired] = useState(false);
+  const [showPinVerify, setShowPinVerify] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Check PIN status every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const checkPinStatus = async () => {
+        const pinIsSet = await hasPin();
+        if (!pinIsSet) {
+          // No PIN set - show modal to set PIN
+          setShowPinRequired(true);
+          setIsAuthenticated(false);
+        } else {
+          // PIN exists - require verification
+          setShowPinVerify(true);
+          setIsAuthenticated(false);
+        }
+      };
+      checkPinStatus();
+
+      // Reset authentication and stop audio when leaving the screen
+      return () => {
+        setIsAuthenticated(false);
+        setPlayingReportId(null);
+      };
+    }, [])
+  );
+
+  const handlePinVerified = () => {
+    setShowPinVerify(false);
+    setIsAuthenticated(true);
+  };
 
   // Load reports on mount and refresh
   const loadReports = async () => {
@@ -45,8 +82,11 @@ export default function LibraryScreen() {
   };
 
   useEffect(() => {
-    loadReports();
-  }, []);
+    // Only load reports if user is authenticated
+    if (isAuthenticated) {
+      loadReports();
+    }
+  }, [isAuthenticated]);
 
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
@@ -167,7 +207,8 @@ export default function LibraryScreen() {
     });
   };
 
-  if (loading) {
+  // Only show loading spinner if authenticated (not during PIN entry)
+  if (loading && isAuthenticated) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
@@ -264,6 +305,72 @@ export default function LibraryScreen() {
           )}
         </ScrollView>
       </View>
+
+      {/* Blur overlay when PIN modal is shown */}
+      {(showPinRequired || showPinVerify) && (
+        <BlurView
+          intensity={90}
+          style={StyleSheet.absoluteFill}
+          tint="dark"
+        />
+      )}
+
+      {/* PIN Required Modal */}
+      <Modal
+        visible={showPinRequired}
+        animationType="slide"
+        transparent={false}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Feather name="lock" size={60} color="#8B5CF6" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>PIN Required</Text>
+            <Text style={styles.modalMessage}>
+              To protect your privacy and sensitive data, you must set a PIN before accessing the library.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setShowPinRequired(false);
+                router.push('/settings');
+              }}
+            >
+              <Text style={styles.modalButtonText}>Set PIN Now</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => {
+                setShowPinRequired(false);
+                router.back();
+              }}
+            >
+              <Text style={styles.modalCancelText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* PIN Verification Modal */}
+      <Modal
+        visible={showPinVerify}
+        animationType="slide"
+        transparent={false}
+      >
+        <LockScreen
+          mode="verify"
+          onUnlock={handlePinVerified}
+          onSetPin={() => { }}
+        />
+        <TouchableOpacity
+          style={styles.modalCloseButton}
+          onPress={() => {
+            setShowPinVerify(false);
+            router.back();
+          }}
+        >
+          <Feather name="x" size={24} color="#666" />
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -387,6 +494,63 @@ const styles = StyleSheet.create({
   viewButtonText: {
     color: '#8A4FFF',
     fontWeight: '600',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '90%',
+    maxHeight: '90%',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalIcon: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  modalButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    marginBottom: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalCancelButton: {
+    paddingVertical: 10,
+  },
+  modalCancelText: {
+    color: '#999',
     fontSize: 14,
   },
 });
