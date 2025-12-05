@@ -39,3 +39,6 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Google Play Store Credentials
+google-play-key.json
