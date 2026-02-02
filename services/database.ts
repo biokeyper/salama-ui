@@ -28,7 +28,14 @@ export async function initDatabase(): Promise<void> {
         metadata TEXT,
         submitted_at TEXT,
         submission_id TEXT,
-        submission_error TEXT
+        submission_error TEXT,
+        blockchain_status TEXT,
+        confirmations INTEGER,
+        tx_hash TEXT,
+        ipfs_hash TEXT,
+        is_archived BOOLEAN DEFAULT 0,
+        archived_at TEXT,
+        archived_reason TEXT
       );
 
       CREATE TABLE IF NOT EXISTS health_logs (
@@ -123,8 +130,9 @@ async function insertReport(report: Report): Promise<void> {
     await database.runAsync(
         `INSERT OR REPLACE INTO reports (
       id, type, status, created_at, updated_at, audio_uri, audio_duration,
-      text_content, metadata, submitted_at, submission_id, submission_error
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      text_content, metadata, submitted_at, submission_id, submission_error,
+      blockchain_status, confirmations, tx_hash, ipfs_hash, is_archived, archived_at, archived_reason
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             report.id,
             report.type,
@@ -138,6 +146,13 @@ async function insertReport(report: Report): Promise<void> {
             report.submittedAt || null,
             report.submissionId || null,
             report.submissionError || null,
+            report.blockchainStatus || null,
+            report.confirmations || null,
+            report.txHash || null,
+            report.ipfsHash || null,
+            report.isArchived ? 1 : 0,
+            report.archivedAt || null,
+            report.archivedReason || null,
         ]
     );
 }
@@ -373,6 +388,13 @@ function rowToReport(row: any): Report {
         submittedAt: row.submitted_at,
         submissionId: row.submission_id,
         submissionError: row.submission_error,
+        blockchainStatus: row.blockchain_status,
+        confirmations: row.confirmations,
+        txHash: row.tx_hash,
+        ipfsHash: row.ipfs_hash,
+        isArchived: row.is_archived === 1,
+        archivedAt: row.archived_at,
+        archivedReason: row.archived_reason,
     };
 }
 

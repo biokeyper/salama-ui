@@ -87,6 +87,13 @@ export default function FakeCalculatorScreen() {
     if (!isRecording) return null;
 
     try {
+      // Verify recorder exists and hasn't been released
+      if (!audioRecorder) {
+        console.warn('Audio recorder was already released');
+        setIsRecording(false);
+        return null;
+      }
+
       await audioRecorder.stop();
       const endTime = Date.now();
       const durationMs = recordingStartTime ? (endTime - recordingStartTime) : 0;

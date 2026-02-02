@@ -3,10 +3,12 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { saveReport } from '../../services/storage';
+import { submitReportToBackend } from '@/services/api';
+import { startStatusPolling } from '@/services/statusPoller';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -16,6 +18,7 @@ export default function RecordScreen() {
   const [reportId, setReportId] = useState<string | null>(null);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const [isExiting, setIsExiting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Animation value for pulsing effect
@@ -67,6 +70,13 @@ export default function RecordScreen() {
 
   const stopRecording = async () => {
     try {
+      // Verify recorder exists and hasn't been released
+      if (!audioRecorder) {
+        console.warn('Audio recorder was already released');
+        setIsRecording(false);
+        return;
+      }
+
       await audioRecorder.stop();
       const endTime = Date.now();
       const durationMs = recordingStartTime ? (endTime - recordingStartTime) : 0;
@@ -140,6 +150,109 @@ export default function RecordScreen() {
       console.error('Error navigating to decoy mode:', error);
       // Fallback: try to navigate even if context update fails or something else happens
       router.replace('/fake-calculator');
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!recordedUri) {
+      Alert.alert('Error', 'No recording available');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Navigate to safety check for additional details
+      let currentReportId = reportId;
+
+      if (recordedUri && !currentReportId) {
+        const savedReport = await saveReport({
+          type: 'audio',
+          status: 'saved',
+          audioUri: recordedUri,
+        });
+        currentReportId = savedReport.id;
+      }
+
+      router.push({
+        pathname: '../safety-check',
+        params: {
+          audioUri: recordedUri || '',
+          reportId: currentReportId || ''
+        }
+      });
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Error', 'Failed to save draft');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    if (!recordedUri || !reportId) {
+      Alert.alert('Error', 'Recording not available');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Get the saved report for submission
+      const { getReportById } = require('@/services/storage');
+      const report = await getReportById(reportId);
+
+      if (!report) {
+        Alert.alert('Error', 'Report not found');
+        return;
+      }
+
+      const result = await submitReportToBackend(report);
+
+      if (result.success) {
+        Alert.alert(
+          'Success',
+          'Your recording has been submitted to the backend securely.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (result.submissionId) {
+                  startStatusPolling(result.submissionId);
+                }
+                router.replace('/(tabs)');
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Submission Error',
+          result.error || 'Failed to submit. Your recording has been saved locally.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                router.replace('/(tabs)');
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      Alert.alert(
+        'Error',
+        'An error occurred. Your recording has been saved locally.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace('/(tabs)');
+            },
+          },
+        ]
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -222,13 +335,39 @@ export default function RecordScreen() {
             <MaterialIcons name="play-arrow" size={24} color="white" />
             <Text style={styles.playButtonText}>Listen</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {recordedUri && !isRecording && (
+        <View style={styles.submissionButtons}>
+          <TouchableOpacity
+            style={[styles.draftButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleSaveDraft}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#8A4FFF" />
+            ) : (
+              <>
+                <MaterialIcons name="save" size={20} color="#8A4FFF" />
+                <Text style={styles.draftButtonText}>Save as Draft</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.continueButton}
-            onPress={navigateToDetailedReport}
+            style={[styles.submitButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleSubmitReport}
+            disabled={isSubmitting}
           >
-            <Text style={styles.continueButtonText}>Continue</Text>
-            <MaterialIcons name="arrow-forward" size={24} color="#8A4FFF" />
+            {isSubmitting ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <MaterialIcons name="cloud-upload" size={20} color="white" />
+                <Text style={styles.submitButtonText}>Submit Report</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -367,5 +506,48 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  submissionButtons: {
+    flexDirection: 'row',
+    marginTop: 24,
+    gap: 12,
+    paddingHorizontal: 16,
+  },
+  draftButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f0f0',
+    borderWidth: 2,
+    borderColor: '#8A4FFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  draftButtonText: {
+    color: '#8A4FFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  submitButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#8A4FFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

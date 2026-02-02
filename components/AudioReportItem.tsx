@@ -3,6 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getAvailableActions } from '@/utils/reportActions';
 
 interface AudioReportItemProps {
   report: Report;
@@ -12,6 +13,8 @@ interface AudioReportItemProps {
   onDelete: (report: Report) => void;
   onResubmit: (report: Report) => void;
   onPlayingChange: (reportId: string | null) => void;
+  onArchive?: (report: Report) => void;
+  onEdit?: (report: Report) => void;
 }
 
 export default function AudioReportItem({
@@ -22,6 +25,8 @@ export default function AudioReportItem({
   onDelete,
   onResubmit,
   onPlayingChange,
+  onArchive,
+  onEdit,
 }: AudioReportItemProps) {
   // Early return if no audio URI - this shouldn't render in the first place
   if (!report.audioUri) {
@@ -135,34 +140,44 @@ export default function AudioReportItem({
     });
   };
 
-  const getStatusColor = (status: Report['status']): string => {
-    switch (status) {
-      case 'submitted':
-        return '#4CAF50';
-      case 'failed':
-        return '#FF3B30';
-      case 'saved':
-        return '#FFA500';
-      case 'draft':
-        return '#9E9E9E';
-      default:
-        return '#9E9E9E';
+  const getStatusDisplay = (): { color: string; label: string } => {
+    // Archived reports
+    if (report.isArchived) {
+      return { color: '#795548', label: 'Archived' };
     }
-  };
 
-  const getStatusLabel = (status: Report['status']): string => {
-    switch (status) {
-      case 'submitted':
-        return 'Submitted';
-      case 'failed':
-        return 'Failed';
-      case 'saved':
-        return 'Saved';
-      case 'draft':
-        return 'Draft';
-      default:
-        return 'Unknown';
+    // Frontend statuses (draft, saved)
+    if (report.status === 'draft') {
+      return { color: '#9E9E9E', label: 'Draft' };
     }
+    if (report.status === 'saved') {
+      return { color: '#FFA500', label: 'Saved' };
+    }
+
+    // Submitted - check blockchain status
+    if (report.status === 'submitted') {
+      if (report.blockchainStatus === 'failed') {
+        return { color: '#FF3B30', label: 'Failed' };
+      }
+      if (report.blockchainStatus === 'confirmed') {
+        return { color: '#4CAF50', label: 'Confirmed ✓' };
+      }
+      if (report.blockchainStatus === 'pending') {
+        const confirmations = report.confirmations || 0;
+        return {
+          color: '#FFEB3B',
+          label: `Pending ${confirmations}/12`,
+        };
+      }
+      return { color: '#2196F3', label: 'Submitting...' };
+    }
+
+    // Failed submission
+    if (report.status === 'failed') {
+      return { color: '#FF3B30', label: 'Failed' };
+    }
+
+    return { color: '#9E9E9E', label: 'Unknown' };
   };
 
   const position = status?.currentTime || 0;
@@ -178,22 +193,81 @@ export default function AudioReportItem({
         <View style={styles.reportInfo}>
           <Text style={styles.reportDate}>{formatDate(report.createdAt)}</Text>
           <View style={styles.statusContainer}>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(report.status) }
-              ]}
-            >
-              <Text style={styles.statusText}>{getStatusLabel(report.status)}</Text>
-            </View>
+            {(() => {
+              const statusDisplay = getStatusDisplay();
+              return (
+                <>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: statusDisplay.color }
+                    ]}
+                  >
+                    <Text style={styles.statusText}>{statusDisplay.label}</Text>
+                  </View>
+
+                  {/* Show confirmation progress for pending reports */}
+                  {report.blockchainStatus === 'pending' && report.confirmations !== undefined && (
+                    <View style={styles.progressBarSmall}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${(report.confirmations / 12) * 100}%` }
+                        ]}
+                      />
+                    </View>
+                  )}
+                </>
+              );
+            })()}
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => onDelete(report)}
-        >
-          <MaterialIcons name="delete-outline" size={24} color="#FF3B30" />
-        </TouchableOpacity>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          {(() => {
+            const actions = getAvailableActions(report);
+            return (
+              <>
+                {actions.canEdit && onEdit && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => onEdit(report)}
+                  >
+                    <MaterialIcons name="edit" size={20} color="#8A4FFF" />
+                  </TouchableOpacity>
+                )}
+
+                {actions.canDelete && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => onDelete(report)}
+                  >
+                    <MaterialIcons name="delete-outline" size={20} color="#FF3B30" />
+                  </TouchableOpacity>
+                )}
+
+                {actions.canArchive && onArchive && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => onArchive(report)}
+                  >
+                    <MaterialIcons name="archive" size={20} color="#FF9800" />
+                  </TouchableOpacity>
+                )}
+
+                {actions.canRetry && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => onResubmit(report)}
+                  >
+                    <MaterialIcons name="refresh" size={20} color="#8A4FFF" />
+                  </TouchableOpacity>
+                )}
+              </>
+            );
+          })()}
+        </View>
       </View>
 
       {/* Playback Controls */}
@@ -307,7 +381,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  deleteButton: {
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  actionButton: {
     padding: 4,
   },
   controlsContainer: {
@@ -387,5 +466,18 @@ const styles = StyleSheet.create({
   submittedText: {
     fontSize: 12,
     color: '#4CAF50',
+  },
+  progressBarSmall: {
+    width: '100%',
+    height: 3,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 1.5,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#FFEB3B',
+    borderRadius: 1.5,
   },
 });

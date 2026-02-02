@@ -1,0 +1,62 @@
+/**
+ * Report Mapper
+ * Maps local Report objects to SafeGirl Core backend's flexible response format
+ * Backend accepts 0+ responses, max 1000 chars each
+ */
+
+import { Report } from '../types/report';
+
+/**
+ * Map a local report to flexible response format
+ * Backend accepts 0+ responses, max 1000 chars each
+ */
+export function mapReportToResponses(report: Report): string[] {
+  const responses: string[] = [];
+
+  // Add text content if available (chunk into max 1000 char responses)
+  if (report.textContent) {
+    const chunks = chunkString(report.textContent, 1000);
+    responses.push(...chunks);
+  }
+
+  // Add notes from metadata if available
+  if (report.metadata?.notes) {
+    responses.push(report.metadata.notes);
+  }
+
+  // Add location if available
+  if (report.metadata?.location) {
+    responses.push(`Location: ${report.metadata.location}`);
+  }
+
+  // Add timestamp if available
+  if (report.metadata?.timestamp) {
+    responses.push(`When: ${report.metadata.timestamp}`);
+  }
+
+  return responses;
+}
+
+/**
+ * Chunk a string into smaller pieces (max maxLength characters)
+ */
+function chunkString(str: string, maxLength: number): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < str.length; i += maxLength) {
+    chunks.push(str.substring(i, i + maxLength));
+  }
+  return chunks;
+}
+
+/**
+ * Prepare report metadata for backend submission
+ */
+export function prepareReportMetadata(report: Report) {
+  return {
+    reportId: report.id,
+    type: report.type,
+    createdAt: report.createdAt,
+    location: report.metadata?.location,
+    tags: report.metadata?.tags || [],
+  };
+}

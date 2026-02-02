@@ -1,8 +1,11 @@
 import LockScreen from '@/app/lock-screen';
 import AudioReportItem from '@/components/AudioReportItem';
 import { hasPin } from '@/services/security';
-import { deleteReport, getAllReports, updateReportStatus } from '@/services/storage';
+import { deleteReport, getAllReports, updateReportStatus, archiveReport } from '@/services/storage';
+import { submitReportToBackend, archiveReportOnBackend } from '@/services/api';
+import { startStatusPolling } from '@/services/statusPoller';
 import { Report } from '@/types/report';
+import { getAvailableActions } from '@/utils/reportActions';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -32,6 +35,7 @@ export default function LibraryScreen() {
   const [showPinRequired, setShowPinRequired] = useState(false);
   const [showPinVerify, setShowPinVerify] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   // Check PIN status every time the screen comes into focus
   useFocusEffect(
@@ -67,11 +71,17 @@ export default function LibraryScreen() {
   const loadReports = async () => {
     try {
       const allReports = await getAllReports();
+
+      // Filter based on archived status
+      const filteredReports = showArchived
+        ? allReports.filter(r => r.isArchived)
+        : allReports.filter(r => !r.isArchived);
+
       // Sort by most recent first
-      allReports.sort((a, b) =>
+      filteredReports.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      setReports(allReports);
+      setReports(filteredReports);
     } catch (error) {
       console.error('Error loading reports:', error);
       Alert.alert('Error', 'Failed to load reports');
@@ -86,7 +96,7 @@ export default function LibraryScreen() {
     if (isAuthenticated) {
       loadReports();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, showArchived]);
 
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
@@ -126,6 +136,17 @@ export default function LibraryScreen() {
   };
 
   const handleDelete = (report: Report) => {
+    const actions = getAvailableActions(report);
+
+    if (!actions.canDelete) {
+      Alert.alert(
+        'Cannot Delete',
+        actions.message || 'This report cannot be deleted. You can archive it instead.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Delete Report',
       'Are you sure you want to delete this report? This action cannot be undone.',
@@ -153,7 +174,7 @@ export default function LibraryScreen() {
                 }
               }
 
-              // Delete report from storage
+              // Delete report from storage (local only)
               await deleteReport(report.id);
 
               // Reload reports
@@ -172,28 +193,125 @@ export default function LibraryScreen() {
 
   const handleResubmit = async (report: Report) => {
     Alert.alert(
-      'Resubmit Report',
-      'This will mark the report for resubmission. Backend submission functionality will be implemented in the future.',
+      'Submit Report',
+      'This will encrypt and submit your report to the backend. It will be stored on IPFS and timestamped on the blockchain.',
       [
         {
           text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Mark for Resubmission',
+          text: 'Submit',
           onPress: async () => {
             try {
-              await updateReportStatus(report.id, 'saved');
-              await loadReports();
-              Alert.alert('Success', 'Report marked for resubmission');
+              const result = await submitReportToBackend(report);
+
+              if (result.success) {
+                Alert.alert(
+                  'Success',
+                  `Report submitted successfully.\nSubmission ID: ${result.submissionId}\nIPFS Hash: ${result.ipfsHash || 'Pending'}`,
+                  [
+                    {
+                      text: 'OK',
+                      onPress: async () => {
+                        await loadReports();
+                        // Start polling for blockchain confirmation
+                        if (result.submissionId) {
+                          startStatusPolling(result.submissionId);
+                        }
+                      },
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert(
+                  'Submission Failed',
+                  result.error || 'Failed to submit report. Please try again.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: async () => {
+                        await loadReports();
+                      },
+                    },
+                  ]
+                );
+              }
             } catch (error) {
-              console.error('Error updating report status:', error);
-              Alert.alert('Error', 'Failed to update report status');
+              console.error('Error submitting report:', error);
+              Alert.alert('Error', 'An unexpected error occurred while submitting the report');
+              await loadReports();
             }
           },
         },
       ]
     );
+  };
+
+  const handleArchive = (report: Report) => {
+    const actions = getAvailableActions(report);
+
+    if (!actions.canArchive) {
+      Alert.alert(
+        'Cannot Archive',
+        actions.message || 'This report cannot be archived',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Archive Report',
+      'Archiving will hide this report from your library but keep the blockchain record.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          onPress: async () => {
+            try {
+              // Archive on backend (for submitted reports with submissionId)
+              if (report.submissionId) {
+                const result = await archiveReportOnBackend(report.submissionId, 'User archived');
+                if (!result.success) {
+                  Alert.alert('Error', result.error || 'Failed to archive on backend');
+                  return;
+                }
+              }
+
+              // Archive locally
+              await archiveReport(report.id, 'User archived');
+              await loadReports();
+              Alert.alert('Success', 'Report archived successfully');
+            } catch (error) {
+              console.error('Error archiving report:', error);
+              Alert.alert('Error', 'Failed to archive report');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEditReport = (report: Report) => {
+    const actions = getAvailableActions(report);
+
+    if (!actions.canEdit) {
+      Alert.alert(
+        'Cannot Edit',
+        actions.message || 'This report cannot be edited',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (report.type === 'text' || report.type === 'mixed') {
+      router.push({
+        pathname: '/text-report',
+        params: { editReportId: report.id },
+      });
+    } else {
+      Alert.alert('Note', 'Audio reports cannot be edited yet');
+    }
   };
 
   const formatDate = (dateString: string): string => {
@@ -227,8 +345,17 @@ export default function LibraryScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={24} color="#8A4FFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Library</Text>
-          <View style={styles.placeholder} />
+          <Text style={styles.headerTitle}>{showArchived ? 'Archived' : 'Library'}</Text>
+          <TouchableOpacity
+            onPress={() => setShowArchived(!showArchived)}
+            style={styles.archiveToggleButton}
+          >
+            <MaterialIcons
+              name={showArchived ? 'inbox' : 'archive'}
+              size={24}
+              color="#8A4FFF"
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Tabs */}
@@ -275,6 +402,8 @@ export default function LibraryScreen() {
                     onDelete={handleDelete}
                     onResubmit={handleResubmit}
                     onPlayingChange={setPlayingReportId}
+                    onArchive={handleArchive}
+                    onEdit={handleEditReport}
                   />
                 ))
               ) : (
@@ -410,6 +539,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
+  },
+  archiveToggleButton: {
+    padding: 8,
   },
   placeholder: {
     width: 40,
@@ -552,5 +684,11 @@ const styles = StyleSheet.create({
   modalCancelText: {
     color: '#999',
     fontSize: 14,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
   },
 });

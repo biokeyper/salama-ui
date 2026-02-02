@@ -58,3 +58,28 @@ export async function updateReportStatus(
     return null;
   }
 }
+
+/**
+ * Archive a report (soft delete - keeps blockchain record but hides from UI)
+ */
+export async function archiveReport(
+  id: string,
+  reason?: string
+): Promise<Report | null> {
+  try {
+    const report = await getReportById(id);
+    if (!report) {
+      return null;
+    }
+
+    return await saveReport({
+      ...report,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      archivedReason: reason || 'User archived',
+    });
+  } catch (error) {
+    console.error('Error archiving report:', error);
+    return null;
+  }
+}

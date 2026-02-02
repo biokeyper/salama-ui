@@ -32,6 +32,17 @@ export interface Report {
   submittedAt?: string; // ISO 8601 timestamp
   submissionId?: string; // ID from backend after successful submission
   submissionError?: string; // Error message if submission failed
+
+  // Blockchain status (from polling)
+  blockchainStatus?: 'pending' | 'confirmed' | 'failed';
+  confirmations?: number; // 0-12+
+  txHash?: string; // Blockchain transaction hash
+  ipfsHash?: string; // IPFS location
+
+  // Archive flag (soft delete for blockchain records)
+  isArchived?: boolean;
+  archivedAt?: string; // ISO 8601 timestamp
+  archivedReason?: string; // Why archived
 }
 
 export interface ReportStorage {

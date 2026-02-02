@@ -63,6 +63,13 @@ export default function RecordPastScreen() {
 
   const stopRecording = async () => {
     try {
+      // Verify recorder exists and hasn't been released
+      if (!audioRecorder) {
+        console.warn('Audio recorder was already released');
+        setIsRecording(false);
+        return;
+      }
+
       await audioRecorder.stop();
       setIsRecording(false);
       const uri = audioRecorder.uri ?? null;
