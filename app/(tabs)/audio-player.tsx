@@ -2,8 +2,9 @@ import LockScreen from '@/app/lock-screen';
 import AudioReportItem from '@/components/AudioReportItem';
 import { hasPin } from '@/services/security';
 import { deleteReport, getAllReports, updateReportStatus, archiveReport } from '@/services/storage';
-import { submitReportToBackend, archiveReportOnBackend } from '@/services/api';
+import { submitReportToBackend, archiveReportOnBackend, decryptReportFromBackend } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
+import { grantAccess, getReportViewers } from '@/services/accessService';
 import { Report } from '@/types/report';
 import { getAvailableActions } from '@/utils/reportActions';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -36,6 +38,12 @@ export default function LibraryScreen() {
   const [showPinVerify, setShowPinVerify] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showDecryptedModal, setShowDecryptedModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [shareUserId, setShareUserId] = useState('');
+  const [decryptedContent, setDecryptedContent] = useState<any>(null);
+  const [isLoadingDecrypt, setIsLoadingDecrypt] = useState(false);
 
   // Check PIN status every time the screen comes into focus
   useFocusEffect(
@@ -325,6 +333,61 @@ export default function LibraryScreen() {
     });
   };
 
+  const handleViewSubmitted = async (report: Report) => {
+    if (!report.submissionId) {
+      Alert.alert('Error', 'This report has not been submitted yet');
+      return;
+    }
+
+    setSelectedReport(report);
+    setIsLoadingDecrypt(true);
+
+    try {
+      const result = await decryptReportFromBackend(report.submissionId);
+      if (result.success && result.data) {
+        setDecryptedContent(result.data);
+        setShowDecryptedModal(true);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to decrypt report');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while decrypting the report');
+    } finally {
+      setIsLoadingDecrypt(false);
+    }
+  };
+
+  const handleShareReport = (report: Report) => {
+    if (!report.submissionId) {
+      Alert.alert('Error', 'Only submitted reports can be shared');
+      return;
+    }
+    setSelectedReport(report);
+    setShareUserId('');
+    setShowShareModal(true);
+  };
+
+  const handleGrantAccess = async () => {
+    if (!selectedReport || !shareUserId.trim()) {
+      Alert.alert('Error', 'Please enter a user ID');
+      return;
+    }
+
+    try {
+      const result = await grantAccess(selectedReport.submissionId!, shareUserId.trim());
+      if (result.success) {
+        Alert.alert('Success', 'Access granted to the user');
+        setShowShareModal(false);
+        setShareUserId('');
+        setSelectedReport(null);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to grant access');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred');
+    }
+  };
+
   // Only show loading spinner if authenticated (not during PIN entry)
   if (loading && isAuthenticated) {
     return (
@@ -393,18 +456,35 @@ export default function LibraryScreen() {
             <>
               {activeTab === 'audio' ? (
                 filteredReports.map((report) => (
-                  <AudioReportItem
-                    key={report.id}
-                    report={report}
-                    isPlaying={playingReportId === report.id}
-                    onPlayPause={handlePlayPause}
-                    onStop={handleStop}
-                    onDelete={handleDelete}
-                    onResubmit={handleResubmit}
-                    onPlayingChange={setPlayingReportId}
-                    onArchive={handleArchive}
-                    onEdit={handleEditReport}
-                  />
+                  <View key={report.id}>
+                    <AudioReportItem
+                      report={report}
+                      isPlaying={playingReportId === report.id}
+                      onPlayPause={handlePlayPause}
+                      onStop={handleStop}
+                      onDelete={handleDelete}
+                      onResubmit={handleResubmit}
+                      onPlayingChange={setPlayingReportId}
+                      onArchive={handleArchive}
+                      onEdit={handleEditReport}
+                    />
+                    {(report.status === 'submitted' || report.status === 'confirmed') && (
+                      <View style={styles.reportActionButtons}>
+                        <TouchableOpacity
+                          style={styles.reportActionButton}
+                          onPress={() => handleViewSubmitted(report)}
+                        >
+                          <Text style={styles.reportActionButtonText}>View Submitted</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.reportActionButton}
+                          onPress={() => handleShareReport(report)}
+                        >
+                          <Text style={styles.reportActionButtonText}>Share</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 ))
               ) : (
                 filteredReports.map((report) => (
@@ -434,6 +514,108 @@ export default function LibraryScreen() {
           )}
         </ScrollView>
       </View>
+
+      {/* Decrypted Report Modal */}
+      <Modal
+        visible={showDecryptedModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setShowDecryptedModal(false);
+          setDecryptedContent(null);
+          setSelectedReport(null);
+        }}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowDecryptedModal(false);
+                setDecryptedContent(null);
+                setSelectedReport(null);
+              }}
+            >
+              <MaterialIcons name="close" size={24} color="#8A4FFF" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Decrypted Report</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {isLoadingDecrypt ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8A4FFF" />
+            </View>
+          ) : decryptedContent ? (
+            <ScrollView style={styles.decryptedContent}>
+              {decryptedContent.payload?.text && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Text Content:</Text>
+                  <Text style={styles.contentText}>{decryptedContent.payload.text}</Text>
+                </View>
+              )}
+              {decryptedContent.payload?.audio && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Audio:</Text>
+                  <Text style={styles.contentText}>Audio file available</Text>
+                </View>
+              )}
+              <View style={styles.contentSection}>
+                <Text style={styles.contentLabel}>Status:</Text>
+                <Text style={styles.contentText}>{decryptedContent.status}</Text>
+              </View>
+              <View style={styles.contentSection}>
+                <Text style={styles.contentLabel}>Created:</Text>
+                <Text style={styles.contentText}>{formatDate(decryptedContent.createdAt)}</Text>
+              </View>
+            </ScrollView>
+          ) : null}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Share Report Modal */}
+      <Modal
+        visible={showShareModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setShowShareModal(false);
+          setShareUserId('');
+          setSelectedReport(null);
+        }}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowShareModal(false);
+                setShareUserId('');
+                setSelectedReport(null);
+              }}
+            >
+              <MaterialIcons name="close" size={24} color="#8A4FFF" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Share Report</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <View style={styles.shareContainer}>
+            <Text style={styles.shareLabel}>Enter user ID to grant access:</Text>
+            <TextInput
+              style={styles.shareInput}
+              placeholder="User ID"
+              value={shareUserId}
+              onChangeText={setShareUserId}
+              placeholderTextColor="#aaa"
+            />
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleGrantAccess}
+            >
+              <Text style={styles.shareButtonText}>Grant Access</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       {/* Blur overlay when PIN modal is shown */}
       {(showPinRequired || showPinVerify) && (
@@ -690,5 +872,89 @@ const styles = StyleSheet.create({
     top: 40,
     right: 20,
     zIndex: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  decryptedContent: {
+    flex: 1,
+    padding: 20,
+  },
+  contentSection: {
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  contentLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  contentText: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 24,
+  },
+  shareContainer: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+  shareLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  shareInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  shareButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  reportActionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  reportActionButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  reportActionButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
 });

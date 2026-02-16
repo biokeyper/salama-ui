@@ -3,11 +3,59 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Easing, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { sendPanicAlert } from '@/services/panicService';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { unreadCount } = useNotifications();
+  const [panicTapCount, setPanicTapCount] = useState(0);
+  const panicTapTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handleEmergencyAlert = async () => {
+    setPanicTapCount((prev) => prev + 1);
+
+    // Clear previous timer
+    if (panicTapTimer.current) {
+      clearTimeout(panicTapTimer.current);
+    }
+
+    if (panicTapCount === 0) {
+      // First tap
+      Alert.alert('Emergency Alert', 'Tap again to confirm sending emergency alert');
+
+      // Reset tap count after 3 seconds
+      panicTapTimer.current = setTimeout(() => {
+        setPanicTapCount(0);
+      }, 3000);
+    } else if (panicTapCount === 1) {
+      // Second tap - send alert
+      setPanicTapCount(0);
+      try {
+        const result = await sendPanicAlert('emergency-location');
+        if (result.success) {
+          Alert.alert(
+            'Alert Sent',
+            'Emergency alert has been sent successfully',
+            [
+              {
+                text: 'View History',
+                onPress: () => router.push('/panic-history'),
+              },
+              { text: 'OK' },
+            ]
+          );
+        } else {
+          Alert.alert('Error', result.error || 'Failed to send emergency alert');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'An error occurred while sending the alert');
+      }
+    }
+  };
 
   const quickActions = [
     {
@@ -62,13 +110,26 @@ export default function HomeScreen() {
   };
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#F5F3FF', dark: '#1F1B2E' }}
-      headerImage={
-        <View style={styles.headerWaveContainer}>
-          <HelloWave />
-        </View>
-      }>
+    <View style={styles.screenContainer}>
+      <TouchableOpacity
+        style={styles.notificationButton}
+        onPress={() => router.push('/notifications')}
+      >
+        <Feather name="bell" size={24} color="#8B5CF6" />
+        {unreadCount > 0 && (
+          <View style={styles.notificationBadge}>
+            <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <ParallaxScrollView
+        headerBackgroundColor={{ light: '#F5F3FF', dark: '#1F1B2E' }}
+        headerImage={
+          <View style={styles.headerWaveContainer}>
+            <HelloWave />
+          </View>
+        }>
 
       {/* Welcome Section */}
       <ThemedView style={styles.welcomeSection}>
@@ -97,6 +158,30 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </ThemedView>
+
+      {/* Emergency Alert Section */}
+      <ThemedView style={styles.emergencySection}>
+        <TouchableOpacity
+          style={styles.emergencyCard}
+          onPress={handleEmergencyAlert}
+        >
+          <Text style={styles.emergencyIcon}>🚨</Text>
+          <View style={styles.emergencyTextContainer}>
+            <ThemedText type="defaultSemiBold" style={styles.emergencyTitle}>
+              Emergency Alert
+            </ThemedText>
+            <ThemedText style={styles.emergencySubtitle}>
+              {panicTapCount === 0 ? 'Tap twice to send' : 'Tap again to confirm'}
+            </ThemedText>
+          </View>
+          <TouchableOpacity
+            style={styles.historyLink}
+            onPress={() => router.push('/panic-history')}
+          >
+            <ThemedText style={styles.historyLinkText}>History</ThemedText>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </ThemedView>
 
       {/* Quick Actions */}
@@ -152,11 +237,40 @@ export default function HomeScreen() {
         <ThemedText style={styles.privacyLinkText}>Privacy Policy</ThemedText>
       </TouchableOpacity>
 
-    </ParallaxScrollView>
+      </ParallaxScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContainer: {
+    flex: 1,
+  },
+  notificationButton: {
+    position: 'absolute',
+    top: 16,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   headerWaveContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -190,6 +304,46 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 16,
     gap: 12,
+  },
+  emergencySection: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  emergencyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+    gap: 12,
+  },
+  emergencyIcon: {
+    fontSize: 28,
+  },
+  emergencyTextContainer: {
+    flex: 1,
+  },
+  emergencyTitle: {
+    fontSize: 16,
+    color: '#EF4444',
+    marginBottom: 2,
+  },
+  emergencySubtitle: {
+    fontSize: 13,
+    color: '#DC2626',
+  },
+  historyLink: {
+    backgroundColor: '#FCA5A5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  historyLinkText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7F1D1D',
   },
   sectionTitle: {
     fontSize: 16,

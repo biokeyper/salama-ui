@@ -6,15 +6,31 @@
 import axios, { AxiosInstance } from 'axios';
 import { Report } from '@/types/report';
 import { apiConfig } from '@/config/api';
-import { encryptReport } from '@/utils/encryption';
 import { mapReportToResponses, prepareReportMetadata } from '@/utils/reportMapper';
 import { updateReportStatus } from './storage';
+import { getAuthToken, isAuthenticated } from './authService';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: apiConfig.baseURL,
   timeout: apiConfig.timeout,
 });
+
+// Add request interceptor to set Authorization header
+apiClient.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await getAuthToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Error reading auth token:', error);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export interface SubmissionResult {
   success: boolean;
@@ -24,6 +40,7 @@ export interface SubmissionResult {
   ipfsHash?: string;
   status?: string;
   error?: string;
+  requiresAuth?: boolean;
 }
 
 export interface StatusCheckResult {
@@ -57,6 +74,16 @@ export async function submitReportToBackend(
   report: Report
 ): Promise<SubmissionResult> {
   try {
+    // Check authentication
+    const authenticated = await isAuthenticated();
+    if (!authenticated) {
+      return {
+        success: false,
+        error: 'Authentication required',
+        requiresAuth: true,
+      };
+    }
+
     // Validate report
     if (!report.id) {
       return {
@@ -68,24 +95,14 @@ export async function submitReportToBackend(
     // Update status to submitted (optimistic)
     await updateReportStatus(report.id, 'submitted');
 
-    // Encrypt report data
-    const encryptedPayload = await encryptReport({
-      id: report.id,
-      type: report.type,
-      content: report.textContent || '[Audio Report]',
-      metadata: report.metadata,
-      timestamp: report.createdAt,
-    });
-
-    // Map to backend format (5 screening questions)
+    // Map to backend format (flexible responses)
     const responses = mapReportToResponses(report);
 
     // Prepare metadata
     const metadata = prepareReportMetadata(report);
 
-    // Submit to backend
+    // Submit to backend (backend handles encryption)
     const response = await apiClient.post(apiConfig.endpoints.submitReport, {
-      encryptedPayload,
       responses,
       metadata,
     });
@@ -187,6 +204,109 @@ export async function archiveReportOnBackend(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Decrypt report from backend
+ * Retrieves decrypted report content for submitted/confirmed reports
+ */
+export async function decryptReportFromBackend(
+  reportId: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const response = await apiClient.get(
+      `${apiConfig.endpoints.reportDecrypt}/${reportId}/decrypt`
+    );
+
+    if (response.status === 200) {
+      return {
+        success: true,
+        data: response.data.data,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Unexpected response from backend',
+    };
+  } catch (error) {
+    console.error('Error decrypting report:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to decrypt report';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Search reports on backend with filters
+ */
+export async function searchBackendReports(
+  params?: {
+    status?: string;
+    createdAfter?: string;
+    createdBefore?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<{ success: boolean; reports?: any[]; pagination?: any; error?: string }> {
+  try {
+    const response = await apiClient.get(apiConfig.endpoints.searchReports, {
+      params: params || {},
+    });
+
+    if (response.status === 200) {
+      return {
+        success: true,
+        reports: response.data.data?.reports || response.data.data || [],
+        pagination: response.data.data?.pagination,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Unexpected response from backend',
+    };
+  } catch (error) {
+    console.error('Error searching reports:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to search reports';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Get report statistics from backend
+ */
+export async function getReportStats(): Promise<{ success: boolean; stats?: any; error?: string }> {
+  try {
+    const response = await apiClient.get(apiConfig.endpoints.searchStats);
+
+    if (response.status === 200) {
+      return {
+        success: true,
+        stats: response.data.data,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Unexpected response from backend',
+    };
+  } catch (error) {
+    console.error('Error fetching report stats:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to fetch report stats';
     return {
       success: false,
       error: errorMessage,

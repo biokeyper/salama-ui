@@ -9,6 +9,8 @@ import { BackgroundRecordingProvider } from '@/contexts/BackgroundRecordingConte
 import { PinProtectionProvider } from '@/contexts/PinProtectionContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
 import { ThemeProvider as CustomThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initDatabase } from '@/services/database';
 
@@ -69,6 +71,42 @@ function RootNavigator() {
           }}
         />
 
+        <Stack.Screen
+          name="login"
+          options={{
+            headerShown: false,
+            animationEnabled: true,
+          }}
+        />
+        <Stack.Screen
+          name="signup"
+          options={{
+            headerShown: false,
+            animationEnabled: true,
+          }}
+        />
+
+        <Stack.Screen
+          name="account"
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="panic-history"
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: false,
+          }}
+        />
+
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
@@ -92,14 +130,18 @@ export default function RootLayout() {
   }
 
   return (
-    <CustomThemeProvider>
-      <PinProtectionProvider>
-        <SettingsProvider>
-          <BackgroundRecordingProvider>
-            <RootNavigator />
-          </BackgroundRecordingProvider>
-        </SettingsProvider>
-      </PinProtectionProvider>
-    </CustomThemeProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <CustomThemeProvider>
+          <PinProtectionProvider>
+            <SettingsProvider>
+              <BackgroundRecordingProvider>
+                <RootNavigator />
+              </BackgroundRecordingProvider>
+            </SettingsProvider>
+          </PinProtectionProvider>
+        </CustomThemeProvider>
+      </NotificationProvider>
+    </AuthProvider>
   );
 }

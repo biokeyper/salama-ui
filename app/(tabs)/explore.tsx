@@ -5,6 +5,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { WavingGirl } from '@/components/WavingGirl';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -57,6 +58,7 @@ const SUPPORT_DATA: Record<CountryCode, SupportInfo> = {
 export default function ExploreScreen() {
   const router = useRouter();
   const { themeMode, setThemeMode } = useTheme();
+  const { unreadCount } = useNotifications();
   const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null);
 
   const handleSupportPress = (country: CountryCode) => {
@@ -83,6 +85,36 @@ export default function ExploreScreen() {
       }>
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Explore</ThemedText>
+      </ThemedView>
+
+      {/* Profile Section */}
+      <ThemedView style={styles.profileSection}>
+        <TouchableOpacity
+          style={styles.profileLink}
+          onPress={() => router.push('/account')}
+        >
+          <View style={styles.profileLinkContent}>
+            <IconSymbol name="person.fill" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.profileLinkText}>My Account</ThemedText>
+          </View>
+          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.profileLink}
+          onPress={() => router.push('/notifications')}
+        >
+          <View style={styles.profileLinkContent}>
+            <IconSymbol name="bell.fill" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.profileLinkText}>Notifications</ThemedText>
+          </View>
+          {unreadCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <ThemedText style={styles.badgeText}>{unreadCount}</ThemedText>
+            </View>
+          )}
+          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
+        </TouchableOpacity>
       </ThemedView>
 
       {/* Apps Section */}
@@ -277,6 +309,45 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     gap: 8,
+  },
+  profileSection: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  profileLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(139, 92, 246, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  profileLinkContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  profileLinkText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  notificationBadge: {
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   sectionDescription: {
     marginBottom: 16,

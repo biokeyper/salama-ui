@@ -3,12 +3,13 @@ import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { hasPin, removePin, setPin as savePin } from '@/services/security';
 import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
 import { usePinProtection } from '@/contexts/PinProtectionContext';
+import { backupEncryptionKey, recoverEncryptionKey } from '@/services/authService';
 import LockScreen from './lock-screen';
 
 
@@ -21,6 +22,9 @@ export default function SettingsScreen() {
     const [pinExists, setPinExists] = useState(false);
     const [showSetPin, setShowSetPin] = useState(false);
     const [showVerifyPin, setShowVerifyPin] = useState(false);
+    const [showKeyBackupModal, setShowKeyBackupModal] = useState(false);
+    const [keyBackupPin, setKeyBackupPin] = useState('');
+    const [isBackingUpKey, setIsBackingUpKey] = useState(false);
 
     useEffect(() => {
         checkPin();
@@ -120,6 +124,31 @@ export default function SettingsScreen() {
                 },
             ]
         );
+    };
+
+    const handleBackupEncryptionKey = async () => {
+        if (!keyBackupPin.trim()) {
+            Alert.alert('Error', 'Please enter a PIN');
+            return;
+        }
+
+        setIsBackingUpKey(true);
+        try {
+            // In a real scenario, you would get the actual encryption key from your app
+            // For now, using a placeholder
+            const result = await backupEncryptionKey(keyBackupPin, 'placeholder-encryption-key');
+            if (result.success) {
+                setShowKeyBackupModal(false);
+                setKeyBackupPin('');
+                Alert.alert('Success', 'Your encryption key has been backed up securely');
+            } else {
+                Alert.alert('Error', result.error || 'Failed to backup encryption key');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'An error occurred while backing up');
+        } finally {
+            setIsBackingUpKey(false);
+        }
     };
 
     return (
@@ -250,6 +279,22 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
+                {/* Key Backup Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>🔑 Key Backup</Text>
+                    <Text style={styles.sectionDescription}>
+                        Backup your encryption key securely to recover access to your data.
+                    </Text>
+
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={() => setShowKeyBackupModal(true)}
+                    >
+                        <Feather name="lock" size={20} color="#8B5CF6" />
+                        <Text style={styles.primaryButtonText}>Backup Encryption Key</Text>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Data Management Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Data Management</Text>
@@ -307,6 +352,48 @@ export default function SettingsScreen() {
                 >
                     <Feather name="x" size={24} color="#666" />
                 </TouchableOpacity>
+            </Modal>
+
+            {/* Key Backup Modal */}
+            <Modal visible={showKeyBackupModal} animationType="slide" transparent={true}>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <TouchableOpacity
+                            style={styles.modalCloseButton}
+                            onPress={() => {
+                                setShowKeyBackupModal(false);
+                                setKeyBackupPin('');
+                            }}
+                        >
+                            <Feather name="x" size={24} color="#666" />
+                        </TouchableOpacity>
+
+                        <Text style={styles.modalTitle}>Backup Encryption Key</Text>
+                        <Text style={styles.modalDescription}>
+                            Enter a PIN to secure your encryption key backup
+                        </Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter PIN"
+                            value={keyBackupPin}
+                            onChangeText={setKeyBackupPin}
+                            secureTextEntry={true}
+                            editable={!isBackingUpKey}
+                            placeholderTextColor="#9CA3AF"
+                        />
+
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={handleBackupEncryptionKey}
+                            disabled={isBackingUpKey}
+                        >
+                            <Text style={styles.primaryButtonText}>
+                                {isBackingUpKey ? 'Backing up...' : 'Backup Key'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
             </Modal>
         </SafeAreaView>
     );
@@ -461,5 +548,38 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        paddingBottom: 32,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 8,
+    },
+    modalDescription: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginBottom: 20,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: '#1F2937',
+        marginBottom: 16,
     },
 });

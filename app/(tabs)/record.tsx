@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { saveReport } from '../../services/storage';
 import { submitReportToBackend } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -219,6 +220,32 @@ export default function RecordScreen() {
                   startStatusPolling(result.submissionId);
                 }
                 router.replace('/(tabs)');
+              },
+            },
+          ]
+        );
+      } else if (result.requiresAuth) {
+        // Authentication required - redirect to login
+        Alert.alert(
+          'Login Required',
+          'You need to be logged in to submit reports.',
+          [
+            {
+              text: 'Login',
+              onPress: () => {
+                router.navigate('/login');
+              },
+            },
+            {
+              text: 'Sign Up',
+              onPress: () => {
+                router.navigate('/signup');
+              },
+            },
+            {
+              text: 'Cancel',
+              onPress: () => {
+                // Recording stays saved locally
               },
             },
           ]

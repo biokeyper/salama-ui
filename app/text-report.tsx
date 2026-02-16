@@ -8,6 +8,7 @@ import { submitReportToBackend } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
 import { Report, ReportType } from '@/types/report';
 import { getAvailableActions } from '@/utils/reportActions';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function TextReportScreen() {
   const [report, setReport] = useState('');
@@ -138,6 +139,32 @@ export default function TextReportScreen() {
                   startStatusPolling(result.submissionId);
                 }
                 router.replace('/(tabs)');
+              },
+            },
+          ]
+        );
+      } else if (result.requiresAuth) {
+        // Authentication required - redirect to login
+        Alert.alert(
+          'Login Required',
+          'You need to be logged in to submit reports.',
+          [
+            {
+              text: 'Login',
+              onPress: () => {
+                router.navigate('/login');
+              },
+            },
+            {
+              text: 'Sign Up',
+              onPress: () => {
+                router.navigate('/signup');
+              },
+            },
+            {
+              text: 'Cancel',
+              onPress: () => {
+                // Report stays saved locally
               },
             },
           ]
