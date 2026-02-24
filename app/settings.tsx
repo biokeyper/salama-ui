@@ -260,7 +260,7 @@ export default function SettingsScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Safety Features</Text>
                     <Text style={styles.sectionDescription}>
-                        Automatically detect concerning patterns in health logs and create private reports.
+                        Automatically detect concerning patterns and quick emergency options.
                     </Text>
 
                     <View style={styles.setting}>
@@ -276,6 +276,16 @@ export default function SettingsScreen() {
                             trackColor={{ false: '#D1D5DB', true: '#C4B5FD' }}
                             thumbColor={settings.abuseDetection ? '#8B5CF6' : '#F3F4F6'}
                         />
+                    </View>
+
+                    <View style={styles.setting}>
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingLabel}>🚨 Emergency Alert (Shake)</Text>
+                            <Text style={styles.settingHint}>
+                                Shake your phone anywhere to send an emergency alert
+                            </Text>
+                        </View>
+                        <Text style={styles.settingStatus}>Active</Text>
                     </View>
                 </View>
 
@@ -467,6 +477,15 @@ const styles = StyleSheet.create({
     settingHint: {
         fontSize: 13,
         color: '#9CA3AF',
+    },
+    settingStatus: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#10B981',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
     dangerButton: {
         flexDirection: 'row',

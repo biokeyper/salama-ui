@@ -4,6 +4,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import {
   getAuthToken,
   getUserInfo,
@@ -14,18 +15,24 @@ import {
   verifyLogin,
   verifySignup,
   verifyChangePhone,
+  setupEmailRecovery as setupEmailRecoveryService,
   User,
 } from '@/services/authService';
+
+const EMAIL_RECOVERY_KEY = 'salama_email_recovery_setup';
 
 export interface AuthContextType {
   isLoggedIn: boolean;
   user: User | null;
   isLoading: boolean;
+  showEmailRecoveryModal: boolean;
   login: (phone: string, otp: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (phone: string, email: string, otp: string) => Promise<{ success: boolean; error?: string }>;
-  initiateSignupFlow: (phone: string, email: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (phone: string, otp: string) => Promise<{ success: boolean; error?: string }>;
+  initiateSignupFlow: (phone: string) => Promise<{ success: boolean; error?: string }>;
   initiateLoginFlow: (phone: string) => Promise<{ success: boolean; error?: string; _testOTP?: string }>;
   changePhone: (newPhone: string, otp: string) => Promise<{ success: boolean; error?: string }>;
+  setupEmailRecovery: (email: string) => Promise<void>;
+  skipEmailRecovery: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -35,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showEmailRecoveryModal, setShowEmailRecoveryModal] = useState(false);
 
   // Rehydrate auth state on mount
   useEffect(() => {
@@ -56,16 +64,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const checkEmailRecoverySetup = async () => {
+    try {
+      const isSetup = await SecureStore.getItemAsync(EMAIL_RECOVERY_KEY);
+      return isSetup === 'true';
+    } catch (error) {
+      return false;
+    }
+  };
+
   const signup = async (
     phone: string,
-    email: string,
     otp: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const result = await verifySignup(phone, email, otp);
+      const result = await verifySignup(phone, otp);
       if (result.success && result.user) {
         setUser(result.user);
         setIsLoggedIn(true);
+        // Show email recovery modal on first signup
+        const isSetup = await checkEmailRecoverySetup();
+        if (!isSetup) {
+          setShowEmailRecoveryModal(true);
+        }
       }
       return result;
     } catch (error) {
@@ -84,6 +105,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.success && result.user) {
         setUser(result.user);
         setIsLoggedIn(true);
+        // Show email recovery modal on first login if not set up
+        const isSetup = await checkEmailRecoverySetup();
+        if (!isSetup) {
+          setShowEmailRecoveryModal(true);
+        }
       }
       return result;
     } catch (error) {
@@ -110,6 +136,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setupEmailRecovery = async (email: string) => {
+    try {
+      // Call backend endpoint to save email for recovery
+      const result = await setupEmailRecoveryService(email);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to setup email recovery');
+      }
+
+      // Mark as set up in secure storage
+      await SecureStore.setItemAsync(EMAIL_RECOVERY_KEY, 'true');
+      setShowEmailRecoveryModal(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to setup email recovery';
+      throw new Error(message);
+    }
+  };
+
+  const skipEmailRecovery = async () => {
+    try {
+      // Mark as skipped in secure storage
+      await SecureStore.setItemAsync(EMAIL_RECOVERY_KEY, 'skipped');
+      setShowEmailRecoveryModal(false);
+    } catch (error) {
+      console.error('Error skipping email recovery:', error);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -126,11 +180,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoggedIn,
         user,
         isLoading,
+        showEmailRecoveryModal,
         login,
         signup,
         initiateSignupFlow: initiateSignup,
         initiateLoginFlow: initiateLogin,
         changePhone: changePhoneNumber,
+        setupEmailRecovery,
+        skipEmailRecovery,
         logout: handleLogout,
       }}
     >

@@ -194,7 +194,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.title}>
+        <ThemedText type="title" style={[styles.title, { color: '#000' }]}>
           {step === 'phone'
             ? 'Login'
             : step === 'otp'
@@ -423,9 +423,18 @@ export default function LoginScreen() {
           )}
         </View>
 
-        <TouchableOpacity onPress={() => router.back()}>
-          <ThemedText style={styles.cancelText}>Cancel</ThemedText>
-        </TouchableOpacity>
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ThemedText style={styles.cancelText}>Cancel</ThemedText>
+          </TouchableOpacity>
+
+          <View style={styles.signupLinkContainer}>
+            <ThemedText style={styles.signupLinkText}>Don't have an account? </ThemedText>
+            <TouchableOpacity onPress={() => router.navigate('/signup')}>
+              <ThemedText style={styles.signupLink}>Sign Up</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ThemedView>
     </KeyboardAvoidingView>
   );
@@ -506,5 +515,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textDecorationLine: 'underline',
     marginTop: 8,
+  },
+  bottomContainer: {
+    gap: 12,
+  },
+  signupLinkContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  signupLinkText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+  },
+  signupLink: {
+    textAlign: 'center',
+    color: '#8A4FFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

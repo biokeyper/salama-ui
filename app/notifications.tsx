@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   deleteNotification,
   getNotifications,
@@ -14,14 +15,19 @@ import {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { refreshUnreadCount } = useNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadNotifications();
-  }, []);
+    if (user) {
+      loadNotifications();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   const loadNotifications = async () => {
     setIsLoading(true);

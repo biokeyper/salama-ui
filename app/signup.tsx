@@ -22,7 +22,6 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function SignupScreen() {
   const [step, setStep] = useState<'details' | 'otp'>('details');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [testOtp, setTestOtp] = useState<string | undefined>();
@@ -35,20 +34,9 @@ export default function SignupScreen() {
       return;
     }
 
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
-      return;
-    }
-
-    // Basic email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const result = await initiateSignupFlow(phone.trim(), email.trim());
+      const result = await initiateSignupFlow(phone.trim());
       if (result.success) {
         setTestOtp(result._testOTP); // For dev mode
         setStep('otp');
@@ -72,7 +60,7 @@ export default function SignupScreen() {
 
     setIsLoading(true);
     try {
-      const result = await signup(phone.trim(), email.trim(), otp.trim());
+      const result = await signup(phone.trim(), otp.trim());
       if (result.success) {
         Alert.alert('Success', 'Account created successfully', [
           {
@@ -100,12 +88,12 @@ export default function SignupScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.title}>
+        <ThemedText type="title" style={[styles.title, { color: '#000' }]}>
           {step === 'details' ? 'Create Account' : 'Enter OTP'}
         </ThemedText>
         <ThemedText style={styles.subtitle}>
           {step === 'details'
-            ? 'Enter your phone number and email to get started'
+            ? 'Enter your phone number to get started'
             : 'Check your phone for the 6-digit code'}
         </ThemedText>
 
@@ -120,16 +108,6 @@ export default function SignupScreen() {
                 onChangeText={setPhone}
                 editable={!isLoading}
                 keyboardType="phone-pad"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Email address"
-                placeholderTextColor="#aaa"
-                value={email}
-                onChangeText={setEmail}
-                editable={!isLoading}
-                keyboardType="email-address"
-                autoCapitalize="none"
               />
               <TouchableOpacity
                 style={[styles.button, styles.primaryButton, isLoading && styles.buttonDisabled]}
@@ -188,9 +166,18 @@ export default function SignupScreen() {
           )}
         </View>
 
-        <TouchableOpacity onPress={() => router.back()}>
-          <ThemedText style={styles.cancelText}>Cancel</ThemedText>
-        </TouchableOpacity>
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ThemedText style={styles.cancelText}>Cancel</ThemedText>
+          </TouchableOpacity>
+
+          <View style={styles.loginLinkContainer}>
+            <ThemedText style={styles.loginLinkText}>Already have an account? </ThemedText>
+            <TouchableOpacity onPress={() => router.navigate('/login')}>
+              <ThemedText style={styles.loginLink}>Login</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ThemedView>
     </KeyboardAvoidingView>
   );
@@ -263,6 +250,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#8A4FFF',
     fontSize: 16,
+    textDecorationLine: 'underline',
+  },
+  bottomContainer: {
+    gap: 12,
+  },
+  loginLinkContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginLinkText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+  },
+  loginLink: {
+    textAlign: 'center',
+    color: '#8A4FFF',
+    fontSize: 14,
+    fontWeight: '600',
     textDecorationLine: 'underline',
   },
 });

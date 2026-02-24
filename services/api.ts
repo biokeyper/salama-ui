@@ -23,6 +23,9 @@ apiClient.interceptors.request.use(
       const token = await getAuthToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('Auth token added to request for:', config.url);
+      } else {
+        console.log('No auth token found for request:', config.url);
       }
     } catch (error) {
       console.error('Error reading auth token:', error);
@@ -30,6 +33,18 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Add response interceptor to handle errors
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.error('401 Unauthorized for URL:', error.config?.url);
+      console.error('Response data:', error.response?.data);
+    }
+    return Promise.reject(error);
+  }
 );
 
 export interface SubmissionResult {
@@ -134,6 +149,18 @@ export async function submitReportToBackend(
     };
   } catch (error) {
     console.error('Error submitting report:', error);
+
+    // Check if it's an authentication error (401)
+    const isAuthError = error instanceof Error &&
+      (error.message.includes('401') || error.message.includes('Unauthorized'));
+
+    if (isAuthError) {
+      return {
+        success: false,
+        error: 'Authentication required',
+        requiresAuth: true,
+      };
+    }
 
     // Update report with error status
     try {

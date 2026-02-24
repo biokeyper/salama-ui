@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getUnreadCount } from '@/services/notificationService';
+import { useAuth } from './AuthContext';
 
 export interface NotificationContextType {
   unreadCount: number;
@@ -15,11 +16,14 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
+  const { user } = useAuth();
 
-  // Refresh unread count on mount
+  // Refresh unread count on mount and when user changes
   useEffect(() => {
-    refreshUnreadCount();
-  }, []);
+    if (user) {
+      refreshUnreadCount();
+    }
+  }, [user]);
 
   const refreshUnreadCount = async () => {
     try {

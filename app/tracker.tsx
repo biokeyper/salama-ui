@@ -38,7 +38,13 @@ export default function TrackerScreen() {
     const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
     const { setBackgroundRecordingUri, exitDecoyMode } = useBackgroundRecording();
     const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+    const audioRecorderRef = useRef(audioRecorder);
     const { settings } = useSettings();
+
+    // Keep audioRecorder ref in sync
+    useEffect(() => {
+        audioRecorderRef.current = audioRecorder;
+    }, [audioRecorder]);
 
     // Log State
     const [flow, setFlow] = useState<CycleFlow | undefined>(undefined);
@@ -82,35 +88,46 @@ export default function TrackerScreen() {
                 return;
             }
 
-            await audioRecorder.prepareToRecordAsync();
-            audioRecorder.record();
+            const recorder = audioRecorderRef.current;
+            if (!recorder) {
+                console.error('Audio recorder not available');
+                return;
+            }
+
+            await recorder.prepareToRecordAsync();
+            recorder.record();
             setRecordingStartTime(Date.now());
             setIsRecording(true);
             isRecordingRef.current = true;
             console.log('Background recording started in Tracker');
         } catch (error) {
             console.error('Error starting background recording:', error);
+            isRecordingRef.current = false;
+            setIsRecording(false);
         }
     };
 
     const stopRecording = async () => {
         if (!isRecordingRef.current) return null;
         isRecordingRef.current = false;
+        setIsRecording(false);
 
         try {
-            // Verify recorder exists and hasn't been released
-            if (!audioRecorder) {
+            // Use the ref to access the recorder
+            const recorder = audioRecorderRef.current;
+
+            // Verify recorder exists
+            if (!recorder) {
                 console.warn('Audio recorder was already released');
-                setIsRecording(false);
                 return null;
             }
 
-            await audioRecorder.stop();
+            // Stop the recording
+            await recorder.stop();
             const endTime = Date.now();
             const durationMs = recordingStartTime ? (endTime - recordingStartTime) : 0;
 
-            const uri = audioRecorder.uri ?? null;
-            setIsRecording(false);
+            const uri = recorder.uri ?? null;
 
             if (uri) {
                 // Save as a hidden report
@@ -123,12 +140,12 @@ export default function TrackerScreen() {
                     metadata: { notes: 'Background recording from Tracker' },
                 });
                 setBackgroundRecordingUri(uri);
-                console.log('Tracker recording saved');
+                console.log('Tracker recording saved:', uri);
                 return uri;
             }
         } catch (error) {
             console.error('Error stopping background recording:', error);
-            setIsRecording(false);
+            // Silently fail - recording might have already stopped
         }
         return null;
     };

@@ -231,6 +231,29 @@ export default function LibraryScreen() {
                     },
                   ]
                 );
+              } else if (result.requiresAuth) {
+                Alert.alert(
+                  'Login Required',
+                  'You need to be logged in to submit reports.',
+                  [
+                    {
+                      text: 'Login',
+                      onPress: () => {
+                        router.navigate('/login');
+                      },
+                    },
+                    {
+                      text: 'Sign Up',
+                      onPress: () => {
+                        router.navigate('/signup');
+                      },
+                    },
+                    {
+                      text: 'Cancel',
+                      style: 'cancel',
+                    },
+                  ]
+                );
               } else {
                 Alert.alert(
                   'Submission Failed',

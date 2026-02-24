@@ -23,20 +23,32 @@ export interface AuthResponse {
   phone?: string;
   email?: string;
   _testOTP?: string; // Dev mode only
+  // For wrapped responses from backend
+  success?: boolean;
+  message?: string;
+  data?: {
+    token?: string;
+    userId?: string;
+    phone?: string;
+    email?: string;
+  };
 }
 
 /**
- * Initiate signup process with phone and email
+ * Initiate signup process with phone
  * Sends OTP to phone number
  */
 export async function initiateSignup(
-  phone: string,
-  email: string
+  phone: string
 ): Promise<{ success: boolean; error?: string }> {
+  const payload = { phone };
+  console.log('Initiating signup with payload:', JSON.stringify(payload));
+  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.signupInitiate}`);
+
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.signupInitiate}`,
-      { phone, email }
+      payload
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -48,8 +60,33 @@ export async function initiateSignup(
       error: response.data?.error || 'Failed to initiate signup',
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Signup initiation failed';
+    let message = 'Signup initiation failed';
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+
+      console.log('Signup error - Status:', status);
+      console.log('Signup error - Message:', errorData?.message);
+      console.log('Signup error - Error:', errorData?.error);
+
+      // Handle specific status codes
+      if (status === 409) {
+        message = errorData?.message || 'Phone number already registered. Please login instead.';
+      } else if (status === 400) {
+        message = errorData?.message || 'Invalid phone number format';
+      } else if (errorData?.message) {
+        message = errorData.message;
+      } else if (errorData?.error === true && errorData?.message) {
+        message = errorData.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+    } else if (error instanceof Error) {
+      message = error.message;
+    }
+
+    console.log('Signup initiation final error message:', message);
     return { success: false, error: message };
   }
 }
@@ -60,19 +97,41 @@ export async function initiateSignup(
  */
 export async function verifySignup(
   phone: string,
-  email: string,
   otp: string
 ): Promise<{ success: boolean; error?: string; user?: User }> {
+  const payload = { phone, otp };
+  console.log('Verifying signup with payload:', JSON.stringify(payload));
+  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.signupVerify}`);
+
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.signupVerify}`,
-      { phone, email, otp }
+      payload
     );
 
-    if (response.status === 200 || response.status === 201) {
-      const data: AuthResponse = response.data;
+    console.log('Signup verification response status:', response.status);
+    console.log('Signup verification response data:', JSON.stringify(response.data));
 
-      if (!data.token) {
+    if (response.status === 200 || response.status === 201) {
+      const response_data: AuthResponse = response.data;
+
+      // Extract token from nested data structure (backend wraps response in { data: { token } })
+      let token = response_data.token;
+      let userData = {
+        phone: response_data.phone || phone,
+        email: response_data.email || '',
+      };
+
+      // If token is nested in data object
+      if (!token && response_data.data?.token) {
+        token = response_data.data.token;
+        userData = {
+          phone: response_data.data.phone || phone,
+          email: response_data.data.email || '',
+        };
+      }
+
+      if (!token) {
         return {
           success: false,
           error: 'No token received from server',
@@ -80,16 +139,22 @@ export async function verifySignup(
       }
 
       // Save token
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
+      console.log('Saving token to SecureStore:', token.substring(0, 20) + '...');
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+      console.log('Token saved, verifying...');
+
+      // Verify token was saved
+      const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+      console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
 
       // Save user info
       const user: User = {
-        userId: data.userId || '',
-        phone: data.phone || phone,
-        email: data.email || email,
+        userId: '', // Backend doesn't return userId in signup response
+        ...userData,
       };
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
 
+      console.log('Signup successful, user data saved');
       return { success: true, user };
     }
 
@@ -98,8 +163,27 @@ export async function verifySignup(
       error: response.data?.error || 'Signup verification failed',
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Signup verification failed';
+    let message = 'Signup verification failed';
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+
+      console.log('Signup verify error - Status:', status);
+      console.log('Signup verify error - Message:', errorData?.message);
+
+      if (status === 401) {
+        message = errorData?.message || 'Invalid OTP. Please try again.';
+      } else if (errorData?.message) {
+        message = errorData.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+    } else if (error instanceof Error) {
+      message = error.message;
+    }
+
+    console.log('Signup verification final error:', message);
     return { success: false, error: message };
   }
 }
@@ -111,10 +195,14 @@ export async function verifySignup(
 export async function initiateLogin(
   phone: string
 ): Promise<{ success: boolean; error?: string; _testOTP?: string }> {
+  const payload = { phone };
+  console.log('Initiating login with payload:', JSON.stringify(payload));
+  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.loginInitiate}`);
+
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.loginInitiate}`,
-      { phone }
+      payload
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -129,8 +217,31 @@ export async function initiateLogin(
       error: response.data?.error || 'Failed to initiate login',
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Login initiation failed';
+    let message = 'Login initiation failed';
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+
+      console.log('Login error - Status:', status);
+      console.log('Login error - Message:', errorData?.message);
+      console.log('Login error - Error:', errorData?.error);
+
+      // Handle specific status codes
+      if (status === 404) {
+        message = errorData?.message || 'Phone number not found. Please sign up instead.';
+      } else if (status === 400) {
+        message = errorData?.message || 'Invalid phone number format';
+      } else if (errorData?.message) {
+        message = errorData.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+    } else if (error instanceof Error) {
+      message = error.message;
+    }
+
+    console.log('Login initiation final error message:', message);
     return { success: false, error: message };
   }
 }
@@ -143,16 +254,39 @@ export async function verifyLogin(
   phone: string,
   otp: string
 ): Promise<{ success: boolean; error?: string; user?: User }> {
+  const payload = { phone, otp };
+  console.log('Verifying login with payload:', JSON.stringify(payload));
+  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.loginVerify}`);
+
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.loginVerify}`,
-      { phone, otp }
+      payload
     );
 
-    if (response.status === 200 || response.status === 201) {
-      const data: AuthResponse = response.data;
+    console.log('Login verification response status:', response.status);
+    console.log('Login verification response data:', JSON.stringify(response.data));
 
-      if (!data.token) {
+    if (response.status === 200 || response.status === 201) {
+      const response_data: AuthResponse = response.data;
+
+      // Extract token from nested data structure (backend wraps response in { data: { token } })
+      let token = response_data.token;
+      let userData = {
+        phone: response_data.phone || phone,
+        email: response_data.email || '',
+      };
+
+      // If token is nested in data object
+      if (!token && response_data.data?.token) {
+        token = response_data.data.token;
+        userData = {
+          phone: response_data.data.phone || phone,
+          email: response_data.data.email || '',
+        };
+      }
+
+      if (!token) {
         return {
           success: false,
           error: 'No token received from server',
@@ -160,16 +294,22 @@ export async function verifyLogin(
       }
 
       // Save token
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
+      console.log('Saving token to SecureStore:', token.substring(0, 20) + '...');
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+      console.log('Token saved, verifying...');
+
+      // Verify token was saved
+      const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+      console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
 
       // Save user info
       const user: User = {
-        userId: data.userId || '',
-        phone: data.phone || phone,
-        email: data.email || '',
+        userId: '', // Backend doesn't return userId in login response
+        ...userData,
       };
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
 
+      console.log('Login successful, user data saved');
       return { success: true, user };
     }
 
@@ -178,8 +318,27 @@ export async function verifyLogin(
       error: response.data?.error || 'Login verification failed',
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Login verification failed';
+    let message = 'Login verification failed';
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+
+      console.log('Login verify error - Status:', status);
+      console.log('Login verify error - Message:', errorData?.message);
+
+      if (status === 401) {
+        message = errorData?.message || 'Invalid OTP. Please try again.';
+      } else if (errorData?.message) {
+        message = errorData.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+    } else if (error instanceof Error) {
+      message = error.message;
+    }
+
+    console.log('Login verification final error:', message);
     return { success: false, error: message };
   }
 }
@@ -189,7 +348,9 @@ export async function verifyLogin(
  */
 export async function getAuthToken(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+    const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+    console.log('getAuthToken retrieved:', token ? `token exists (${token.substring(0, 20)}...)` : 'NO TOKEN FOUND');
+    return token;
   } catch (error) {
     console.error('Error reading auth token:', error);
     return null;
@@ -227,6 +388,44 @@ export async function logout(): Promise<void> {
     await SecureStore.deleteItemAsync(AUTH_USER_KEY);
   } catch (error) {
     console.error('Error during logout:', error);
+  }
+}
+
+/**
+ * Setup email recovery (authenticated)
+ * Allows user to set an email for account recovery
+ */
+export async function setupEmailRecovery(
+  email: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const response = await axios.post(
+      `${apiConfig.baseURL}/api/auth/setup-email`,
+      { email },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (response.status === 200 || response.status === 201) {
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      error: response.data?.error || 'Failed to setup email recovery',
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Email recovery setup failed';
+    return { success: false, error: message };
   }
 }
 
@@ -293,9 +492,25 @@ export async function verifyChangePhone(
     );
 
     if (response.status === 200 || response.status === 201) {
-      const data: AuthResponse = response.data;
+      const response_data: AuthResponse = response.data;
 
-      if (!data.token) {
+      // Extract token from nested data structure
+      let token = response_data.token;
+      let userData = {
+        phone: response_data.phone || newPhone,
+        email: response_data.email || '',
+      };
+
+      // If token is nested in data object
+      if (!token && response_data.data?.token) {
+        token = response_data.data.token;
+        userData = {
+          phone: response_data.data.phone || newPhone,
+          email: response_data.data.email || '',
+        };
+      }
+
+      if (!token) {
         return {
           success: false,
           error: 'No token received from server',
@@ -303,14 +518,13 @@ export async function verifyChangePhone(
       }
 
       // Save new token
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
       // Update user info with new phone
       const currentUser = await getUserInfo();
       const user: User = {
-        userId: currentUser?.userId || data.userId || '',
-        phone: data.phone || newPhone,
-        email: currentUser?.email || data.email || '',
+        userId: currentUser?.userId || '',
+        ...userData,
       };
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
 
@@ -429,9 +643,25 @@ export async function verifyPhoneChangeRecovery(
     );
 
     if (response.status === 200 || response.status === 201) {
-      const data: AuthResponse = response.data;
+      const response_data: AuthResponse = response.data;
 
-      if (!data.token) {
+      // Extract token from nested data structure
+      let token = response_data.token;
+      let userData = {
+        phone: response_data.phone || newPhone,
+        email: response_data.email || email,
+      };
+
+      // If token is nested in data object
+      if (!token && response_data.data?.token) {
+        token = response_data.data.token;
+        userData = {
+          phone: response_data.data.phone || newPhone,
+          email: response_data.data.email || email,
+        };
+      }
+
+      if (!token) {
         return {
           success: false,
           error: 'No token received from server',
@@ -439,13 +669,12 @@ export async function verifyPhoneChangeRecovery(
       }
 
       // Save token
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
       // Save user info
       const user: User = {
-        userId: data.userId || '',
-        phone: data.phone || newPhone,
-        email: data.email || email,
+        userId: '',
+        ...userData,
       };
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
 

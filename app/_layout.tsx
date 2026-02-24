@@ -2,8 +2,9 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
+import { View, ActivityIndicator } from 'react-native';
 
 import { BackgroundRecordingProvider } from '@/contexts/BackgroundRecordingContext';
 import { PinProtectionProvider } from '@/contexts/PinProtectionContext';
@@ -11,6 +12,7 @@ import { SettingsProvider } from '@/contexts/SettingsContext';
 import { ThemeProvider as CustomThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
+import { EmergencyAlertProvider } from '@/contexts/EmergencyAlertContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initDatabase } from '@/services/database';
 
@@ -118,29 +120,55 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const [dbInitialized, setDbInitialized] = useState(false);
 
   // Initialize database on app launch
   useEffect(() => {
-    initDatabase().catch(console.error);
+    initDatabase()
+      .then(() => {
+        console.log('Database initialized successfully');
+        setDbInitialized(true);
+      })
+      .catch((error) => {
+        console.error('Error initializing database:', error);
+        // Retry after a delay
+        setTimeout(() => {
+          initDatabase()
+            .then(() => {
+              console.log('Database initialized successfully (retry)');
+              setDbInitialized(true);
+            })
+            .catch((retryError) => {
+              console.error('Database initialization failed after retry:', retryError);
+              setDbInitialized(true); // Allow app to continue anyway
+            });
+        }, 1000);
+      });
   }, []);
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
+  if (!loaded || !dbInitialized) {
+    // Show loading screen while fonts and database are loading
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
+    );
   }
 
   return (
     <AuthProvider>
       <NotificationProvider>
-        <CustomThemeProvider>
-          <PinProtectionProvider>
-            <SettingsProvider>
-              <BackgroundRecordingProvider>
-                <RootNavigator />
-              </BackgroundRecordingProvider>
-            </SettingsProvider>
-          </PinProtectionProvider>
-        </CustomThemeProvider>
+        <EmergencyAlertProvider>
+          <CustomThemeProvider>
+            <PinProtectionProvider>
+              <SettingsProvider>
+                <BackgroundRecordingProvider>
+                  <RootNavigator />
+                </BackgroundRecordingProvider>
+              </SettingsProvider>
+            </PinProtectionProvider>
+          </CustomThemeProvider>
+        </EmergencyAlertProvider>
       </NotificationProvider>
     </AuthProvider>
   );

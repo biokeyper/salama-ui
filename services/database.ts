@@ -6,11 +6,37 @@ const DATABASE_NAME = 'safegirls.db';
 const MIGRATION_KEY = '@safegirls:migration_complete';
 
 let db: SQLite.SQLiteDatabase | null = null;
+let initPromise: Promise<void> | null = null;
 
 /**
  * Initialize the SQLite database
  */
 export async function initDatabase(): Promise<void> {
+    // If already initializing, wait for it
+    if (initPromise) {
+        return initPromise;
+    }
+
+    // Start initialization
+    initPromise = initDatabaseAsync();
+    return initPromise;
+}
+
+/**
+ * Wait for database to be initialized
+ */
+export async function waitForDatabaseInit(): Promise<void> {
+    if (initPromise) {
+        await initPromise;
+    } else {
+        throw new Error('Database initialization not started');
+    }
+}
+
+/**
+ * Actual database initialization logic
+ */
+async function initDatabaseAsync(): Promise<void> {
     try {
         db = await SQLite.openDatabaseAsync(DATABASE_NAME);
 
@@ -115,6 +141,10 @@ async function migrateFromAsyncStorage(): Promise<void> {
  */
 function getDb(): SQLite.SQLiteDatabase {
     if (!db) {
+        console.error('Database not initialized. Initialization status:', {
+            initPromise: !!initPromise,
+            db: !!db,
+        });
         throw new Error('Database not initialized. Call initDatabase() first.');
     }
     return db;
@@ -161,18 +191,28 @@ async function insertReport(report: Report): Promise<void> {
  * Get all reports
  */
 export async function dbGetAllReports(): Promise<Report[]> {
-    const database = getDb();
-    const result = await database.getAllAsync<any>('SELECT * FROM reports ORDER BY created_at DESC');
-    return result.map(rowToReport);
+    try {
+        const database = getDb();
+        const result = await database.getAllAsync<any>('SELECT * FROM reports ORDER BY created_at DESC');
+        return result ? result.map(rowToReport) : [];
+    } catch (error) {
+        console.error('Error fetching all reports:', error);
+        throw error;
+    }
 }
 
 /**
  * Get report by ID
  */
 export async function dbGetReportById(id: string): Promise<Report | null> {
-    const database = getDb();
-    const result = await database.getFirstAsync<any>('SELECT * FROM reports WHERE id = ?', [id]);
-    return result ? rowToReport(result) : null;
+    try {
+        const database = getDb();
+        const result = await database.getFirstAsync<any>('SELECT * FROM reports WHERE id = ?', [id]);
+        return result ? rowToReport(result) : null;
+    } catch (error) {
+        console.error('Error fetching report by ID:', error);
+        throw error;
+    }
 }
 
 /**
@@ -247,24 +287,34 @@ export async function dbDeleteAllReports(): Promise<boolean> {
  * Get reports by status
  */
 export async function dbGetReportsByStatus(status: Report['status']): Promise<Report[]> {
-    const database = getDb();
-    const result = await database.getAllAsync<any>(
-        'SELECT * FROM reports WHERE status = ? ORDER BY created_at DESC',
-        [status]
-    );
-    return result.map(rowToReport);
+    try {
+        const database = getDb();
+        const result = await database.getAllAsync<any>(
+            'SELECT * FROM reports WHERE status = ? ORDER BY created_at DESC',
+            [status]
+        );
+        return result ? result.map(rowToReport) : [];
+    } catch (error) {
+        console.error('Error fetching reports by status:', error);
+        throw error;
+    }
 }
 
 /**
  * Get reports by type
  */
 export async function dbGetReportsByType(type: Report['type']): Promise<Report[]> {
-    const database = getDb();
-    const result = await database.getAllAsync<any>(
-        'SELECT * FROM reports WHERE type = ? ORDER BY created_at DESC',
-        [type]
-    );
-    return result.map(rowToReport);
+    try {
+        const database = getDb();
+        const result = await database.getAllAsync<any>(
+            'SELECT * FROM reports WHERE type = ? ORDER BY created_at DESC',
+            [type]
+        );
+        return result ? result.map(rowToReport) : [];
+    } catch (error) {
+        console.error('Error fetching reports by type:', error);
+        throw error;
+    }
 }
 
 // ============ HEALTH LOGS ============
@@ -295,9 +345,14 @@ async function insertHealthLog(log: HealthLog): Promise<void> {
  * Get all health logs
  */
 export async function dbGetHealthLogs(): Promise<HealthLog[]> {
-    const database = getDb();
-    const result = await database.getAllAsync<any>('SELECT * FROM health_logs ORDER BY date DESC');
-    return result.map(rowToHealthLog);
+    try {
+        const database = getDb();
+        const result = await database.getAllAsync<any>('SELECT * FROM health_logs ORDER BY date DESC');
+        return result ? result.map(rowToHealthLog) : [];
+    } catch (error) {
+        console.error('Error fetching health logs:', error);
+        throw error;
+    }
 }
 
 /**

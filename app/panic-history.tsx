@@ -4,16 +4,22 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPanicAlertHistory, PanicAlertHistoryItem } from '@/services/panicService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function PanicHistoryScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState<PanicAlertHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadAlerts();
-  }, []);
+    if (user) {
+      loadAlerts();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   const loadAlerts = async () => {
     setIsLoading(true);

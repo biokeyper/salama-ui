@@ -2,60 +2,18 @@ import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import EmailRecoveryModal from '@/components/EmailRecoveryModal';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { sendPanicAlert } from '@/services/panicService';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { unreadCount } = useNotifications();
-  const [panicTapCount, setPanicTapCount] = useState(0);
-  const panicTapTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const handleEmergencyAlert = async () => {
-    setPanicTapCount((prev) => prev + 1);
-
-    // Clear previous timer
-    if (panicTapTimer.current) {
-      clearTimeout(panicTapTimer.current);
-    }
-
-    if (panicTapCount === 0) {
-      // First tap
-      Alert.alert('Emergency Alert', 'Tap again to confirm sending emergency alert');
-
-      // Reset tap count after 3 seconds
-      panicTapTimer.current = setTimeout(() => {
-        setPanicTapCount(0);
-      }, 3000);
-    } else if (panicTapCount === 1) {
-      // Second tap - send alert
-      setPanicTapCount(0);
-      try {
-        const result = await sendPanicAlert('emergency-location');
-        if (result.success) {
-          Alert.alert(
-            'Alert Sent',
-            'Emergency alert has been sent successfully',
-            [
-              {
-                text: 'View History',
-                onPress: () => router.push('/panic-history'),
-              },
-              { text: 'OK' },
-            ]
-          );
-        } else {
-          Alert.alert('Error', result.error || 'Failed to send emergency alert');
-        }
-      } catch (error) {
-        Alert.alert('Error', 'An error occurred while sending the alert');
-      }
-    }
-  };
+  const { showEmailRecoveryModal, setupEmailRecovery, skipEmailRecovery } = useAuth();
 
   const quickActions = [
     {
@@ -160,29 +118,8 @@ export default function HomeScreen() {
         </View>
       </ThemedView>
 
-      {/* Emergency Alert Section */}
-      <ThemedView style={styles.emergencySection}>
-        <TouchableOpacity
-          style={styles.emergencyCard}
-          onPress={handleEmergencyAlert}
-        >
-          <Text style={styles.emergencyIcon}>🚨</Text>
-          <View style={styles.emergencyTextContainer}>
-            <ThemedText type="defaultSemiBold" style={styles.emergencyTitle}>
-              Emergency Alert
-            </ThemedText>
-            <ThemedText style={styles.emergencySubtitle}>
-              {panicTapCount === 0 ? 'Tap twice to send' : 'Tap again to confirm'}
-            </ThemedText>
-          </View>
-          <TouchableOpacity
-            style={styles.historyLink}
-            onPress={() => router.push('/panic-history')}
-          >
-            <ThemedText style={styles.historyLinkText}>History</ThemedText>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </ThemedView>
+      {/* Emergency Alert - Now Hidden (Gesture-based via shake detection) */}
+      {/* Shake your phone anywhere in the app to trigger emergency alert */}
 
       {/* Quick Actions */}
       <ThemedView style={styles.section}>
@@ -238,6 +175,12 @@ export default function HomeScreen() {
       </TouchableOpacity>
 
       </ParallaxScrollView>
+
+      <EmailRecoveryModal
+        visible={showEmailRecoveryModal}
+        onSkip={skipEmailRecovery}
+        onSave={setupEmailRecovery}
+      />
     </View>
   );
 }
