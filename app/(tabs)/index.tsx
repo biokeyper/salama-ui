@@ -15,6 +15,10 @@ export default function HomeScreen() {
   const { unreadCount } = useNotifications();
   const { showEmailRecoveryModal, setupEmailRecovery, skipEmailRecovery } = useAuth();
 
+  useEffect(() => {
+    console.log('Home screen - Email recovery modal visible:', showEmailRecoveryModal);
+  }, [showEmailRecoveryModal]);
+
   const quickActions = [
     {
       icon: '🎤',
@@ -117,9 +121,6 @@ export default function HomeScreen() {
           ))}
         </View>
       </ThemedView>
-
-      {/* Emergency Alert - Now Hidden (Gesture-based via shake detection) */}
-      {/* Shake your phone anywhere in the app to trigger emergency alert */}
 
       {/* Quick Actions */}
       <ThemedView style={styles.section}>
@@ -247,46 +248,6 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 16,
     gap: 12,
-  },
-  emergencySection: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  emergencyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#EF4444',
-    gap: 12,
-  },
-  emergencyIcon: {
-    fontSize: 28,
-  },
-  emergencyTextContainer: {
-    flex: 1,
-  },
-  emergencyTitle: {
-    fontSize: 16,
-    color: '#EF4444',
-    marginBottom: 2,
-  },
-  emergencySubtitle: {
-    fontSize: 13,
-    color: '#DC2626',
-  },
-  historyLink: {
-    backgroundColor: '#FCA5A5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  historyLinkText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#7F1D1D',
   },
   sectionTitle: {
     fontSize: 16,

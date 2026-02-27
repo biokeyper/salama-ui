@@ -15,102 +15,118 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { EmergencyAlertProvider } from '@/contexts/EmergencyAlertContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initDatabase } from '@/services/database';
+import FloatingEmergencyButton from '@/components/FloatingEmergencyButton';
+import EmergencyAlertModal from '@/components/EmergencyAlertModal';
 
-function RootNavigator() {
+interface RootNavigatorProps {
+  emergencyModalVisible: boolean;
+  onOpenEmergencyModal: () => void;
+  onCloseEmergencyModal: () => void;
+}
+
+function RootNavigator({
+  emergencyModalVisible,
+  onOpenEmergencyModal,
+  onCloseEmergencyModal,
+}: RootNavigatorProps) {
   const colorScheme = useColorScheme();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen
-          name="index"
-          options={{
-            headerShown: false,
-            title: 'SafeGirls',
-            animation: 'fade_from_bottom',
-          }}
-        />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <View style={{ flex: 1 }}>
+        <Stack>
+          <Stack.Screen
+            name="index"
+            options={{
+              headerShown: false,
+              title: 'SafeGirls',
+              animation: 'fade_from_bottom',
+            }}
+          />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
 
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="fake-calculator" options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="fake-calendar" options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="tracker" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="fake-calculator" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="fake-calendar" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="tracker" options={{ headerShown: false }} />
 
-        <Stack.Screen
-          name="safety-check"
-          options={{
-            title: 'Safety Check',
-            headerBackTitle: 'Back'
-          }}
-        />
-        <Stack.Screen
-          name="detailed-report"
-          options={{
-            title: 'Detailed Report',
-            headerBackTitle: 'Back'
-          }}
-        />
-        <Stack.Screen
-          name="text-report"
-          options={{
-            title: 'Text Report',
-            headerBackTitle: 'Back'
-          }}
-        />
-        <Stack.Screen
-          name="record-past"
-          options={{
-            title: 'Record Past Event',
-            headerBackTitle: 'Back'
-          }}
-        />
+          <Stack.Screen
+            name="safety-check"
+            options={{
+              title: 'Safety Check',
+              headerBackTitle: 'Back'
+            }}
+          />
+          <Stack.Screen
+            name="detailed-report"
+            options={{
+              title: 'Detailed Report',
+              headerBackTitle: 'Back'
+            }}
+          />
+          <Stack.Screen
+            name="text-report"
+            options={{
+              title: 'Text Report',
+              headerBackTitle: 'Back'
+            }}
+          />
+          <Stack.Screen
+            name="record-past"
+            options={{
+              title: 'Record Past Event',
+              headerBackTitle: 'Back'
+            }}
+          />
 
-        <Stack.Screen
-          name="settings"
-          options={{
-            headerShown: false
-          }}
-        />
+          <Stack.Screen
+            name="settings"
+            options={{
+              headerShown: false
+            }}
+          />
 
-        <Stack.Screen
-          name="login"
-          options={{
-            headerShown: false,
-            animationEnabled: true,
-          }}
-        />
-        <Stack.Screen
-          name="signup"
-          options={{
-            headerShown: false,
-            animationEnabled: true,
-          }}
-        />
+          <Stack.Screen
+            name="login"
+            options={{
+              headerShown: false,
+              animationEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="signup"
+            options={{
+              headerShown: false,
+              animationEnabled: true,
+            }}
+          />
 
-        <Stack.Screen
-          name="account"
-          options={{
-            headerShown: false,
-          }}
-        />
+          <Stack.Screen
+            name="account"
+            options={{
+              headerShown: false,
+            }}
+          />
 
-        <Stack.Screen
-          name="panic-history"
-          options={{
-            headerShown: false,
-          }}
-        />
+          <Stack.Screen
+            name="panic-history"
+            options={{
+              headerShown: false,
+            }}
+          />
 
-        <Stack.Screen
-          name="notifications"
-          options={{
-            headerShown: false,
-          }}
-        />
+          <Stack.Screen
+            name="notifications"
+            options={{
+              headerShown: false,
+            }}
+          />
 
-        <Stack.Screen name="+not-found" />
-      </Stack>
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <FloatingEmergencyButton onPress={onOpenEmergencyModal} />
+        <EmergencyAlertModal visible={emergencyModalVisible} onClose={onCloseEmergencyModal} />
+      </View>
       <StatusBar style="auto" />
     </ThemeProvider>
   );
@@ -121,6 +137,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   const [dbInitialized, setDbInitialized] = useState(false);
+  const [emergencyModalVisible, setEmergencyModalVisible] = useState(false);
 
   // Initialize database on app launch
   useEffect(() => {
@@ -163,7 +180,11 @@ export default function RootLayout() {
             <PinProtectionProvider>
               <SettingsProvider>
                 <BackgroundRecordingProvider>
-                  <RootNavigator />
+                  <RootNavigator
+                    emergencyModalVisible={emergencyModalVisible}
+                    onOpenEmergencyModal={() => setEmergencyModalVisible(true)}
+                    onCloseEmergencyModal={() => setEmergencyModalVisible(false)}
+                  />
                 </BackgroundRecordingProvider>
               </SettingsProvider>
             </PinProtectionProvider>

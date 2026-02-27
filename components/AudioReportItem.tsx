@@ -2,12 +2,13 @@ import { Report } from '@/types/report';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getAvailableActions } from '@/utils/reportActions';
 
 interface AudioReportItemProps {
   report: Report;
   isPlaying: boolean;
+  isSubmitting?: boolean;
   onPlayPause: (report: Report) => void;
   onStop: (report: Report) => void;
   onDelete: (report: Report) => void;
@@ -20,6 +21,7 @@ interface AudioReportItemProps {
 export default function AudioReportItem({
   report,
   isPlaying,
+  isSubmitting = false,
   onPlayPause,
   onStop,
   onDelete,
@@ -260,8 +262,13 @@ export default function AudioReportItem({
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => onResubmit(report)}
+                    disabled={isSubmitting}
                   >
-                    <MaterialIcons name="refresh" size={20} color="#8A4FFF" />
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#8A4FFF" />
+                    ) : (
+                      <MaterialIcons name="refresh" size={20} color="#8A4FFF" />
+                    )}
                   </TouchableOpacity>
                 )}
               </>
@@ -317,11 +324,18 @@ export default function AudioReportItem({
             <Text style={styles.errorText}>{report.submissionError}</Text>
           )}
           <TouchableOpacity
-            style={styles.resubmitButton}
+            style={[styles.resubmitButton, isSubmitting && styles.resubmitButtonDisabled]}
             onPress={() => onResubmit(report)}
+            disabled={isSubmitting}
           >
-            <MaterialIcons name="refresh" size={20} color="#8A4FFF" />
-            <Text style={styles.resubmitText}>Resubmit</Text>
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color="#8A4FFF" />
+            ) : (
+              <>
+                <MaterialIcons name="refresh" size={20} color="#8A4FFF" />
+                <Text style={styles.resubmitText}>Resubmit</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -453,6 +467,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#8A4FFF',
+  },
+  resubmitButtonDisabled: {
+    opacity: 0.6,
   },
   submittedContainer: {
     flexDirection: 'row',

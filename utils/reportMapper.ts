@@ -13,10 +13,22 @@ import { Report } from '../types/report';
 export function mapReportToResponses(report: Report): string[] {
   const responses: string[] = [];
 
+  // Debug logging
+  console.log('mapReportToResponses - Report object:', JSON.stringify(report, null, 2));
+  console.log('mapReportToResponses - textContent:', report.textContent);
+  console.log('mapReportToResponses - audioUri:', report.audioUri);
+  console.log('mapReportToResponses - type:', report.type);
+
   // Add text content if available (chunk into max 1000 char responses)
   if (report.textContent) {
     const chunks = chunkString(report.textContent, 1000);
     responses.push(...chunks);
+  }
+
+  // Add audio recording info if available
+  if (report.audioUri) {
+    const durationSeconds = report.audioDuration ? Math.round(report.audioDuration / 1000) : 0;
+    responses.push(`Audio recording: ${durationSeconds} seconds`);
   }
 
   // Add notes from metadata if available

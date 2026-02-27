@@ -12,7 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function TextReportScreen() {
   const [report, setReport] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingLocally, setIsSavingLocally] = useState(false);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -60,7 +61,7 @@ export default function TextReportScreen() {
 
     if (!editingReport) return;
 
-    setIsProcessing(true);
+    setIsSubmitting(true);
     try {
       await saveReport({
         id: editingReport.id,
@@ -74,7 +75,7 @@ export default function TextReportScreen() {
       console.error('Error updating report:', error);
       Alert.alert('Error', 'Failed to update report');
     } finally {
-      setIsProcessing(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -84,7 +85,7 @@ export default function TextReportScreen() {
       return;
     }
 
-    setIsProcessing(true);
+    setIsSavingLocally(true);
     try {
       const reportType: ReportType = audioUri ? 'mixed' : 'text';
 
@@ -95,13 +96,20 @@ export default function TextReportScreen() {
         audioUri: audioUri || undefined,
       });
 
-      Alert.alert('Thank you', 'Your report has been saved locally.');
-      router.replace('/(tabs)');
+      Alert.alert('Success', 'Your report has been saved locally.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Clear input and stay on same page
+            setReport('');
+          },
+        },
+      ]);
     } catch (error) {
       console.error('Error saving report:', error);
       Alert.alert('Error', 'Failed to save your report. Please try again.');
     } finally {
-      setIsProcessing(false);
+      setIsSavingLocally(false);
     }
   };
 
@@ -111,7 +119,7 @@ export default function TextReportScreen() {
       return;
     }
 
-    setIsProcessing(true);
+    setIsSubmitting(true);
     try {
       const reportType: ReportType = audioUri ? 'mixed' : 'text';
 
@@ -129,7 +137,7 @@ export default function TextReportScreen() {
       if (result.success) {
         Alert.alert(
           'Success',
-          'Your report has been submitted securely to the backend and will be stored on the blockchain.',
+          'Your report has been submitted successfully.',
           [
             {
               text: 'OK',
@@ -138,7 +146,7 @@ export default function TextReportScreen() {
                 if (result.submissionId) {
                   startStatusPolling(result.submissionId);
                 }
-                router.replace('/(tabs)');
+                router.replace('/');
               },
             },
           ]
@@ -198,7 +206,7 @@ export default function TextReportScreen() {
         ]
       );
     } finally {
-      setIsProcessing(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -229,19 +237,19 @@ export default function TextReportScreen() {
           {editingReport ? (
             <>
               <TouchableOpacity
-                style={[styles.button, styles.secondaryButton, isProcessing && styles.buttonDisabled]}
+                style={[styles.button, styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
                 onPress={() => router.back()}
-                disabled={isProcessing}
+                disabled={isSubmitting}
               >
                 <ThemedText style={styles.secondaryButtonText}>Cancel</ThemedText>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.button, styles.primaryButton, isProcessing && styles.buttonDisabled]}
+                style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
                 onPress={handleUpdate}
-                disabled={isProcessing}
+                disabled={isSubmitting}
               >
-                {isProcessing ? (
+                {isSubmitting ? (
                   <ActivityIndicator color="white" />
                 ) : (
                   <ThemedText style={styles.buttonText}>Update Report</ThemedText>
@@ -251,11 +259,11 @@ export default function TextReportScreen() {
           ) : (
             <>
               <TouchableOpacity
-                style={[styles.button, styles.secondaryButton, isProcessing && styles.buttonDisabled]}
+                style={[styles.button, styles.secondaryButton, isSavingLocally && styles.buttonDisabled]}
                 onPress={handleSaveLocally}
-                disabled={isProcessing}
+                disabled={isSavingLocally || isSubmitting}
               >
-                {isProcessing ? (
+                {isSavingLocally ? (
                   <ActivityIndicator color="#8A4FFF" />
                 ) : (
                   <ThemedText style={styles.secondaryButtonText}>Save Locally</ThemedText>
@@ -263,11 +271,11 @@ export default function TextReportScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.button, styles.primaryButton, isProcessing && styles.buttonDisabled]}
+                style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
                 onPress={handleSubmitToBackend}
-                disabled={isProcessing}
+                disabled={isSubmitting || isSavingLocally}
               >
-                {isProcessing ? (
+                {isSubmitting ? (
                   <ActivityIndicator color="white" />
                 ) : (
                   <ThemedText style={styles.buttonText}>Submit Report</ThemedText>

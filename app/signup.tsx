@@ -66,7 +66,8 @@ export default function SignupScreen() {
           {
             text: 'OK',
             onPress: () => {
-              router.back();
+              // Navigate to home screen (main tabs)
+              router.replace('/');
             },
           },
         ]);

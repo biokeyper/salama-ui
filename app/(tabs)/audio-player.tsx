@@ -2,7 +2,7 @@ import LockScreen from '@/app/lock-screen';
 import AudioReportItem from '@/components/AudioReportItem';
 import { hasPin } from '@/services/security';
 import { deleteReport, getAllReports, updateReportStatus, archiveReport } from '@/services/storage';
-import { submitReportToBackend, archiveReportOnBackend, decryptReportFromBackend } from '@/services/api';
+import { submitReportToBackend, archiveReportOnBackend, decryptReportFromBackend, searchBackendReports, getReportStats } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
 import { grantAccess, getReportViewers } from '@/services/accessService';
 import { Report } from '@/types/report';
@@ -44,6 +44,17 @@ export default function LibraryScreen() {
   const [shareUserId, setShareUserId] = useState('');
   const [decryptedContent, setDecryptedContent] = useState<any>(null);
   const [isLoadingDecrypt, setIsLoadingDecrypt] = useState(false);
+  const [isSubmittingReportId, setIsSubmittingReportId] = useState<string | null>(null);
+
+  // Search functionality state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchStatus, setSearchStatus] = useState<string>('all');
+  const [backendReports, setBackendReports] = useState<any[]>([]);
+  const [reportStats, setReportStats] = useState<any>(null);
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
+  const [searchOffset, setSearchOffset] = useState(0);
+  const [isSearchingBackend, setIsSearchingBackend] = useState(false);
+  const searchLimit = 10;
 
   // Check PIN status every time the screen comes into focus
   useFocusEffect(
@@ -107,14 +118,27 @@ export default function LibraryScreen() {
   }, [isAuthenticated, showArchived]);
 
   const filteredReports = useMemo(() => {
-    return reports.filter(r => {
+    let filtered = reports.filter(r => {
       if (activeTab === 'audio') {
         return (r.type === 'audio' || r.type === 'mixed') && r.audioUri;
       } else {
         return r.type === 'text' || (r.type === 'mixed' && r.textContent);
       }
     });
-  }, [reports, activeTab]);
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(r => {
+        const dateStr = new Date(r.createdAt).toLocaleDateString().toLowerCase();
+        const contentStr = (r.textContent || '').toLowerCase();
+        const idStr = (r.id || '').toLowerCase();
+        return dateStr.includes(query) || contentStr.includes(query) || idStr.includes(query);
+      });
+    }
+
+    return filtered;
+  }, [reports, activeTab, searchQuery]);
 
   const handlePlayPause = (report: Report) => {
     // If clicking on a different report, stop the currently playing one
@@ -202,7 +226,7 @@ export default function LibraryScreen() {
   const handleResubmit = async (report: Report) => {
     Alert.alert(
       'Submit Report',
-      'This will encrypt and submit your report to the backend. It will be stored on IPFS and timestamped on the blockchain.',
+      'Submit this report securely?',
       [
         {
           text: 'Cancel',
@@ -211,13 +235,14 @@ export default function LibraryScreen() {
         {
           text: 'Submit',
           onPress: async () => {
+            setIsSubmittingReportId(report.id);
             try {
               const result = await submitReportToBackend(report);
 
               if (result.success) {
                 Alert.alert(
                   'Success',
-                  `Report submitted successfully.\nSubmission ID: ${result.submissionId}\nIPFS Hash: ${result.ipfsHash || 'Pending'}`,
+                  'Your report has been submitted successfully.',
                   [
                     {
                       text: 'OK',
@@ -272,6 +297,8 @@ export default function LibraryScreen() {
               console.error('Error submitting report:', error);
               Alert.alert('Error', 'An unexpected error occurred while submitting the report');
               await loadReports();
+            } finally {
+              setIsSubmittingReportId(null);
             }
           },
         },
@@ -390,6 +417,50 @@ export default function LibraryScreen() {
     setShowShareModal(true);
   };
 
+  const loadBackendReports = async () => {
+    setIsLoadingSearch(true);
+    try {
+      // Load stats
+      const statsResult = await getReportStats();
+      if (statsResult.success) {
+        setReportStats(statsResult.stats);
+      }
+
+      // Load reports based on selected status
+      const params: any = { limit: searchLimit, offset: 0 };
+      if (searchStatus !== 'all') {
+        params.status = searchStatus;
+      }
+      const reportsResult = await searchBackendReports(params);
+      if (reportsResult.success) {
+        setBackendReports(reportsResult.reports || []);
+        setSearchOffset(0);
+      }
+    } catch (error) {
+      console.error('Error loading backend reports:', error);
+      Alert.alert('Error', 'Failed to load reports');
+    } finally {
+      setIsLoadingSearch(false);
+    }
+  };
+
+  const loadMoreBackendReports = async () => {
+    try {
+      const params: any = { limit: searchLimit, offset: searchOffset + searchLimit };
+      if (searchStatus !== 'all') {
+        params.status = searchStatus;
+      }
+      const result = await searchBackendReports(params);
+      if (result.success) {
+        setBackendReports([...backendReports, ...(result.reports || [])]);
+        setSearchOffset(searchOffset + searchLimit);
+      }
+    } catch (error) {
+      console.error('Error loading more reports:', error);
+      Alert.alert('Error', 'Failed to load more reports');
+    }
+  };
+
   const handleGrantAccess = async () => {
     if (!selectedReport || !shareUserId.trim()) {
       Alert.alert('Error', 'Please enter a user ID');
@@ -423,6 +494,56 @@ export default function LibraryScreen() {
     );
   }
 
+  // Show PIN screens if not authenticated
+  if (!isAuthenticated) {
+    if (showPinRequired) {
+      return (
+        <Modal
+          visible={showPinRequired}
+          animationType="slide"
+          transparent={false}
+        >
+          <LockScreen
+            mode="setup"
+            onSetPin={() => {
+              setShowPinRequired(false);
+              setIsAuthenticated(true);
+            }}
+            onUnlock={() => { }}
+          />
+        </Modal>
+      );
+    }
+
+    if (showPinVerify) {
+      return (
+        <Modal
+          visible={showPinVerify}
+          animationType="slide"
+          transparent={false}
+        >
+          <LockScreen
+            mode="verify"
+            onUnlock={() => {
+              setShowPinVerify(false);
+              setIsAuthenticated(true);
+            }}
+            onSetPin={() => { }}
+          />
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => {
+              setShowPinVerify(false);
+              router.back();
+            }}
+          >
+            <Feather name="x" size={24} color="#666" />
+          </TouchableOpacity>
+        </Modal>
+      );
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -442,6 +563,23 @@ export default function LibraryScreen() {
               color="#8A4FFF"
             />
           </TouchableOpacity>
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchBarContainer}>
+          <MaterialIcons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search reports..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <MaterialIcons name="close" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Tabs */}
@@ -483,6 +621,7 @@ export default function LibraryScreen() {
                     <AudioReportItem
                       report={report}
                       isPlaying={playingReportId === report.id}
+                      isSubmitting={isSubmittingReportId === report.id}
                       onPlayPause={handlePlayPause}
                       onStop={handleStop}
                       onDelete={handleDelete}
@@ -979,5 +1118,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#8B5CF6',
+  },
+  // Search bar styles
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#333',
   },
 });

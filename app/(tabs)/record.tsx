@@ -19,6 +19,7 @@ export default function RecordScreen() {
   const [reportId, setReportId] = useState<string | null>(null);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const [isExiting, setIsExiting] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
 
@@ -160,7 +161,7 @@ export default function RecordScreen() {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSavingDraft(true);
     try {
       // Navigate to safety check for additional details
       let currentReportId = reportId;
@@ -185,7 +186,7 @@ export default function RecordScreen() {
       console.error('Error:', error);
       Alert.alert('Error', 'Failed to save draft');
     } finally {
-      setIsSubmitting(false);
+      setIsSavingDraft(false);
     }
   };
 
@@ -368,11 +369,11 @@ export default function RecordScreen() {
       {recordedUri && !isRecording && (
         <View style={styles.submissionButtons}>
           <TouchableOpacity
-            style={[styles.draftButton, isSubmitting && styles.buttonDisabled]}
+            style={[styles.draftButton, isSavingDraft && styles.buttonDisabled]}
             onPress={handleSaveDraft}
-            disabled={isSubmitting}
+            disabled={isSavingDraft || isSubmitting}
           >
-            {isSubmitting ? (
+            {isSavingDraft ? (
               <ActivityIndicator color="#8A4FFF" />
             ) : (
               <>
@@ -385,7 +386,7 @@ export default function RecordScreen() {
           <TouchableOpacity
             style={[styles.submitButton, isSubmitting && styles.buttonDisabled]}
             onPress={handleSubmitReport}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isSavingDraft}
           >
             {isSubmitting ? (
               <ActivityIndicator color="white" />

@@ -145,13 +145,23 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin }: Lock
                 </View>
 
                 {/* Submit Button */}
-                {currentPin.length >= 4 && (
-                    <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                        <ThemedText style={styles.submitButtonText}>
-                            {mode === 'set' ? (isConfirming ? 'Confirm' : 'Next') : 'Unlock'}
-                        </ThemedText>
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    currentPin.length < 4 && styles.submitButtonDisabled,
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={currentPin.length < 4}
+                >
+                  <ThemedText
+                    style={[
+                      styles.submitButtonText,
+                      currentPin.length < 4 && styles.submitButtonTextDisabled,
+                    ]}
+                  >
+                    {mode === 'set' ? (isConfirming ? 'Confirm' : 'Next') : 'Unlock'}
+                  </ThemedText>
+                </TouchableOpacity>
 
                 {/* Cancel (only in verify mode) */}
                 {mode === 'verify' && (
@@ -262,5 +272,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: 'center',
         color: '#666',
+    },
+    submitButtonDisabled: {
+        backgroundColor: '#D1D5DB',
+        shadowOpacity: 0.1,
+    },
+    submitButtonTextDisabled: {
+        color: '#9CA3AF',
     },
 });

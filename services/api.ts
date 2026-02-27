@@ -24,6 +24,8 @@ apiClient.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         console.log('Auth token added to request for:', config.url);
+        console.log('Token preview (first 50 chars):', token.substring(0, 50));
+        console.log('Full header:', `Bearer ${token.substring(0, 50)}...`);
       } else {
         console.log('No auth token found for request:', config.url);
       }
@@ -42,6 +44,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       console.error('401 Unauthorized for URL:', error.config?.url);
       console.error('Response data:', error.response?.data);
+      console.error('Request Authorization header:', error.config?.headers?.Authorization?.substring(0, 60) || 'NO HEADER');
     }
     return Promise.reject(error);
   }
@@ -89,6 +92,8 @@ export async function submitReportToBackend(
   report: Report
 ): Promise<SubmissionResult> {
   try {
+    console.log('submitReportToBackend called with report:', JSON.stringify(report, null, 2));
+
     // Check authentication
     const authenticated = await isAuthenticated();
     if (!authenticated) {
@@ -112,15 +117,28 @@ export async function submitReportToBackend(
 
     // Map to backend format (flexible responses)
     const responses = mapReportToResponses(report);
+    console.log('Report mapped to responses:', JSON.stringify(responses, null, 2));
 
     // Prepare metadata
     const metadata = prepareReportMetadata(report);
+    console.log('Report metadata prepared:', JSON.stringify(metadata, null, 2));
+
+    // Build final payload - wrapped in "payload" field as backend expects
+    const submitPayload = {
+      payload: {
+        responses,
+        metadata,
+      },
+    };
+    console.log('FULL SUBMIT PAYLOAD:', JSON.stringify(submitPayload, null, 2));
+    console.log('Submitting to endpoint:', apiConfig.endpoints.submitReport);
+    console.log('API Base URL:', apiConfig.baseURL);
 
     // Submit to backend (backend handles encryption)
-    const response = await apiClient.post(apiConfig.endpoints.submitReport, {
-      responses,
-      metadata,
-    });
+    const response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
+
+    console.log('Submit response status:', response.status);
+    console.log('Submit response data:', JSON.stringify(response.data, null, 2));
 
     if (response.status === 200 || response.status === 201) {
       const data = response.data;
@@ -149,6 +167,14 @@ export async function submitReportToBackend(
     };
   } catch (error) {
     console.error('Error submitting report:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as any;
+      console.error('Response status:', axiosError.response?.status);
+      console.error('Response data:', JSON.stringify(axiosError.response?.data, null, 2));
+      console.error('Request payload:', JSON.stringify(axiosError.config?.data, null, 2));
+    }
 
     // Check if it's an authentication error (401)
     const isAuthError = error instanceof Error &&

@@ -3,14 +3,17 @@ import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { hasPin, removePin, setPin as savePin } from '@/services/security';
 import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
 import { usePinProtection } from '@/contexts/PinProtectionContext';
-import { backupEncryptionKey, recoverEncryptionKey } from '@/services/authService';
+import { backupEncryptionKey, recoverEncryptionKey, setupEmailRecovery } from '@/services/authService';
 import LockScreen from './lock-screen';
+import * as SecureStore from 'expo-secure-store';
+
+const EMAIL_RECOVERY_KEY = 'salama_email_recovery_setup';
 
 
 export default function SettingsScreen() {
@@ -25,10 +28,24 @@ export default function SettingsScreen() {
     const [showKeyBackupModal, setShowKeyBackupModal] = useState(false);
     const [keyBackupPin, setKeyBackupPin] = useState('');
     const [isBackingUpKey, setIsBackingUpKey] = useState(false);
+    const [showEmailRecoveryModal, setShowEmailRecoveryModal] = useState(false);
+    const [recoveryEmail, setRecoveryEmail] = useState('');
+    const [isSettingUpEmail, setIsSettingUpEmail] = useState(false);
+    const [emailRecoverySetup, setEmailRecoverySetup] = useState(false);
 
     useEffect(() => {
         checkPin();
+        checkEmailRecoverySetup();
     }, []);
+
+    const checkEmailRecoverySetup = async () => {
+        try {
+            const isSetup = await SecureStore.getItemAsync(EMAIL_RECOVERY_KEY);
+            setEmailRecoverySetup(isSetup === 'true');
+        } catch (error) {
+            console.error('Error checking email recovery setup:', error);
+        }
+    };
 
     const checkPin = async () => {
         const exists = await hasPin();
@@ -148,6 +165,36 @@ export default function SettingsScreen() {
             Alert.alert('Error', 'An error occurred while backing up');
         } finally {
             setIsBackingUpKey(false);
+        }
+    };
+
+    const handleSetupEmailRecovery = async () => {
+        if (!recoveryEmail.trim()) {
+            Alert.alert('Error', 'Please enter your email address');
+            return;
+        }
+
+        // Basic email validation
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recoveryEmail.trim())) {
+            Alert.alert('Error', 'Please enter a valid email address');
+            return;
+        }
+
+        setIsSettingUpEmail(true);
+        try {
+            const result = await setupEmailRecovery(recoveryEmail.trim());
+            if (result.success) {
+                setShowEmailRecoveryModal(false);
+                setRecoveryEmail('');
+                setEmailRecoverySetup(true);
+                Alert.alert('Success', 'Email recovery has been set up successfully');
+            } else {
+                Alert.alert('Error', result.error || 'Failed to setup email recovery');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'An error occurred while setting up email recovery');
+        } finally {
+            setIsSettingUpEmail(false);
         }
     };
 
@@ -289,6 +336,34 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
+                {/* Account Security Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>🔐 Account Security</Text>
+                    <Text style={styles.sectionDescription}>
+                        Set up recovery options to regain access if you lose your phone.
+                    </Text>
+
+                    <View style={styles.securityOption}>
+                        <View style={styles.securityInfo}>
+                            <Text style={styles.settingLabel}>📧 Email Recovery</Text>
+                            <Text style={styles.settingHint}>
+                                {emailRecoverySetup ? 'Email recovery is enabled' : 'Set up email recovery'}
+                            </Text>
+                        </View>
+                        {emailRecoverySetup && <Feather name="check-circle" size={20} color="#10B981" />}
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={() => setShowEmailRecoveryModal(true)}
+                    >
+                        <Feather name="mail" size={20} color="#8B5CF6" />
+                        <Text style={styles.primaryButtonText}>
+                            {emailRecoverySetup ? 'Update Email Recovery' : 'Setup Email Recovery'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Key Backup Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>🔑 Key Backup</Text>
@@ -401,6 +476,56 @@ export default function SettingsScreen() {
                             <Text style={styles.primaryButtonText}>
                                 {isBackingUpKey ? 'Backing up...' : 'Backup Key'}
                             </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Email Recovery Modal */}
+            <Modal visible={showEmailRecoveryModal} animationType="slide" transparent={true}>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <TouchableOpacity
+                            style={styles.modalCloseButton}
+                            onPress={() => {
+                                setShowEmailRecoveryModal(false);
+                                setRecoveryEmail('');
+                            }}
+                        >
+                            <Feather name="x" size={24} color="#666" />
+                        </TouchableOpacity>
+
+                        <Text style={styles.modalTitle}>Email Recovery</Text>
+                        <Text style={styles.modalDescription}>
+                            Add your email to recover your account if you lose access to your phone.
+                        </Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your email address"
+                            value={recoveryEmail}
+                            onChangeText={setRecoveryEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            editable={!isSettingUpEmail}
+                            placeholderTextColor="#9CA3AF"
+                        />
+
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={handleSetupEmailRecovery}
+                            disabled={isSettingUpEmail}
+                        >
+                            {isSettingUpEmail ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <>
+                                    <Feather name="mail" size={20} color="#fff" />
+                                    <Text style={styles.primaryButtonText}>
+                                        {emailRecoverySetup ? 'Update Email' : 'Setup Email'}
+                                    </Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -600,5 +725,18 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#1F2937',
         marginBottom: 16,
+    },
+    securityOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+        marginBottom: 16,
+    },
+    securityInfo: {
+        flex: 1,
+        marginRight: 12,
     },
 });

@@ -80,10 +80,53 @@ async function initDatabaseAsync(): Promise<void> {
     `);
 
         console.log('Database initialized successfully');
+        await runDatabaseMigrations();
         await migrateFromAsyncStorage();
     } catch (error) {
         console.error('Error initializing database:', error);
         throw error;
+    }
+}
+
+/**
+ * Run database migrations to update schema
+ */
+async function runDatabaseMigrations(): Promise<void> {
+    try {
+        const database = db;
+        if (!database) return;
+
+        console.log('Running database migrations...');
+
+        // Migration 1: Add missing columns to reports table
+        const columnDefinitions = [
+            { name: 'blockchain_status', type: 'TEXT' },
+            { name: 'confirmations', type: 'INTEGER' },
+            { name: 'tx_hash', type: 'TEXT' },
+            { name: 'ipfs_hash', type: 'TEXT' },
+            { name: 'is_archived', type: 'BOOLEAN DEFAULT 0' },
+            { name: 'archived_at', type: 'TEXT' },
+            { name: 'archived_reason', type: 'TEXT' },
+        ];
+
+        for (const column of columnDefinitions) {
+            try {
+                await database.execAsync(
+                    `ALTER TABLE reports ADD COLUMN ${column.name} ${column.type};`
+                );
+                console.log(`Added column: ${column.name}`);
+            } catch (error: any) {
+                // Column probably already exists, that's fine
+                if (!error.message?.includes('duplicate column')) {
+                    console.log(`Column ${column.name} already exists or skipped`);
+                }
+            }
+        }
+
+        console.log('Database migrations completed');
+    } catch (error) {
+        console.error('Error running migrations:', error);
+        // Don't throw - migrations are optional
     }
 }
 

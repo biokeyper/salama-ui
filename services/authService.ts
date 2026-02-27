@@ -398,21 +398,31 @@ export async function logout(): Promise<void> {
 export async function setupEmailRecovery(
   email: string
 ): Promise<{ success: boolean; error?: string }> {
+  const payload = { email };
+  console.log('Setting up email recovery with payload:', JSON.stringify(payload));
+  console.log('API URL:', `${apiConfig.baseURL}/api/auth/setup-email`);
+
   try {
     const token = await getAuthToken();
     if (!token) {
+      console.log('Email recovery setup - No auth token found');
       return { success: false, error: 'Not authenticated' };
     }
 
+    console.log('Email recovery setup - Token found, sending request...');
+
     const response = await axios.post(
       `${apiConfig.baseURL}/api/auth/setup-email`,
-      { email },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       }
     );
+
+    console.log('Email recovery setup response status:', response.status);
+    console.log('Email recovery setup response data:', JSON.stringify(response.data));
 
     if (response.status === 200 || response.status === 201) {
       return { success: true };
@@ -423,8 +433,36 @@ export async function setupEmailRecovery(
       error: response.data?.error || 'Failed to setup email recovery',
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Email recovery setup failed';
+    let message = 'Email recovery setup failed';
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+
+      console.error('Email recovery setup error - Status:', status);
+      console.error('Email recovery setup error - Response data:', JSON.stringify(errorData));
+      console.error('Email recovery setup error - Message:', errorData?.message);
+      console.error('Email recovery setup error - Error:', errorData?.error);
+
+      if (status === 500) {
+        message = errorData?.message || 'Server error. Please try again later.';
+      } else if (status === 400) {
+        message = errorData?.message || 'Invalid email format';
+      } else if (status === 409) {
+        message = errorData?.message || 'Email already registered';
+      } else if (errorData?.message) {
+        message = errorData.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+    } else if (error instanceof Error) {
+      console.error('Email recovery setup error:', error.message);
+      message = error.message;
+    } else {
+      console.error('Email recovery setup unknown error:', error);
+    }
+
+    console.log('Email recovery setup final error:', message);
     return { success: false, error: message };
   }
 }

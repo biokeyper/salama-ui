@@ -75,7 +75,8 @@ export default function LoginScreen() {
           {
             text: 'OK',
             onPress: () => {
-              router.back();
+              // Navigate to home screen (main tabs)
+              router.replace('/');
             },
           },
         ]);

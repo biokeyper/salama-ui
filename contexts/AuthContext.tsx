@@ -157,8 +157,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const skipEmailRecovery = async () => {
     try {
       // Mark as skipped in secure storage
+      console.log('Skipping email recovery...');
       await SecureStore.setItemAsync(EMAIL_RECOVERY_KEY, 'skipped');
+      console.log('Email recovery marked as skipped');
       setShowEmailRecoveryModal(false);
+      console.log('Email recovery modal should be hidden now');
     } catch (error) {
       console.error('Error skipping email recovery:', error);
     }
