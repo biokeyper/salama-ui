@@ -22,6 +22,7 @@ export interface AuthResponse {
   userId?: string;
   phone?: string;
   email?: string;
+  pin?: string | null;
   _testOTP?: string; // Dev mode only
   // For wrapped responses from backend
   success?: boolean;
@@ -31,6 +32,7 @@ export interface AuthResponse {
     userId?: string;
     phone?: string;
     email?: string;
+    pin?: string | null;
   };
 }
 
@@ -117,6 +119,7 @@ export async function verifySignup(
 
       // Extract token from nested data structure (backend wraps response in { data: { token } })
       let token = response_data.token;
+      let pin = response_data.pin;
       let userData = {
         phone: response_data.phone || phone,
         email: response_data.email || '',
@@ -125,6 +128,7 @@ export async function verifySignup(
       // If token is nested in data object
       if (!token && response_data.data?.token) {
         token = response_data.data.token;
+        pin = response_data.data.pin;
         userData = {
           phone: response_data.data.phone || phone,
           email: response_data.data.email || '',
@@ -146,6 +150,12 @@ export async function verifySignup(
       // Verify token was saved
       const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
       console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
+
+      // Save PIN if provided from backend (signup always returns null for new users)
+      if (pin) {
+        console.log('Storing PIN from backend response');
+        await SecureStore.setItemAsync('user_pin', pin);
+      }
 
       // Save user info
       const user: User = {
@@ -272,6 +282,7 @@ export async function verifyLogin(
 
       // Extract token from nested data structure (backend wraps response in { data: { token } })
       let token = response_data.token;
+      let pin = response_data.pin;
       let userData = {
         phone: response_data.phone || phone,
         email: response_data.email || '',
@@ -280,6 +291,7 @@ export async function verifyLogin(
       // If token is nested in data object
       if (!token && response_data.data?.token) {
         token = response_data.data.token;
+        pin = response_data.data.pin;
         userData = {
           phone: response_data.data.phone || phone,
           email: response_data.data.email || '',
@@ -301,6 +313,16 @@ export async function verifyLogin(
       // Verify token was saved
       const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
       console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
+
+      // Save PIN if provided from backend
+      if (pin) {
+        console.log('Storing PIN from backend response');
+        await SecureStore.setItemAsync('user_pin', pin);
+      } else {
+        // User hasn't set a PIN yet, remove any existing PIN
+        console.log('No PIN from backend, clearing local PIN');
+        await SecureStore.deleteItemAsync('user_pin');
+      }
 
       // Save user info
       const user: User = {
@@ -534,6 +556,7 @@ export async function verifyChangePhone(
 
       // Extract token from nested data structure
       let token = response_data.token;
+      let pin = response_data.pin;
       let userData = {
         phone: response_data.phone || newPhone,
         email: response_data.email || '',
@@ -542,6 +565,7 @@ export async function verifyChangePhone(
       // If token is nested in data object
       if (!token && response_data.data?.token) {
         token = response_data.data.token;
+        pin = response_data.data.pin;
         userData = {
           phone: response_data.data.phone || newPhone,
           email: response_data.data.email || '',
@@ -557,6 +581,12 @@ export async function verifyChangePhone(
 
       // Save new token
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+
+      // Save PIN if provided
+      if (pin) {
+        console.log('Storing PIN from backend response');
+        await SecureStore.setItemAsync('user_pin', pin);
+      }
 
       // Update user info with new phone
       const currentUser = await getUserInfo();
@@ -685,6 +715,7 @@ export async function verifyPhoneChangeRecovery(
 
       // Extract token from nested data structure
       let token = response_data.token;
+      let pin = response_data.pin;
       let userData = {
         phone: response_data.phone || newPhone,
         email: response_data.email || email,
@@ -693,6 +724,7 @@ export async function verifyPhoneChangeRecovery(
       // If token is nested in data object
       if (!token && response_data.data?.token) {
         token = response_data.data.token;
+        pin = response_data.data.pin;
         userData = {
           phone: response_data.data.phone || newPhone,
           email: response_data.data.email || email,
@@ -708,6 +740,12 @@ export async function verifyPhoneChangeRecovery(
 
       // Save token
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+
+      // Save PIN if provided
+      if (pin) {
+        console.log('Storing PIN from backend response');
+        await SecureStore.setItemAsync('user_pin', pin);
+      }
 
       // Save user info
       const user: User = {
