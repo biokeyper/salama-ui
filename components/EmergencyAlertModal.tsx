@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { sendPanicAlert } from '@/services/panicService';
+import { getEmergencyContacts } from '@/services/emergencyContactService';
 
 interface EmergencyAlertModalProps {
   visible: boolean;
@@ -42,23 +44,84 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
       setIsSending(true);
 
       try {
-        const result = await sendPanicAlert('emergency-alert-triggered');
-        if (result.success) {
-          Alert.alert('🚨 Alert Sent', 'Your emergency alert has been sent successfully.', [
-            {
-              text: 'OK',
-              onPress: onClose,
-            },
-          ]);
-        } else {
-          Alert.alert('Error', result.error || 'Failed to send emergency alert');
+        // Check if emergency contacts exist
+        const contactsResult = await getEmergencyContacts();
+        const hasContacts = contactsResult.success && (contactsResult.data?.length ?? 0) > 0;
+
+        // Show warning if no contacts
+        if (!hasContacts) {
+          Alert.alert(
+            '⚠️ No Emergency Contacts',
+            'You haven\'t added emergency contacts. Your panic alert will be recorded but no SMS will be sent to contacts.\n\nContinue?',
+            [
+              {
+                text: 'Cancel',
+                onPress: () => setIsSending(false),
+                style: 'cancel',
+              },
+              {
+                text: 'Continue',
+                onPress: () => sendAlert(),
+                style: 'destructive',
+              },
+            ]
+          );
+          return;
         }
+
+        await sendAlert();
       } catch (error) {
-        console.error('Error sending panic alert:', error);
-        Alert.alert('Error', 'An error occurred while sending the alert');
-      } finally {
+        console.error('Error in panic alert handler:', error);
+        Alert.alert('Error', 'An error occurred');
         setIsSending(false);
       }
+    }
+  };
+
+  const sendAlert = async () => {
+    try {
+      // Request location permission (optional)
+      let locationData = 'emergency-alert-triggered';
+
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+
+          const mapLink = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+          locationData = JSON.stringify({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            mapLink,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (locError) {
+        console.error('Error getting location:', locError);
+        // Continue without location if permission denied or GPS fails
+      }
+
+      // Send panic alert (with or without location)
+      const result = await sendPanicAlert(locationData);
+
+      if (result.success) {
+        Alert.alert('🚨 Alert Sent', 'Your emergency alert has been sent successfully.', [
+          {
+            text: 'OK',
+            onPress: onClose,
+          },
+        ]);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to send emergency alert');
+        setIsSending(false);
+      }
+    } catch (error) {
+      console.error('Error sending panic alert:', error);
+      Alert.alert('Error', 'An error occurred while sending the alert');
+      setIsSending(false);
     }
   };
 
@@ -120,7 +183,7 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
 
           {/* Info text */}
           <Text style={styles.infoText}>
-            Emergency services and your trusted contacts will be notified.
+            Your location and custom message will be sent to emergency contacts via SMS.
           </Text>
         </View>
       </View>

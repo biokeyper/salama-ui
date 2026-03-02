@@ -12,6 +12,7 @@ import { usePinProtection } from '@/contexts/PinProtectionContext';
 import { backupEncryptionKey, recoverEncryptionKey, setupEmailRecovery } from '@/services/authService';
 import LockScreen from './lock-screen';
 import * as SecureStore from 'expo-secure-store';
+import EmergencyContactsSection from '@/components/EmergencyContactsSection';
 
 const EMAIL_RECOVERY_KEY = 'salama_email_recovery_setup';
 
@@ -335,6 +336,9 @@ export default function SettingsScreen() {
                         <Text style={styles.settingStatus}>Active</Text>
                     </View>
                 </View>
+
+                {/* Emergency Contacts Section */}
+                <EmergencyContactsSection />
 
                 {/* Account Security Section */}
                 <View style={styles.section}>

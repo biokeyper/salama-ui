@@ -116,6 +116,8 @@ export default function NotificationsScreen() {
         return 'file-text';
       case 'alert':
         return 'alert-circle';
+      case 'panic_alert':
+        return 'heart';
       case 'share':
         return 'share-2';
       default:
