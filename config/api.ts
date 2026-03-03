@@ -65,5 +65,11 @@ export const apiConfig = {
     verifyRecovery: '/api/auth/verify-recovery',
     changePhoneRecovery: '/api/auth/change-phone/recovery',
     verifyPhoneChangeRecovery: '/api/auth/verify-phone-change/recovery',
+
+    // PIN Management
+    setPin: '/api/auth/set-pin',  // Set or change PIN in settings
+
+    // Account Management
+    deleteAccount: '/api/auth/delete-account',  // Delete user account (authenticated)
   },
 };

@@ -12,9 +12,10 @@ interface LockScreenProps {
     onUnlock: () => void;
     mode?: 'verify' | 'set';
     onSetPin?: (pin: string) => void;
+    onClose?: () => void;
 }
 
-export default function LockScreen({ onUnlock, mode = 'verify', onSetPin }: LockScreenProps) {
+export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClose }: LockScreenProps) {
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
     const [isConfirming, setIsConfirming] = useState(false);

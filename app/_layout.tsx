@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -30,6 +30,10 @@ function RootNavigator({
   onCloseEmergencyModal,
 }: RootNavigatorProps) {
   const colorScheme = useColorScheme();
+  const pathname = usePathname();
+
+  // Hide emergency components on auth and onboarding pages
+  const showEmergencyComponents = !pathname.includes('index') && !pathname.includes('onboarding') && !pathname.includes('auth');
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -124,8 +128,12 @@ function RootNavigator({
 
           <Stack.Screen name="+not-found" />
         </Stack>
-        <FloatingEmergencyButton onPress={onOpenEmergencyModal} />
-        <EmergencyAlertModal visible={emergencyModalVisible} onClose={onCloseEmergencyModal} />
+        {showEmergencyComponents && (
+          <>
+            <FloatingEmergencyButton onPress={onOpenEmergencyModal} />
+            <EmergencyAlertModal visible={emergencyModalVisible} onClose={onCloseEmergencyModal} />
+          </>
+        )}
       </View>
       <StatusBar style="auto" />
     </ThemeProvider>

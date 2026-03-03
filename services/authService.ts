@@ -151,11 +151,9 @@ export async function verifySignup(
       const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
       console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
 
-      // Save PIN if provided from backend (signup always returns null for new users)
-      if (pin) {
-        console.log('Storing PIN from backend response');
-        await SecureStore.setItemAsync('user_pin', pin);
-      }
+      // Store PIN from backend response (signup always returns null for new users)
+      const { storePinFromBackend } = await import('./security');
+      await storePinFromBackend(pin);
 
       // Save user info
       const user: User = {
@@ -275,7 +273,7 @@ export async function verifyLogin(
     );
 
     console.log('Login verification response status:', response.status);
-    console.log('Login verification response data:', JSON.stringify(response.data));
+    console.log('📱 FULL LOGIN RESPONSE:', JSON.stringify(response.data, null, 2));
 
     if (response.status === 200 || response.status === 201) {
       const response_data: AuthResponse = response.data;
@@ -298,6 +296,10 @@ export async function verifyLogin(
         };
       }
 
+      console.log('🔐 Extracted PIN:', pin);
+      console.log('🔑 Extracted Token:', token ? '✅ Present' : '❌ Missing');
+      console.log('👤 User Data:', userData);
+
       if (!token) {
         return {
           success: false,
@@ -314,15 +316,9 @@ export async function verifyLogin(
       const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
       console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
 
-      // Save PIN if provided from backend
-      if (pin) {
-        console.log('Storing PIN from backend response');
-        await SecureStore.setItemAsync('user_pin', pin);
-      } else {
-        // User hasn't set a PIN yet, remove any existing PIN
-        console.log('No PIN from backend, clearing local PIN');
-        await SecureStore.deleteItemAsync('user_pin');
-      }
+      // Store PIN from backend response
+      const { storePinFromBackend } = await import('./security');
+      await storePinFromBackend(pin);
 
       // Save user info
       const user: User = {
@@ -582,11 +578,9 @@ export async function verifyChangePhone(
       // Save new token
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
-      // Save PIN if provided
-      if (pin) {
-        console.log('Storing PIN from backend response');
-        await SecureStore.setItemAsync('user_pin', pin);
-      }
+      // Store PIN from backend response if provided
+      const { storePinFromBackend } = await import('./security');
+      await storePinFromBackend(pin);
 
       // Update user info with new phone
       const currentUser = await getUserInfo();
@@ -741,11 +735,9 @@ export async function verifyPhoneChangeRecovery(
       // Save token
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
-      // Save PIN if provided
-      if (pin) {
-        console.log('Storing PIN from backend response');
-        await SecureStore.setItemAsync('user_pin', pin);
-      }
+      // Store PIN from backend response if provided
+      const { storePinFromBackend } = await import('./security');
+      await storePinFromBackend(pin);
 
       // Save user info
       const user: User = {
@@ -833,6 +825,70 @@ export async function recoverEncryptionKey(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Key recovery failed';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Delete user account (authenticated)
+ * Permanently removes all user data from backend
+ * Note: Submitted reports remain on blockchain
+ */
+export async function deleteUserAccount(): Promise<{ success: boolean; error?: string; data?: any }> {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      console.log('Delete account - No auth token found');
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    console.log('Delete account - Token found, sending request...');
+
+    const response = await axios.post(
+      `${apiConfig.baseURL}${apiConfig.endpoints.deleteAccount}`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    console.log('Delete account response status:', response.status);
+    console.log('Delete account response data:', JSON.stringify(response.data));
+
+    if (response.status === 200 || response.status === 201) {
+      // Clear all local auth data after successful deletion
+      await logout();
+      return { success: true, data: response.data.data };
+    }
+
+    return {
+      success: false,
+      error: response.data?.error || 'Failed to delete account',
+    };
+  } catch (error) {
+    let message = 'Account deletion failed';
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+
+      console.log('Delete account error - Status:', status);
+      console.log('Delete account error - Message:', errorData?.message);
+
+      if (status === 401) {
+        message = errorData?.message || 'Authentication failed. Please login again.';
+      } else if (errorData?.message) {
+        message = errorData.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+    } else if (error instanceof Error) {
+      message = error.message;
+    }
+
+    console.log('Delete account final error:', message);
     return { success: false, error: message };
   }
 }

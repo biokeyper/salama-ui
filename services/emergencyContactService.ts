@@ -139,9 +139,11 @@ export async function removeEmergencyContact(
 
 /**
  * Set custom panic message
+ * Backend returns the saved message in response
  */
 export async function setPanicMessage(message: string): Promise<{
   success: boolean;
+  data?: { panicMessage: string };
   error?: string;
 }> {
   try {
@@ -161,7 +163,12 @@ export async function setPanicMessage(message: string): Promise<{
     );
 
     if (response.status === 200 || response.status === 201) {
-      return { success: true };
+      return {
+        success: true,
+        data: {
+          panicMessage: response.data.data?.panicMessage || message,
+        },
+      };
     }
 
     return {
@@ -169,13 +176,13 @@ export async function setPanicMessage(message: string): Promise<{
       error: response.data?.error || 'Failed to set panic message',
     };
   } catch (error) {
-    let message = 'Failed to set panic message';
+    let errorMessage = 'Failed to set panic message';
     if (axios.isAxiosError(error)) {
-      message = error.response?.data?.error || error.message;
+      errorMessage = error.response?.data?.error || error.message;
     } else if (error instanceof Error) {
-      message = error.message;
+      errorMessage = error.message;
     }
-    return { success: false, error: message };
+    return { success: false, error: errorMessage };
   }
 }
 

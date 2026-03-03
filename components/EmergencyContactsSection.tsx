@@ -10,8 +10,10 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Keyboard,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Contacts from 'expo-contacts';
 import {
   addEmergencyContact,
   getEmergencyContacts,
@@ -32,6 +34,8 @@ export default function EmergencyContactsSection() {
   const [newRelationship, setNewRelationship] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isSavingMessage, setIsSavingMessage] = useState(false);
+  const [deviceContacts, setDeviceContacts] = useState<any[]>([]);
+  const [showDeviceContacts, setShowDeviceContacts] = useState(false);
 
   useEffect(() => {
     loadContacts();
@@ -61,6 +65,39 @@ export default function EmergencyContactsSection() {
     } catch (error) {
       console.error('Error loading panic message:', error);
     }
+  };
+
+  const loadDeviceContacts = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+
+      if (status === 'granted') {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+        });
+
+        // Filter contacts that have phone numbers
+        const contactsWithPhones = data
+          .filter((contact) => contact.phoneNumbers && contact.phoneNumbers.length > 0)
+          .map((contact) => ({
+            name: contact.name || 'Unknown',
+            phone: contact.phoneNumbers?.[0]?.number || '',
+          }));
+
+        setDeviceContacts(contactsWithPhones);
+        setShowDeviceContacts(true);
+      }
+    } catch (error) {
+      console.error('Error loading device contacts:', error);
+      Alert.alert('Error', 'Failed to load device contacts');
+    }
+  };
+
+  const handleSelectDeviceContact = (contact: any) => {
+    setNewName(contact.name);
+    setNewPhone(contact.phone);
+    setShowDeviceContacts(false);
+    // User will fill in relationship manually
   };
 
   const handleAddContact = async () => {
@@ -122,10 +159,16 @@ export default function EmergencyContactsSection() {
       return;
     }
 
+    // Dismiss keyboard first
+    Keyboard.dismiss();
+
     setIsSavingMessage(true);
     try {
       const result = await setPanicMessage(panicMessage);
       if (result.success) {
+        // Use the message returned from backend
+        const savedMessage = result.data?.panicMessage || panicMessage;
+        setPanicMsg(savedMessage);
         Alert.alert('Success', 'Panic message saved');
         setShowPanicMessageModal(false);
       } else {
@@ -238,6 +281,14 @@ export default function EmergencyContactsSection() {
             </View>
 
             <ScrollView style={styles.modalForm}>
+              <TouchableOpacity
+                style={styles.loadContactsButton}
+                onPress={loadDeviceContacts}
+              >
+                <Feather name="smartphone" size={18} color="#8B5CF6" />
+                <Text style={styles.loadContactsButtonText}>Load from Phone Contacts</Text>
+              </TouchableOpacity>
+
               <Text style={styles.inputLabel}>Name</Text>
               <TextInput
                 style={styles.input}
@@ -334,6 +385,45 @@ export default function EmergencyContactsSection() {
                 )}
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Device Contacts Modal */}
+      <Modal visible={showDeviceContacts} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Contact</Text>
+              <TouchableOpacity
+                onPress={() => setShowDeviceContacts(false)}
+                style={styles.modalCloseButton}
+              >
+                <Feather name="x" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={deviceContacts}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.deviceContactItem}
+                  onPress={() => handleSelectDeviceContact(item)}
+                >
+                  <View>
+                    <Text style={styles.deviceContactName}>{item.name}</Text>
+                    <Text style={styles.deviceContactPhone}>{item.phone}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color="#D1D5DB" />
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              ListEmptyComponent={() => (
+                <Text style={styles.emptyMessage}>No contacts with phone numbers found</Text>
+              )}
+              style={{ paddingHorizontal: 16 }}
+            />
           </View>
         </View>
       </Modal>
@@ -563,5 +653,44 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  loadContactsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  loadContactsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  deviceContactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  deviceContactName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  deviceContactPhone: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });

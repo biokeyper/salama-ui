@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { hasPin, removePin, setPin as savePin } from '@/services/security';
+import { hasPin, setPin as savePin } from '@/services/security';
 import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
 import { usePinProtection } from '@/contexts/PinProtectionContext';
-import { backupEncryptionKey, recoverEncryptionKey, setupEmailRecovery } from '@/services/authService';
+import { setupEmailRecovery, deleteUserAccount } from '@/services/authService';
 import LockScreen from './lock-screen';
 import * as SecureStore from 'expo-secure-store';
 import EmergencyContactsSection from '@/components/EmergencyContactsSection';
@@ -26,9 +26,6 @@ export default function SettingsScreen() {
     const [pinExists, setPinExists] = useState(false);
     const [showSetPin, setShowSetPin] = useState(false);
     const [showVerifyPin, setShowVerifyPin] = useState(false);
-    const [showKeyBackupModal, setShowKeyBackupModal] = useState(false);
-    const [keyBackupPin, setKeyBackupPin] = useState('');
-    const [isBackingUpKey, setIsBackingUpKey] = useState(false);
     const [showEmailRecoveryModal, setShowEmailRecoveryModal] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
     const [isSettingUpEmail, setIsSettingUpEmail] = useState(false);
@@ -53,24 +50,39 @@ export default function SettingsScreen() {
         setPinExists(exists);
     };
 
-    const handleClearAllData = () => {
+    const handleDeleteAccount = () => {
         Alert.alert(
-            'Clear All Data',
-            'This will permanently delete all reports, health logs, and recordings. This action cannot be undone. Are you sure?',
+            '⚠️ Delete Account',
+            'All your account data, reports, and settings will be permanently deleted. However, any reports you have submitted to the blockchain will remain there permanently as they are immutable. This action cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Clear All Data',
+                    text: 'Delete My Account',
                     style: 'destructive',
                     onPress: async () => {
                         setIsClearing(true);
                         try {
-                            await AsyncStorage.clear();
-                            await resetSettings();
-                            Alert.alert('Success', 'All data has been cleared.');
-                            router.back();
+                            const result = await deleteUserAccount();
+                            if (result.success) {
+                                Alert.alert(
+                                    'Account Deleted',
+                                    'Your account has been permanently deleted.',
+                                    [
+                                        {
+                                            text: 'OK',
+                                            onPress: () => {
+                                                // Clear local storage and redirect to login
+                                                AsyncStorage.clear();
+                                                router.replace('/');
+                                            },
+                                        },
+                                    ]
+                                );
+                            } else {
+                                Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
+                            }
                         } catch (error) {
-                            Alert.alert('Error', 'Failed to clear data. Please try again.');
+                            Alert.alert('Error', 'An error occurred. Please try again.');
                         } finally {
                             setIsClearing(false);
                         }
@@ -103,70 +115,6 @@ export default function SettingsScreen() {
         // After successful verification, show set PIN modal
         setShowVerifyPin(false);
         setShowSetPin(true);
-    };
-
-    const handleRemovePin = () => {
-        Alert.alert(
-            'Remove PIN & Clear Data',
-            'Removing your PIN will also permanently delete all your data for security reasons. This action cannot be undone. Are you sure?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Remove & Clear',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            // Clear all data from database
-                            await deleteAllReports();
-                            await deleteAllHealthLogs();
-                            // Clear AsyncStorage
-                            await AsyncStorage.clear();
-                            // Remove PIN
-                            const pinRemoved = await removePin();
-                            if (pinRemoved) {
-                                setPinExists(false);
-                                // Refresh global PIN state
-                                await checkPinStatus();
-                                Alert.alert(
-                                    'Complete',
-                                    'PIN removed and all data has been cleared.',
-                                    [{ text: 'OK', onPress: () => router.back() }]
-                                );
-                            } else {
-                                Alert.alert('Error', 'Failed to remove PIN. Please try again.');
-                            }
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to clear data. Please try again.');
-                        }
-                    },
-                },
-            ]
-        );
-    };
-
-    const handleBackupEncryptionKey = async () => {
-        if (!keyBackupPin.trim()) {
-            Alert.alert('Error', 'Please enter a PIN');
-            return;
-        }
-
-        setIsBackingUpKey(true);
-        try {
-            // In a real scenario, you would get the actual encryption key from your app
-            // For now, using a placeholder
-            const result = await backupEncryptionKey(keyBackupPin, 'placeholder-encryption-key');
-            if (result.success) {
-                setShowKeyBackupModal(false);
-                setKeyBackupPin('');
-                Alert.alert('Success', 'Your encryption key has been backed up securely');
-            } else {
-                Alert.alert('Error', result.error || 'Failed to backup encryption key');
-            }
-        } catch (error) {
-            Alert.alert('Error', 'An error occurred while backing up');
-        } finally {
-            setIsBackingUpKey(false);
-        }
     };
 
     const handleSetupEmailRecovery = async () => {
@@ -285,22 +233,13 @@ export default function SettingsScreen() {
                             <Text style={styles.primaryButtonText}>Set PIN</Text>
                         </TouchableOpacity>
                     ) : (
-                        <View style={styles.buttonGroup}>
-                            <TouchableOpacity
-                                style={styles.secondaryButton}
-                                onPress={handleChangePin}
-                            >
-                                <Feather name="edit-2" size={18} color="#6B7280" />
-                                <Text style={styles.secondaryButtonText}>Change PIN</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.secondaryButton}
-                                onPress={handleRemovePin}
-                            >
-                                <Feather name="unlock" size={18} color="#6B7280" />
-                                <Text style={styles.secondaryButtonText}>Remove PIN</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={handleChangePin}
+                        >
+                            <Feather name="edit-2" size={20} color="#8B5CF6" />
+                            <Text style={styles.primaryButtonText}>Change PIN</Text>
+                        </TouchableOpacity>
                     )}
                 </View>
 
@@ -326,15 +265,6 @@ export default function SettingsScreen() {
                         />
                     </View>
 
-                    <View style={styles.setting}>
-                        <View style={styles.settingInfo}>
-                            <Text style={styles.settingLabel}>🚨 Emergency Alert (Shake)</Text>
-                            <Text style={styles.settingHint}>
-                                Shake your phone anywhere to send an emergency alert
-                            </Text>
-                        </View>
-                        <Text style={styles.settingStatus}>Active</Text>
-                    </View>
                 </View>
 
                 {/* Emergency Contacts Section */}
@@ -368,22 +298,6 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Key Backup Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🔑 Key Backup</Text>
-                    <Text style={styles.sectionDescription}>
-                        Backup your encryption key securely to recover access to your data.
-                    </Text>
-
-                    <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={() => setShowKeyBackupModal(true)}
-                    >
-                        <Feather name="lock" size={20} color="#8B5CF6" />
-                        <Text style={styles.primaryButtonText}>Backup Encryption Key</Text>
-                    </TouchableOpacity>
-                </View>
-
                 {/* Data Management Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Data Management</Text>
@@ -393,12 +307,12 @@ export default function SettingsScreen() {
 
                     <TouchableOpacity
                         style={styles.dangerButton}
-                        onPress={handleClearAllData}
+                        onPress={handleDeleteAccount}
                         disabled={isClearing}
                     >
                         <Feather name="trash-2" size={20} color="#EF4444" />
                         <Text style={styles.dangerButtonText}>
-                            {isClearing ? 'Clearing...' : 'Clear All Data'}
+                            {isClearing ? 'Deleting...' : 'Delete Account'}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -419,6 +333,7 @@ export default function SettingsScreen() {
                     mode="verify"
                     onUnlock={handleVerificationSuccess}
                     onSetPin={() => { }}
+                    onClose={() => setShowVerifyPin(false)}
                 />
                 <TouchableOpacity
                     style={styles.modalCloseButton}
@@ -434,6 +349,7 @@ export default function SettingsScreen() {
                     mode="set"
                     onSetPin={handleSetPin}
                     onUnlock={() => { }}
+                    onClose={() => setShowSetPin(false)}
                 />
                 <TouchableOpacity
                     style={styles.modalCloseButton}
@@ -441,48 +357,6 @@ export default function SettingsScreen() {
                 >
                     <Feather name="x" size={24} color="#666" />
                 </TouchableOpacity>
-            </Modal>
-
-            {/* Key Backup Modal */}
-            <Modal visible={showKeyBackupModal} animationType="slide" transparent={true}>
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <TouchableOpacity
-                            style={styles.modalCloseButton}
-                            onPress={() => {
-                                setShowKeyBackupModal(false);
-                                setKeyBackupPin('');
-                            }}
-                        >
-                            <Feather name="x" size={24} color="#666" />
-                        </TouchableOpacity>
-
-                        <Text style={styles.modalTitle}>Backup Encryption Key</Text>
-                        <Text style={styles.modalDescription}>
-                            Enter a PIN to secure your encryption key backup
-                        </Text>
-
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter PIN"
-                            value={keyBackupPin}
-                            onChangeText={setKeyBackupPin}
-                            secureTextEntry={true}
-                            editable={!isBackingUpKey}
-                            placeholderTextColor="#9CA3AF"
-                        />
-
-                        <TouchableOpacity
-                            style={styles.primaryButton}
-                            onPress={handleBackupEncryptionKey}
-                            disabled={isBackingUpKey}
-                        >
-                            <Text style={styles.primaryButtonText}>
-                                {isBackingUpKey ? 'Backing up...' : 'Backup Key'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
             </Modal>
 
             {/* Email Recovery Modal */}

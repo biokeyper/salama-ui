@@ -1,6 +1,7 @@
 import LockScreen from '@/app/lock-screen';
 import AudioReportItem from '@/components/AudioReportItem';
 import { hasPin } from '@/services/security';
+import { getAuthToken } from '@/services/authService';
 import { deleteReport, getAllReports, updateReportStatus, archiveReport } from '@/services/storage';
 import { submitReportToBackend, archiveReportOnBackend, decryptReportFromBackend, searchBackendReports, getReportStats } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
@@ -37,7 +38,9 @@ export default function LibraryScreen() {
   const [showPinRequired, setShowPinRequired] = useState(false);
   const [showPinVerify, setShowPinVerify] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasNoAuthToken, setHasNoAuthToken] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [openMenuReportId, setOpenMenuReportId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showViewersModal, setShowViewersModal] = useState(false);
   const [showSharedWithMeTab, setShowSharedWithMeTab] = useState(false);
@@ -115,6 +118,28 @@ export default function LibraryScreen() {
       setRefreshing(false);
     }
   };
+
+  // Check if user has auth token on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await getAuthToken();
+        if (!token) {
+          console.log('❌ No auth token found, redirecting to login');
+          setHasNoAuthToken(true);
+          router.replace('/');
+          return;
+        }
+        console.log('✅ Auth token found, user is logged in');
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setHasNoAuthToken(true);
+        router.replace('/');
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     // Only load reports if user is authenticated
@@ -241,18 +266,30 @@ export default function LibraryScreen() {
         {
           text: 'Submit',
           onPress: async () => {
+            console.log('🔄 Setting submitting state for report:', report.id);
             setIsSubmittingReportId(report.id);
             try {
               const result = await submitReportToBackend(report);
+              console.log('📊 Submit result:', result);
 
               if (result.success) {
+                console.log('✅ Report submitted successfully');
+                console.log('📋 Submission Details:', {
+                  reportId: result.reportId,
+                  txHash: result.txHash,
+                  ipfsHash: result.ipfsHash,
+                  status: result.status,
+                });
+
                 Alert.alert(
                   'Success',
-                  'Your report has been submitted successfully.',
+                  `Report submitted!\n\nTx: ${result.txHash?.substring(0, 16)}...\nIPFS: ${result.ipfsHash?.substring(0, 16)}...`,
                   [
                     {
                       text: 'OK',
                       onPress: async () => {
+                        console.log('🔄 Clearing submitting state');
+                        setIsSubmittingReportId(null);
                         await loadReports();
                         // Start polling for blockchain confirmation
                         if (result.submissionId) {
@@ -614,6 +651,7 @@ export default function LibraryScreen() {
               setIsAuthenticated(true);
             }}
             onSetPin={() => { }}
+            onClose={() => setShowPinVerify(false)}
           />
           <TouchableOpacity
             style={styles.modalCloseButton}
@@ -716,7 +754,7 @@ export default function LibraryScreen() {
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#8A4FFF" />
               </View>
-            ) : sharedReports.length === 0 ? (
+            ) : !sharedReports || sharedReports.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Feather name="share-2" size={64} color="#CCC" />
                 <Text style={styles.emptyText}>No reports shared with you</Text>
@@ -724,7 +762,7 @@ export default function LibraryScreen() {
               </View>
             ) : (
               <View style={styles.reportsList}>
-                {sharedReports.map((report) => (
+                {(sharedReports || []).map((report) => (
                   <View key={report.reportId || report.id} style={styles.sharedReportCard}>
                     <View style={styles.sharedReportHeader}>
                       <View>
@@ -783,52 +821,167 @@ export default function LibraryScreen() {
                       onEdit={handleEditReport}
                     />
                     {(report.status === 'submitted' || report.status === 'confirmed') && (
-                      <View style={styles.reportActionButtons}>
+                      <View style={styles.menuContainer}>
                         <TouchableOpacity
-                          style={styles.reportActionButton}
-                          onPress={() => handleViewSubmitted(report)}
+                          style={styles.menuButton}
+                          onPress={() => setOpenMenuReportId(openMenuReportId === report.id ? null : report.id)}
                         >
-                          <Text style={styles.reportActionButtonText}>View Submitted</Text>
+                          <MaterialIcons name="more-vert" size={24} color="#6B7280" />
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.reportActionButton}
-                          onPress={() => handleShareReport(report)}
-                        >
-                          <Text style={styles.reportActionButtonText}>Share</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.reportActionButton}
-                          onPress={() => handleViewViewers(report)}
-                        >
-                          <Text style={styles.reportActionButtonText}>Viewers</Text>
-                        </TouchableOpacity>
+
+                        {openMenuReportId === report.id && (
+                          <View style={styles.dropdownMenu}>
+                            <TouchableOpacity
+                              style={styles.menuOption}
+                              onPress={() => {
+                                handleViewSubmitted(report);
+                                setOpenMenuReportId(null);
+                              }}
+                            >
+                              <Feather name="eye" size={18} color="#8B5CF6" />
+                              <Text style={styles.menuOptionText}>View Details</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.menuOption}
+                              onPress={() => {
+                                handleShareReport(report);
+                                setOpenMenuReportId(null);
+                              }}
+                            >
+                              <Feather name="share-2" size={18} color="#8B5CF6" />
+                              <Text style={styles.menuOptionText}>Share</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.menuOption}
+                              onPress={() => {
+                                handleViewViewers(report);
+                                setOpenMenuReportId(null);
+                              }}
+                            >
+                              <Feather name="users" size={18} color="#8B5CF6" />
+                              <Text style={styles.menuOptionText}>Viewers</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.menuOption, styles.menuOptionDanger]}
+                              onPress={() => {
+                                handleArchive(report);
+                                setOpenMenuReportId(null);
+                              }}
+                            >
+                              <Feather name="archive" size={18} color="#FF3B30" />
+                              <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>Archive</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>
                 ))
               ) : (
-                filteredReports.map((report) => (
-                  <View key={report.id} style={styles.textReportItem}>
-                    <View style={styles.textReportHeader}>
-                      <Text style={styles.textReportDate}>{formatDate(report.createdAt)}</Text>
-                      <TouchableOpacity onPress={() => handleDelete(report)}>
-                        <MaterialIcons name="delete-outline" size={24} color="#FF3B30" />
+                filteredReports.map((report) => {
+                  const actions = getAvailableActions(report.status || 'saved');
+                  return (
+                    <View key={report.id} style={styles.textReportItem}>
+                      <View style={styles.textReportHeader}>
+                        <Text style={styles.textReportDate}>{formatDate(report.createdAt)}</Text>
+                        <TouchableOpacity onPress={() => handleDelete(report)}>
+                          <MaterialIcons name="delete-outline" size={24} color="#FF3B30" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.textReportContent} numberOfLines={3}>
+                        {report.textContent || 'No content'}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.viewButton}
+                        onPress={() => {
+                          // Navigate to detail view (to be implemented)
+                          Alert.alert('Report Details', report.textContent || 'No content');
+                        }}
+                      >
+                        <Text style={styles.viewButtonText}>View Full Report</Text>
                       </TouchableOpacity>
+
+                      {/* Action Menu */}
+                      <View style={styles.menuContainer}>
+                        {actions.canSubmit && (
+                          <TouchableOpacity
+                            style={[styles.reportActionButton, styles.submitButton]}
+                            onPress={() => handleResubmit(report)}
+                            disabled={isSubmittingReportId === report.id}
+                          >
+                            {isSubmittingReportId === report.id ? (
+                              <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                              <Text style={styles.reportActionButtonText}>Submit</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
+
+                        {(report.status === 'submitted' || report.status === 'confirmed') && (
+                          <>
+                            <TouchableOpacity
+                              style={styles.menuButton}
+                              onPress={() => setOpenMenuReportId(openMenuReportId === report.id ? null : report.id)}
+                            >
+                              <MaterialIcons name="more-vert" size={24} color="#6B7280" />
+                            </TouchableOpacity>
+
+                            {openMenuReportId === report.id && (
+                              <View style={styles.dropdownMenu}>
+                                <TouchableOpacity
+                                  style={styles.menuOption}
+                                  onPress={() => {
+                                    handleViewSubmitted(report);
+                                    setOpenMenuReportId(null);
+                                  }}
+                                >
+                                  <Feather name="eye" size={18} color="#8B5CF6" />
+                                  <Text style={styles.menuOptionText}>View Details</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={styles.menuOption}
+                                  onPress={() => {
+                                    handleShareReport(report);
+                                    setOpenMenuReportId(null);
+                                  }}
+                                >
+                                  <Feather name="share-2" size={18} color="#8B5CF6" />
+                                  <Text style={styles.menuOptionText}>Share</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={styles.menuOption}
+                                  onPress={() => {
+                                    handleViewViewers(report);
+                                    setOpenMenuReportId(null);
+                                  }}
+                                >
+                                  <Feather name="users" size={18} color="#8B5CF6" />
+                                  <Text style={styles.menuOptionText}>Viewers</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={[styles.menuOption, styles.menuOptionDanger]}
+                                  onPress={() => {
+                                    handleArchive(report);
+                                    setOpenMenuReportId(null);
+                                  }}
+                                >
+                                  <Feather name="archive" size={18} color="#FF3B30" />
+                                  <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>Archive</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </>
+                        )}
+                      </View>
                     </View>
-                    <Text style={styles.textReportContent} numberOfLines={3}>
-                      {report.textContent || 'No content'}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.viewButton}
-                      onPress={() => {
-                        // Navigate to detail view (to be implemented)
-                        Alert.alert('Report Details', report.textContent || 'No content');
-                      }}
-                    >
-                      <Text style={styles.viewButtonText}>View Full Report</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))
+                  );
+                })
               )}
             </>
           )}
@@ -1054,6 +1207,7 @@ export default function LibraryScreen() {
           mode="verify"
           onUnlock={handlePinVerified}
           onSetPin={() => { }}
+          onClose={() => setShowPinVerify(false)}
         />
         <TouchableOpacity
           style={styles.modalCloseButton}
@@ -1420,5 +1574,51 @@ const styles = StyleSheet.create({
   revokeButton: {
     paddingHorizontal: 8,
     paddingVertical: 8,
+  },
+  menuContainer: {
+    position: 'relative',
+    marginTop: 12,
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: -8,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 40,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    minWidth: 180,
+    zIndex: 1000,
+  },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  menuOptionDanger: {
+    borderBottomWidth: 0,
+  },
+  menuOptionText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  menuOptionDangerText: {
+    color: '#FF3B30',
   },
 });

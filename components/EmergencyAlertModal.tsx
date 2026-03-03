@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { sendPanicAlert } from '@/services/panicService';
 import { getEmergencyContacts } from '@/services/emergencyContactService';
@@ -19,6 +20,7 @@ interface EmergencyAlertModalProps {
 }
 
 export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlertModalProps) {
+  const router = useRouter();
   const [tapCount, setTapCount] = useState(0);
   const [isSending, setIsSending] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -51,13 +53,16 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
         // Show warning if no contacts
         if (!hasContacts) {
           Alert.alert(
-            '⚠️ No Emergency Contacts',
-            'You haven\'t added emergency contacts. Your panic alert will be recorded but no SMS will be sent to contacts.\n\nContinue?',
+            'No Emergency Contacts',
+            'You haven\'t added emergency contacts. Your panic alert will be recorded but no SMS will be sent to contacts.',
             [
               {
-                text: 'Cancel',
-                onPress: () => setIsSending(false),
-                style: 'cancel',
+                text: 'Go to Settings',
+                onPress: () => {
+                  setIsSending(false);
+                  onClose();
+                  router.push('/settings');
+                },
               },
               {
                 text: 'Continue',
@@ -234,16 +239,16 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: '#8B5CF6',
   },
   alertButtonConfirm: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#EF4444',
+    backgroundColor: '#F5F3FF',
+    borderColor: '#8B5CF6',
     width: 120,
     height: 120,
   },

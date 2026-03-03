@@ -103,9 +103,18 @@ export async function getSharedWithMe(): Promise<{ success: boolean; reports?: S
     const response = await apiClient.get(apiConfig.endpoints.accessSharedWithMe);
 
     if (response.status === 200) {
+      // Ensure we always return an array
+      let reports: any[] = [];
+
+      if (response.data.data?.reports) {
+        reports = Array.isArray(response.data.data.reports) ? response.data.data.reports : [];
+      } else if (response.data.data) {
+        reports = Array.isArray(response.data.data) ? response.data.data : [];
+      }
+
       return {
         success: true,
-        reports: response.data.data?.reports || response.data.data || [],
+        reports,
       };
     }
 
@@ -137,9 +146,18 @@ export async function getReportViewers(
     );
 
     if (response.status === 200) {
+      // Ensure we always return an array
+      let viewers: any[] = [];
+
+      if (response.data.data?.viewers) {
+        viewers = Array.isArray(response.data.data.viewers) ? response.data.data.viewers : [];
+      } else if (response.data.data) {
+        viewers = Array.isArray(response.data.data) ? response.data.data : [];
+      }
+
       return {
         success: true,
-        viewers: response.data.data?.viewers || response.data.data || [],
+        viewers,
       };
     }
 
