@@ -176,10 +176,6 @@ export default function TextReportScreen() {
             {
               text: 'OK',
               onPress: async () => {
-                // Start polling for confirmation
-                if (result.submissionId) {
-                  startStatusPolling(result.submissionId);
-                }
                 router.replace('/');
               },
             },

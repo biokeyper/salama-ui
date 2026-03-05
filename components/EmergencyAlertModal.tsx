@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { sendPanicAlert } from '@/services/panicService';
 import { getEmergencyContacts } from '@/services/emergencyContactService';
+import { getAuthToken } from '@/services/authService';
 
 interface EmergencyAlertModalProps {
   visible: boolean;
@@ -46,6 +47,31 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
       setIsSending(true);
 
       try {
+        // Check if user is authenticated
+        const token = await getAuthToken();
+        if (!token) {
+          Alert.alert(
+            'Session Expired',
+            'Your session has expired. Please log in to send emergency alerts.',
+            [
+              {
+                text: 'Login',
+                onPress: () => {
+                  setIsSending(false);
+                  onClose();
+                  router.navigate('/login');
+                },
+              },
+              {
+                text: 'Cancel',
+                onPress: () => setIsSending(false),
+                style: 'cancel',
+              },
+            ]
+          );
+          return;
+        }
+
         // Check if emergency contacts exist
         const contactsResult = await getEmergencyContacts();
         const hasContacts = contactsResult.success && (contactsResult.data?.length ?? 0) > 0;

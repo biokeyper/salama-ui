@@ -18,6 +18,7 @@ import {
   Alert,
   Modal,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -38,6 +39,7 @@ export default function LibraryScreen() {
   const [showPinRequired, setShowPinRequired] = useState(false);
   const [showPinVerify, setShowPinVerify] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasNoAuthToken, setHasNoAuthToken] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [openMenuReportId, setOpenMenuReportId] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export default function LibraryScreen() {
   useFocusEffect(
     useCallback(() => {
       const checkPinStatus = async () => {
+        setIsCheckingAuth(true);
         const pinIsSet = await hasPin();
         if (!pinIsSet) {
           // No PIN set - show modal to set PIN
@@ -79,6 +82,7 @@ export default function LibraryScreen() {
           setShowPinVerify(true);
           setIsAuthenticated(false);
         }
+        setIsCheckingAuth(false);
       };
       checkPinStatus();
 
@@ -336,18 +340,13 @@ export default function LibraryScreen() {
 
                 Alert.alert(
                   'Success',
-                  `Report submitted!\n\nTx: ${result.txHash?.substring(0, 16)}...\nIPFS: ${result.ipfsHash?.substring(0, 16)}...`,
+                  'Report submitted successfully!',
                   [
                     {
                       text: 'OK',
                       onPress: async () => {
-                        console.log('🔄 Clearing submitting state');
                         setIsSubmittingReportId(null);
                         await loadReports();
-                        // Start polling for blockchain confirmation
-                        if (result.submissionId) {
-                          startStatusPolling(result.submissionId);
-                        }
                       },
                     },
                   ]
@@ -484,6 +483,14 @@ export default function LibraryScreen() {
     );
   };
 
+  const handleArchiveToggle = (report: Report) => {
+    if (report.isArchived) {
+      handleUnarchive(report);
+    } else {
+      handleArchive(report);
+    }
+  };
+
   const handleEditReport = (report: Report) => {
     const actions = getAvailableActions(report);
 
@@ -525,17 +532,23 @@ export default function LibraryScreen() {
 
     setSelectedReport(report);
     setIsLoadingDecrypt(true);
+    setShowDecryptedModal(true);
 
     try {
       const result = await decryptReportFromBackend(report.submissionId);
+      console.log('View Details Response:', JSON.stringify(result, null, 2));
+      console.log('Metadata:', result.data?.metadata);
+      console.log('Responses:', result.data?.responses);
       if (result.success && result.data) {
         setDecryptedContent(result.data);
-        setShowDecryptedModal(true);
       } else {
         Alert.alert('Error', result.error || 'Failed to decrypt report');
+        setShowDecryptedModal(false);
       }
     } catch (error) {
+      console.error('Error viewing report details:', error);
       Alert.alert('Error', 'An error occurred while decrypting the report');
+      setShowDecryptedModal(false);
     } finally {
       setIsLoadingDecrypt(false);
     }
@@ -695,6 +708,15 @@ export default function LibraryScreen() {
     }
   };
 
+  // Show blank screen while checking auth status
+  if (isCheckingAuth) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container} />
+      </SafeAreaView>
+    );
+  }
+
   // Only show loading spinner if authenticated (not during PIN entry)
   if (loading && isAuthenticated) {
     return (
@@ -773,9 +795,12 @@ export default function LibraryScreen() {
           >
             <MaterialIcons
               name={showArchived ? 'inbox' : 'archive'}
-              size={24}
+              size={20}
               color="#8A4FFF"
             />
+            <Text style={styles.archiveToggleText}>
+              {showArchived ? 'Back to Library' : 'View Archived'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -908,7 +933,7 @@ export default function LibraryScreen() {
                       onDelete={handleDelete}
                       onResubmit={handleResubmit}
                       onPlayingChange={setPlayingReportId}
-                      onArchive={handleArchive}
+                      onArchive={handleArchiveToggle}
                       onEdit={handleEditReport}
                       openMenuReportId={openMenuReportId}
                       onMenuToggle={(id) => setOpenMenuReportId(openMenuReportId === id ? null : id)}
@@ -950,7 +975,7 @@ export default function LibraryScreen() {
                                 <MaterialIcons name="delete-outline" size={20} color="#FF3B30" />
                               </TouchableOpacity>
                             )}
-                            {(report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') && (
+                            {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && (
                               <TouchableOpacity
                                 style={styles.actionIcon}
                                 onPress={() => setOpenMenuReportId(openMenuReportId === report.id ? null : report.id)}
@@ -960,8 +985,13 @@ export default function LibraryScreen() {
                             )}
                           </View>
                         </View>
-                        {(report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') && openMenuReportId === report.id && (
-                          <View style={styles.dropdownMenu}>
+                        {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && openMenuReportId === report.id && (
+                          <>
+                            <Pressable
+                              style={styles.menuOverlay}
+                              onPress={() => setOpenMenuReportId(null)}
+                            />
+                            <View style={styles.dropdownMenu}>
                             <TouchableOpacity
                               style={styles.menuOption}
                               onPress={() => {
@@ -998,14 +1028,17 @@ export default function LibraryScreen() {
                             <TouchableOpacity
                               style={[styles.menuOption, styles.menuOptionDanger]}
                               onPress={() => {
-                                handleArchive(report);
+                                handleArchiveToggle(report);
                                 setOpenMenuReportId(null);
                               }}
                             >
-                              <Feather name="archive" size={18} color="#FF3B30" />
-                              <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>Archive</Text>
+                              <Feather name={report.isArchived ? "inbox" : "archive"} size={18} color="#FF3B30" />
+                              <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>
+                                {report.isArchived ? 'Unarchive' : 'Archive'}
+                              </Text>
                             </TouchableOpacity>
                           </View>
+                          </>
                         )}
                       </View>
                       <Text style={styles.textReportContent} numberOfLines={3}>
@@ -1084,7 +1117,7 @@ export default function LibraryScreen() {
             >
               <MaterialIcons name="close" size={24} color="#8A4FFF" />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Decrypted Report</Text>
+            <Text style={styles.modalTitle}>Details</Text>
             <View style={{ width: 24 }} />
           </View>
 
@@ -1094,25 +1127,72 @@ export default function LibraryScreen() {
             </View>
           ) : decryptedContent ? (
             <ScrollView style={styles.decryptedContent}>
+              {/* Text Content */}
               {decryptedContent.payload?.text && (
                 <View style={styles.contentSection}>
-                  <Text style={styles.contentLabel}>Text Content:</Text>
+                  <Text style={styles.contentLabel}>Report Text:</Text>
                   <Text style={styles.contentText}>{decryptedContent.payload.text}</Text>
                 </View>
               )}
+
+              {/* Audio Content */}
               {decryptedContent.payload?.audio && (
                 <View style={styles.contentSection}>
-                  <Text style={styles.contentLabel}>Audio:</Text>
-                  <Text style={styles.contentText}>Audio file available</Text>
+                  <Text style={styles.contentLabel}>Audio Recording:</Text>
+                  <View style={styles.audioInfo}>
+                    <MaterialIcons name="mic" size={20} color="#8A4FFF" />
+                    <Text style={styles.audioText}>
+                      {decryptedContent.metadata?.duration
+                        ? `${decryptedContent.metadata.duration}s`
+                        : 'Audio file available'}
+                    </Text>
+                    {decryptedContent.payload?.audioFormat && (
+                      <Text style={styles.audioFormat}>{decryptedContent.payload.audioFormat}</Text>
+                    )}
+                  </View>
                 </View>
               )}
+
+              {/* Status */}
               <View style={styles.contentSection}>
                 <Text style={styles.contentLabel}>Status:</Text>
-                <Text style={styles.contentText}>{decryptedContent.status}</Text>
+                <View style={[
+                  styles.statusBadge,
+                  decryptedContent.status === 'confirmed' && { backgroundColor: '#4CAF50' },
+                  decryptedContent.status === 'pending' && { backgroundColor: '#FFEB3B' },
+                  decryptedContent.status === 'failed' && { backgroundColor: '#FF3B30' },
+                ]}>
+                  <Text style={styles.statusBadgeText}>
+                    {decryptedContent.status?.charAt(0).toUpperCase() + decryptedContent.status?.slice(1)}
+                  </Text>
+                </View>
               </View>
+
+              {/* Timeline */}
               <View style={styles.contentSection}>
-                <Text style={styles.contentLabel}>Created:</Text>
-                <Text style={styles.contentText}>{formatDate(decryptedContent.createdAt)}</Text>
+                <Text style={styles.contentLabel}>Timeline:</Text>
+                <View style={styles.timelineItem}>
+                  <MaterialIcons name="schedule" size={18} color="#8A4FFF" />
+                  <View style={styles.timelineText}>
+                    <Text style={styles.timelineLabel}>Submitted</Text>
+                    <Text style={styles.timelineDate}>{formatDate(decryptedContent.createdAt)}</Text>
+                  </View>
+                </View>
+                {decryptedContent.confirmedAt && (
+                  <View style={styles.timelineItem}>
+                    <MaterialIcons name="check-circle" size={18} color="#4CAF50" />
+                    <View style={styles.timelineText}>
+                      <Text style={styles.timelineLabel}>Confirmed</Text>
+                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.confirmedAt)}</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Report ID */}
+              <View style={styles.contentSection}>
+                <Text style={styles.contentLabel}>Report ID:</Text>
+                <Text style={styles.reportId}>{decryptedContent.reportId}</Text>
               </View>
             </ScrollView>
           ) : null}
@@ -1334,7 +1414,15 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   archiveToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     padding: 8,
+  },
+  archiveToggleText: {
+    fontSize: 14,
+    color: '#8A4FFF',
+    fontWeight: '600',
   },
   placeholder: {
     width: 40,
@@ -1465,8 +1553,6 @@ const styles = StyleSheet.create({
   submitButtonSection: {
     marginTop: 12,
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
     alignSelf: 'flex-start',
   },
   primarySubmitButton: {
@@ -1598,6 +1684,58 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     lineHeight: 24,
+  },
+  audioInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#F5F3FF',
+    borderRadius: 8,
+  },
+  audioText: {
+    fontSize: 14,
+    color: '#8A4FFF',
+    fontWeight: '600',
+    flex: 1,
+  },
+  audioFormat: {
+    fontSize: 12,
+    color: '#999',
+    backgroundColor: '#E8E8E8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+    paddingVertical: 8,
+  },
+  timelineText: {
+    flex: 1,
+  },
+  timelineLabel: {
+    fontSize: 12,
+    color: '#999',
+    textTransform: 'uppercase',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  timelineDate: {
+    fontSize: 14,
+    color: '#333',
+  },
+  reportId: {
+    fontSize: 12,
+    color: '#999',
+    fontFamily: 'monospace',
+    backgroundColor: '#F5F5F5',
+    padding: 8,
+    borderRadius: 4,
   },
   shareContainer: {
     flex: 1,
@@ -1769,9 +1907,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 20,
     minWidth: 180,
-    zIndex: 1000,
+    zIndex: 99999,
   },
   menuOption: {
     flexDirection: 'row',

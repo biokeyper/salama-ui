@@ -2,7 +2,7 @@ import { Report } from '@/types/report';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View, Pressable } from 'react-native';
 import { getAvailableActions } from '@/utils/reportActions';
 
 interface AudioReportItemProps {
@@ -198,6 +198,14 @@ export default function AudioReportItem({
 
   return (
     <View style={styles.reportCard}>
+      {/* Click outside to close menu overlay */}
+      {openMenuReportId === report.id && (
+        <Pressable
+          style={styles.menuOverlay}
+          onPress={() => onMenuToggle?.(report.id)}
+        />
+      )}
+
       {/* Report Header */}
       <View style={styles.reportHeader}>
         <View style={styles.reportInfo}>
@@ -239,15 +247,6 @@ export default function AudioReportItem({
             const actions = getAvailableActions(report);
             return (
               <>
-                {actions.canEdit && onEdit && (
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => onEdit(report)}
-                  >
-                    <MaterialIcons name="edit" size={20} color="#8A4FFF" />
-                  </TouchableOpacity>
-                )}
-
                 {actions.canDelete && (
                   <TouchableOpacity
                     style={styles.actionButton}
@@ -271,7 +270,7 @@ export default function AudioReportItem({
                   </TouchableOpacity>
                 )}
 
-                {(report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') && (
+                {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && (
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => onMenuToggle?.(report.id)}
@@ -285,7 +284,7 @@ export default function AudioReportItem({
         </View>
 
         {/* Dropdown Menu */}
-        {(report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') && openMenuReportId === report.id && (
+        {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && openMenuReportId === report.id && (
           <View style={styles.dropdownMenu}>
             <TouchableOpacity
               style={styles.menuOption}
@@ -318,8 +317,10 @@ export default function AudioReportItem({
                 onMenuToggle?.(report.id);
               }}
             >
-              <Feather name="archive" size={18} color="#FF3B30" />
-              <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>Archive</Text>
+              <Feather name={report.isArchived ? "inbox" : "archive"} size={18} color="#FF3B30" />
+              <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>
+                {report.isArchived ? 'Unarchive' : 'Archive'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -547,6 +548,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFEB3B',
     borderRadius: 1.5,
   },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99998,
+  },
   dropdownMenu: {
     position: 'absolute',
     top: 35,
@@ -559,9 +568,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 20,
     minWidth: 180,
-    zIndex: 1000,
+    zIndex: 99999,
   },
   menuOption: {
     flexDirection: 'row',

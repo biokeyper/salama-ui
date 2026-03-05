@@ -53,14 +53,17 @@ export function startStatusPolling(reportId: string): void {
       if (confirmations >= apiConfig.statusPolling.confirmationThreshold) {
         console.log(`Report ${reportId} confirmed with ${confirmations} confirmations`);
 
-        const { saveReport } = await import('./storage');
-        await saveReport({
-          id: reportId,
-          status: 'confirmed',
-          confirmations: confirmations,
-          txHash: statusResult.txHash,
-          ipfsHash: statusResult.ipfsHash,
-        });
+        const { saveReport, getReportById } = await import('./storage');
+        const existingReport = await getReportById(reportId);
+        if (existingReport) {
+          await saveReport({
+            ...existingReport,
+            status: 'confirmed',
+            confirmations: confirmations,
+            txHash: statusResult.txHash,
+            ipfsHash: statusResult.ipfsHash,
+          });
+        }
 
         // Stop polling
         stopStatusPolling(reportId);
@@ -70,24 +73,30 @@ export function startStatusPolling(reportId: string): void {
       // Check if failed
       if (statusResult.status === 'failed') {
         console.log(`Report ${reportId} submission failed`);
-        const { saveReport } = await import('./storage');
-        await saveReport({
-          id: reportId,
-          status: 'failed',
-        });
+        const { saveReport, getReportById } = await import('./storage');
+        const existingReport = await getReportById(reportId);
+        if (existingReport) {
+          await saveReport({
+            ...existingReport,
+            status: 'failed',
+          });
+        }
         stopStatusPolling(reportId);
         return;
       }
 
       // Update with latest status and confirmations (still pending)
-      const { saveReport } = await import('./storage');
-      await saveReport({
-        id: reportId,
-        status: 'pending',
-        confirmations: confirmations,
-        txHash: statusResult.txHash,
-        ipfsHash: statusResult.ipfsHash,
-      });
+      const { saveReport, getReportById } = await import('./storage');
+      const existingReport = await getReportById(reportId);
+      if (existingReport) {
+        await saveReport({
+          ...existingReport,
+          status: 'pending',
+          confirmations: confirmations,
+          txHash: statusResult.txHash,
+          ipfsHash: statusResult.ipfsHash,
+        });
+      }
 
       console.log(
         `Report ${reportId} status: ${statusResult.status}, confirmations: ${confirmations}`

@@ -26,8 +26,9 @@ export default function RecordScreen() {
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Audio player for listening to recorded audio
-  const audioPlayer = recordedUri ? useAudioPlayer(recordedUri, { updateInterval: 100 }) : null;
-  const playerStatus = audioPlayer ? useAudioPlayerStatus(audioPlayer) : null;
+  // Must call hooks unconditionally - use a fallback URI if recordedUri is not set
+  const audioPlayer = useAudioPlayer(recordedUri || '', { updateInterval: 100 });
+  const playerStatus = useAudioPlayerStatus(audioPlayer);
 
   // Animation value for pulsing effect
   const pulseScale = useSharedValue(1);
@@ -66,7 +67,7 @@ export default function RecordScreen() {
 
   // Handle audio playback
   useEffect(() => {
-    if (!audioPlayer) return;
+    if (!audioPlayer || !recordedUri) return;
 
     if (isPlayingRecording) {
       try {
@@ -86,11 +87,11 @@ export default function RecordScreen() {
         // Player already released
       }
     }
-  }, [isPlayingRecording, audioPlayer]);
+  }, [isPlayingRecording, audioPlayer, recordedUri]);
 
   // Auto-stop when playback finishes
   useEffect(() => {
-    if (!audioPlayer || !playerStatus) return;
+    if (!audioPlayer || !playerStatus || !recordedUri) return;
 
     if (playerStatus.currentTime && playerStatus.duration && playerStatus.currentTime >= playerStatus.duration) {
       try {
@@ -101,7 +102,7 @@ export default function RecordScreen() {
         setIsPlayingRecording(false);
       }
     }
-  }, [playerStatus?.currentTime, playerStatus?.duration, audioPlayer]);
+  }, [playerStatus?.currentTime, playerStatus?.duration, audioPlayer, recordedUri]);
 
   const startRecording = async () => {
     try {
@@ -216,7 +217,23 @@ export default function RecordScreen() {
 
     setIsSavingDraft(true);
     try {
-      // Save the report locally
+      // If report was already auto-saved when recording stopped, just clear it
+      if (reportId) {
+        Alert.alert('Success', 'Your draft has been saved.', [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Clear recording and stay on page
+              setRecordedUri(null);
+              setReportId(null);
+            },
+          },
+        ]);
+        setIsSavingDraft(false);
+        return;
+      }
+
+      // Otherwise save the report locally (in case auto-save failed)
       const now = new Date().toISOString();
       const draftReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const savedReport = await saveReport({
@@ -234,6 +251,7 @@ export default function RecordScreen() {
           onPress: () => {
             // Clear recording and stay on page
             setRecordedUri(null);
+            setReportId(null);
           },
         },
       ]);
