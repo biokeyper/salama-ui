@@ -24,7 +24,7 @@ export default function HomeScreen() {
       icon: '🎤',
       label: 'Record',
       description: 'Document an incident',
-      route: '/(tabs)/record' as const,
+      route: '/safety-check' as const,
       color: '#8B5CF6'
     },
     {
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     position: 'absolute',
-    top: 16,
+    top: 32,
     right: 20,
     zIndex: 10,
     padding: 8,

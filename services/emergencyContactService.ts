@@ -29,15 +29,20 @@ export async function addEmergencyContact(
       return { success: false, error: 'Not authenticated' };
     }
 
+    const payload = { phone, name, relationship, isActive: true };
+    console.log('📞 Adding emergency contact with payload:', JSON.stringify(payload, null, 2));
+
     const response = await axios.post(
       `${apiConfig.baseURL}/api/emergency/add-contact`,
-      { phone, name, relationship },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       }
     );
+
+    console.log('📞 Add contact response:', response.status, JSON.stringify(response.data, null, 2));
 
     if (response.status === 200 || response.status === 201) {
       return { success: true, data: response.data.data };
@@ -49,11 +54,16 @@ export async function addEmergencyContact(
     };
   } catch (error) {
     let message = 'Failed to add emergency contact';
+    console.error('❌ Error adding emergency contact:');
     if (axios.isAxiosError(error)) {
+      console.error('Status:', error.response?.status);
+      console.error('Full error response:', JSON.stringify(error.response?.data, null, 2));
       message = error.response?.data?.error || error.message;
     } else if (error instanceof Error) {
+      console.error('Error message:', error.message);
       message = error.message;
     }
+    console.error('Final error:', message);
     return { success: false, error: message };
   }
 }

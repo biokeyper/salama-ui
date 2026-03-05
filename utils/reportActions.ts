@@ -19,7 +19,7 @@ export interface ActionAvailability {
  * Implements action rules per the status model specification
  */
 export function getAvailableActions(report: Report): ActionAvailability {
-  const { status, blockchainStatus, isArchived } = report;
+  const { status, isArchived } = report;
 
   // Archived reports are read-only
   if (isArchived) {
@@ -44,32 +44,43 @@ export function getAvailableActions(report: Report): ActionAvailability {
     };
   }
 
-  // Submitted reports
+  // Submitted - waiting for blockchain to process
   if (status === 'submitted') {
-    // Failed submission can be retried and deleted
-    if (blockchainStatus === 'failed') {
-      return {
-        canDelete: true,
-        canEdit: false,
-        canArchive: false,
-        canSubmit: false,
-        canRetry: true,
-        message: 'Submission failed',
-      };
-    }
-
-    // Pending/confirmed reports can only be archived
     return {
       canDelete: false,
       canEdit: false,
       canArchive: true,
       canSubmit: false,
       canRetry: false,
-      message: 'Submitted reports are immutable on blockchain',
+      message: 'Submitted - processing on blockchain',
     };
   }
 
-  // Failed reports (not submitted)
+  // Pending - blockchain is confirming
+  if (status === 'pending') {
+    return {
+      canDelete: false,
+      canEdit: false,
+      canArchive: true,
+      canSubmit: false,
+      canRetry: false,
+      message: 'Pending blockchain confirmation',
+    };
+  }
+
+  // Confirmed - blockchain confirmed, immutable
+  if (status === 'confirmed') {
+    return {
+      canDelete: false,
+      canEdit: false,
+      canArchive: true,
+      canSubmit: false,
+      canRetry: false,
+      message: 'Confirmed on blockchain',
+    };
+  }
+
+  // Failed - submission failed
   if (status === 'failed') {
     return {
       canDelete: true,
@@ -77,7 +88,7 @@ export function getAvailableActions(report: Report): ActionAvailability {
       canArchive: false,
       canSubmit: true,
       canRetry: true,
-      message: 'Submission failed',
+      message: 'Submission failed - can retry',
     };
   }
 

@@ -4,7 +4,7 @@
 
 export type ReportType = 'audio' | 'text' | 'mixed';
 
-export type ReportStatus = 'draft' | 'saved' | 'submitted' | 'failed';
+export type ReportStatus = 'draft' | 'saved' | 'submitted' | 'pending' | 'confirmed' | 'failed';
 
 export interface Report {
   id: string;
@@ -33,8 +33,7 @@ export interface Report {
   submissionId?: string; // ID from backend after successful submission
   submissionError?: string; // Error message if submission failed
 
-  // Blockchain status (from polling)
-  blockchainStatus?: 'pending' | 'confirmed' | 'failed';
+  // Blockchain details
   confirmations?: number; // 0-12+
   txHash?: string; // Blockchain transaction hash
   ipfsHash?: string; // IPFS location

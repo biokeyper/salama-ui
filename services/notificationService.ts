@@ -11,8 +11,10 @@ export interface Notification {
   type: string;
   title: string;
   message: string;
+  relatedId?: string;
   isRead: boolean;
   createdAt: string;
+  readAt?: string | null;
 }
 
 export interface NotificationResponse {
@@ -41,10 +43,30 @@ export async function getNotifications(
       params: params || {},
     });
 
+    // Log the entire response from backend
+    console.log('📬 FULL NOTIFICATIONS RESPONSE FROM BACKEND:');
+    console.log(JSON.stringify(response.data, null, 2));
+    console.log('---');
+
     if (response.status === 200) {
+      // Ensure we always return an array
+      let notifications: any[] = [];
+
+      if (response.data.data?.notifications) {
+        notifications = Array.isArray(response.data.data.notifications) ? response.data.data.notifications : [];
+      } else if (response.data.data) {
+        notifications = Array.isArray(response.data.data) ? response.data.data : [];
+      }
+
+      console.log(`✅ Extracted ${notifications.length} notifications`);
+      console.log('Notification details:');
+      notifications.forEach((notif, idx) => {
+        console.log(`  [${idx}] ${notif.type} - createdAt: "${notif.createdAt}"`);
+      });
+
       return {
         success: true,
-        notifications: response.data.data?.notifications || response.data.data || [],
+        notifications,
         pagination: response.data.data?.pagination,
       };
     }

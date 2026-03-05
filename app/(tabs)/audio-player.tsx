@@ -2,10 +2,10 @@ import LockScreen from '@/app/lock-screen';
 import AudioReportItem from '@/components/AudioReportItem';
 import { hasPin } from '@/services/security';
 import { getAuthToken } from '@/services/authService';
-import { deleteReport, getAllReports, updateReportStatus, archiveReport } from '@/services/storage';
+import { deleteReport, getAllReports, updateReportStatus, archiveReport, saveReport } from '@/services/storage';
 import { submitReportToBackend, archiveReportOnBackend, decryptReportFromBackend, searchBackendReports, getReportStats } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
-import { grantAccess, getReportViewers, revokeAccess, getSharedWithMe } from '@/services/accessService';
+import { grantAccess, getReportViewers, revokeAccess, getSharedWithMe, unarchiveReport } from '@/services/accessService';
 import { Report } from '@/types/report';
 import { getAvailableActions } from '@/utils/reportActions';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
@@ -95,10 +95,47 @@ export default function LibraryScreen() {
     setIsAuthenticated(true);
   };
 
-  // Load reports on mount and refresh
+  // Load reports from local storage and sync with backend
   const loadReports = async () => {
     try {
+      // Load local reports
       const allReports = await getAllReports();
+
+      // Sync submitted reports with backend to get latest status
+      if (isAuthenticated) {
+        try {
+          const backendResult = await searchBackendReports({
+            limit: 100,
+            offset: 0,
+          });
+
+          if (backendResult.success && backendResult.reports) {
+            // Update local reports with backend data (status, confirmations, hashes only)
+            for (const backendReport of backendResult.reports) {
+              const localReportIndex = allReports.findIndex(r => r.id === backendReport.reportId);
+              if (localReportIndex !== -1) {
+                const localReport = allReports[localReportIndex];
+                // Only update blockchain-related fields from backend
+                if (backendReport.status) {
+                  localReport.status = backendReport.status;
+                }
+                if (backendReport.confirmations !== undefined && backendReport.confirmations !== null) {
+                  localReport.confirmations = backendReport.confirmations;
+                }
+                if (backendReport.txHash) {
+                  localReport.txHash = backendReport.txHash;
+                }
+                if (backendReport.ipfsHash) {
+                  localReport.ipfsHash = backendReport.ipfsHash;
+                }
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error('Error syncing with backend:', syncError);
+          // Continue with local reports if sync fails
+        }
+      }
 
       // Filter based on archived status
       const filteredReports = showArchived
@@ -125,16 +162,32 @@ export default function LibraryScreen() {
       try {
         const token = await getAuthToken();
         if (!token) {
-          console.log('❌ No auth token found, redirecting to login');
           setHasNoAuthToken(true);
-          router.replace('/');
+          Alert.alert(
+            'Session Expired',
+            'Your session has expired. Please log in again to access your reports.',
+            [
+              {
+                text: 'Go to Login',
+                onPress: () => router.replace('/'),
+              },
+            ]
+          );
           return;
         }
-        console.log('✅ Auth token found, user is logged in');
       } catch (error) {
         console.error('Error checking auth:', error);
         setHasNoAuthToken(true);
-        router.replace('/');
+        Alert.alert(
+          'Authentication Error',
+          'Unable to verify your session. Please log in again.',
+          [
+            {
+              text: 'Go to Login',
+              onPress: () => router.replace('/'),
+            },
+          ]
+        );
       }
     };
 
@@ -386,6 +439,44 @@ export default function LibraryScreen() {
             } catch (error) {
               console.error('Error archiving report:', error);
               Alert.alert('Error', 'Failed to archive report');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleUnarchive = (report: Report) => {
+    Alert.alert(
+      'Unarchive Report',
+      'This report will be restored to your library.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unarchive',
+          onPress: async () => {
+            try {
+              // Unarchive on backend
+              if (report.submissionId) {
+                const result = await unarchiveReport(report.submissionId);
+                if (!result.success) {
+                  Alert.alert('Error', result.error || 'Failed to unarchive on backend');
+                  return;
+                }
+              }
+
+              // Update local status
+              await saveReport({
+                ...report,
+                isArchived: false,
+                archivedAt: null,
+                archivedReason: null,
+              });
+              await loadReports();
+              Alert.alert('Success', 'Report restored successfully');
+            } catch (error) {
+              console.error('Error unarchiving report:', error);
+              Alert.alert('Error', 'Failed to unarchive report');
             }
           },
         },
@@ -819,17 +910,57 @@ export default function LibraryScreen() {
                       onPlayingChange={setPlayingReportId}
                       onArchive={handleArchive}
                       onEdit={handleEditReport}
+                      openMenuReportId={openMenuReportId}
+                      onMenuToggle={(id) => setOpenMenuReportId(openMenuReportId === id ? null : id)}
+                      onShare={handleShareReport}
+                      onViewViewers={handleViewViewers}
+                      onViewDetails={handleViewSubmitted}
                     />
-                    {(report.status === 'submitted' || report.status === 'confirmed') && (
-                      <View style={styles.menuContainer}>
-                        <TouchableOpacity
-                          style={styles.menuButton}
-                          onPress={() => setOpenMenuReportId(openMenuReportId === report.id ? null : report.id)}
-                        >
-                          <MaterialIcons name="more-vert" size={24} color="#6B7280" />
-                        </TouchableOpacity>
-
-                        {openMenuReportId === report.id && (
+                  </View>
+                ))
+              ) : (
+                filteredReports.map((report) => {
+                  const actions = getAvailableActions(report);
+                  return (
+                    <View key={report.id} style={styles.textReportItem}>
+                      <View style={styles.textReportHeaderWrapper}>
+                        <View style={styles.textReportHeader}>
+                          <View style={styles.textReportHeaderLeft}>
+                            <Text style={styles.textReportDate}>{formatDate(report.createdAt)}</Text>
+                            <View style={[
+                              styles.statusBadge,
+                              report.status === 'saved' && styles.draftBadge,
+                              report.status === 'submitted' && styles.submittedBadge,
+                              report.status === 'confirmed' && styles.confirmedBadge,
+                              report.status === 'failed' && styles.failedBadge,
+                            ]}>
+                              <Text style={styles.statusBadgeText}>
+                                {report.status === 'saved' ? 'Draft' : report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.actionIconsContainer}>
+                            {actions.canEdit && (
+                              <TouchableOpacity style={styles.actionIcon} onPress={() => handleEditReport(report)}>
+                                <Feather name="edit-2" size={20} color="#8A4FFF" />
+                              </TouchableOpacity>
+                            )}
+                            {actions.canDelete && (
+                              <TouchableOpacity style={styles.actionIcon} onPress={() => handleDelete(report)}>
+                                <MaterialIcons name="delete-outline" size={20} color="#FF3B30" />
+                              </TouchableOpacity>
+                            )}
+                            {(report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') && (
+                              <TouchableOpacity
+                                style={styles.actionIcon}
+                                onPress={() => setOpenMenuReportId(openMenuReportId === report.id ? null : report.id)}
+                              >
+                                <MaterialIcons name="more-vert" size={24} color="#6B7280" />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                        {(report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') && openMenuReportId === report.id && (
                           <View style={styles.dropdownMenu}>
                             <TouchableOpacity
                               style={styles.menuOption}
@@ -877,20 +1008,6 @@ export default function LibraryScreen() {
                           </View>
                         )}
                       </View>
-                    )}
-                  </View>
-                ))
-              ) : (
-                filteredReports.map((report) => {
-                  const actions = getAvailableActions(report.status || 'saved');
-                  return (
-                    <View key={report.id} style={styles.textReportItem}>
-                      <View style={styles.textReportHeader}>
-                        <Text style={styles.textReportDate}>{formatDate(report.createdAt)}</Text>
-                        <TouchableOpacity onPress={() => handleDelete(report)}>
-                          <MaterialIcons name="delete-outline" size={24} color="#FF3B30" />
-                        </TouchableOpacity>
-                      </View>
                       <Text style={styles.textReportContent} numberOfLines={3}>
                         {report.textContent || 'No content'}
                       </Text>
@@ -904,81 +1021,38 @@ export default function LibraryScreen() {
                         <Text style={styles.viewButtonText}>View Full Report</Text>
                       </TouchableOpacity>
 
-                      {/* Action Menu */}
-                      <View style={styles.menuContainer}>
-                        {actions.canSubmit && (
+                      {/* Submit Button Section */}
+                      {actions.canSubmit && (
+                        <View style={styles.submitButtonSection}>
                           <TouchableOpacity
-                            style={[styles.reportActionButton, styles.submitButton]}
+                            style={[styles.primarySubmitButton, isSubmittingReportId === report.id && styles.buttonDisabled]}
                             onPress={() => handleResubmit(report)}
                             disabled={isSubmittingReportId === report.id}
                           >
                             {isSubmittingReportId === report.id ? (
-                              <ActivityIndicator size="small" color="#fff" />
+                              <ActivityIndicator size="small" color="#8A4FFF" />
                             ) : (
-                              <Text style={styles.reportActionButtonText}>Submit</Text>
+                              <>
+                                <MaterialIcons name={report.status === 'saved' ? 'cloud-upload' : 'refresh'} size={18} color="#8A4FFF" />
+                                <Text style={styles.primarySubmitButtonText}>{report.status === 'saved' ? 'Submit' : 'Resubmit'}</Text>
+                              </>
                             )}
                           </TouchableOpacity>
-                        )}
+                        </View>
+                      )}
 
-                        {(report.status === 'submitted' || report.status === 'confirmed') && (
-                          <>
-                            <TouchableOpacity
-                              style={styles.menuButton}
-                              onPress={() => setOpenMenuReportId(openMenuReportId === report.id ? null : report.id)}
-                            >
-                              <MaterialIcons name="more-vert" size={24} color="#6B7280" />
-                            </TouchableOpacity>
-
-                            {openMenuReportId === report.id && (
-                              <View style={styles.dropdownMenu}>
-                                <TouchableOpacity
-                                  style={styles.menuOption}
-                                  onPress={() => {
-                                    handleViewSubmitted(report);
-                                    setOpenMenuReportId(null);
-                                  }}
-                                >
-                                  <Feather name="eye" size={18} color="#8B5CF6" />
-                                  <Text style={styles.menuOptionText}>View Details</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                  style={styles.menuOption}
-                                  onPress={() => {
-                                    handleShareReport(report);
-                                    setOpenMenuReportId(null);
-                                  }}
-                                >
-                                  <Feather name="share-2" size={18} color="#8B5CF6" />
-                                  <Text style={styles.menuOptionText}>Share</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                  style={styles.menuOption}
-                                  onPress={() => {
-                                    handleViewViewers(report);
-                                    setOpenMenuReportId(null);
-                                  }}
-                                >
-                                  <Feather name="users" size={18} color="#8B5CF6" />
-                                  <Text style={styles.menuOptionText}>Viewers</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                  style={[styles.menuOption, styles.menuOptionDanger]}
-                                  onPress={() => {
-                                    handleArchive(report);
-                                    setOpenMenuReportId(null);
-                                  }}
-                                >
-                                  <Feather name="archive" size={18} color="#FF3B30" />
-                                  <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>Archive</Text>
-                                </TouchableOpacity>
-                              </View>
-                            )}
-                          </>
-                        )}
-                      </View>
+                      {/* Unarchive Button for Archived Reports */}
+                      {report.isArchived && (
+                        <View style={styles.menuContainer}>
+                          <TouchableOpacity
+                            style={styles.unarchiveFullButton}
+                            onPress={() => handleUnarchive(report)}
+                          >
+                            <Feather name="inbox" size={18} color="#8A4FFF" />
+                            <Text style={styles.unarchiveButtonText}>Unarchive</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                   );
                 })
@@ -1328,10 +1402,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  textReportHeaderWrapper: {
+    position: 'relative',
+  },
+  textReportHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  actionIconsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  actionIcon: {
+    padding: 4,
+  },
   textReportDate: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  draftBadge: {
+    backgroundColor: '#FFA500',
+  },
+  submittedBadge: {
+    backgroundColor: '#2196F3',
+  },
+  confirmedBadge: {
+    backgroundColor: '#4CAF50',
+  },
+  failedBadge: {
+    backgroundColor: '#FF3B30',
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
   },
   textReportContent: {
     fontSize: 14,
@@ -1346,6 +1461,46 @@ const styles = StyleSheet.create({
     color: '#8A4FFF',
     fontWeight: '600',
     fontSize: 14,
+  },
+  submitButtonSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    alignSelf: 'flex-start',
+  },
+  primarySubmitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#8A4FFF',
+    gap: 6,
+  },
+  primarySubmitButtonText: {
+    color: '#8A4FFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  unarchiveFullButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#8A4FFF',
+    gap: 6,
+  },
+  unarchiveButtonText: {
+    color: '#8A4FFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   modalOverlay: {
     flex: 1,
@@ -1492,7 +1647,23 @@ const styles = StyleSheet.create({
   reportActionButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#8B5CF6',
+    color: '#fff',
+  },
+  editButton: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  submitButton: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  unarchiveButton: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+    flexDirection: 'row',
+    gap: 6,
   },
   // Search bar styles
   searchBarContainer: {
@@ -1576,10 +1747,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   menuContainer: {
-    position: 'relative',
+    flexDirection: 'row',
+    gap: 8,
     marginTop: 12,
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   menuButton: {
     padding: 8,

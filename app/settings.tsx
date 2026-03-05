@@ -1,4 +1,5 @@
 import { useSettings } from '@/contexts/SettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -20,6 +21,7 @@ const EMAIL_RECOVERY_KEY = 'salama_email_recovery_setup';
 export default function SettingsScreen() {
     const router = useRouter();
     const { settings, updateSettings, resetSettings } = useSettings();
+    const { user, logout } = useAuth();
     const pinProtection = usePinProtection();
     const checkPinStatus = pinProtection?.checkPinStatus || (async () => { });
     const [isClearing, setIsClearing] = useState(false);
@@ -29,25 +31,51 @@ export default function SettingsScreen() {
     const [showEmailRecoveryModal, setShowEmailRecoveryModal] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
     const [isSettingUpEmail, setIsSettingUpEmail] = useState(false);
-    const [emailRecoverySetup, setEmailRecoverySetup] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => {
         checkPin();
-        checkEmailRecoverySetup();
-    }, []);
-
-    const checkEmailRecoverySetup = async () => {
-        try {
-            const isSetup = await SecureStore.getItemAsync(EMAIL_RECOVERY_KEY);
-            setEmailRecoverySetup(isSetup === 'true');
-        } catch (error) {
-            console.error('Error checking email recovery setup:', error);
+        // Pre-fill with user's email if it exists
+        if (user?.email) {
+            console.log('📧 Email Recovery - Using email from backend login response:', user.email);
+            setRecoveryEmail(user.email);
+        } else {
+            console.log('📧 Email Recovery - No email set from backend');
         }
-    };
+    }, [user]);
+
+    // Check if email is set (not null and not empty)
+    const emailRecoverySetup = user?.email ? true : false;
+    console.log('📧 Email Recovery Setup Status:', emailRecoverySetup ? `ENABLED (${user?.email})` : 'NOT SET UP');
 
     const checkPin = async () => {
         const exists = await hasPin();
         setPinExists(exists);
+    };
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsLoggingOut(true);
+                        try {
+                            await logout();
+                            router.replace('/login');
+                        } catch (error) {
+                            Alert.alert('Error', 'An error occurred while logging out. Please try again.');
+                        } finally {
+                            setIsLoggingOut(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleDeleteAccount = () => {
@@ -133,10 +161,13 @@ export default function SettingsScreen() {
         try {
             const result = await setupEmailRecovery(recoveryEmail.trim());
             if (result.success) {
+                // Update local user info in SecureStore to reflect new email
+                if (user) {
+                    const updatedUser = { ...user, email: recoveryEmail.trim() };
+                    await SecureStore.setItemAsync('salama_auth_user', JSON.stringify(updatedUser));
+                }
                 setShowEmailRecoveryModal(false);
-                setRecoveryEmail('');
-                setEmailRecoverySetup(true);
-                Alert.alert('Success', 'Email recovery has been set up successfully');
+                Alert.alert('Success', emailRecoverySetup ? 'Email has been updated successfully' : 'Email recovery has been set up successfully');
             } else {
                 Alert.alert('Error', result.error || 'Failed to setup email recovery');
             }
@@ -281,19 +312,52 @@ export default function SettingsScreen() {
                         <View style={styles.securityInfo}>
                             <Text style={styles.settingLabel}>📧 Email Recovery</Text>
                             <Text style={styles.settingHint}>
-                                {emailRecoverySetup ? 'Email recovery is enabled' : 'Set up email recovery'}
+                                {emailRecoverySetup ? user?.email : 'Not set up yet'}
                             </Text>
                         </View>
                         {emailRecoverySetup && <Feather name="check-circle" size={20} color="#10B981" />}
                     </View>
 
+                    {emailRecoverySetup && (
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() => setShowEmailRecoveryModal(true)}
+                        >
+                            <Feather name="edit-2" size={20} color="#8B5CF6" />
+                            <Text style={styles.primaryButtonText}>
+                                Change Email Recovery
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {!emailRecoverySetup && (
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() => setShowEmailRecoveryModal(true)}
+                        >
+                            <Feather name="mail" size={20} color="#8B5CF6" />
+                            <Text style={styles.primaryButtonText}>
+                                Setup Email Recovery
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Session Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Session</Text>
+                    <Text style={styles.sectionDescription}>
+                        Manage your account session and login status.
+                    </Text>
+
                     <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={() => setShowEmailRecoveryModal(true)}
+                        style={styles.dangerButton}
+                        onPress={handleLogout}
+                        disabled={isLoggingOut}
                     >
-                        <Feather name="mail" size={20} color="#8B5CF6" />
-                        <Text style={styles.primaryButtonText}>
-                            {emailRecoverySetup ? 'Update Email Recovery' : 'Setup Email Recovery'}
+                        <Feather name="log-out" size={20} color="#EF4444" />
+                        <Text style={styles.dangerButtonText}>
+                            {isLoggingOut ? 'Logging out...' : 'Logout'}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -363,19 +427,21 @@ export default function SettingsScreen() {
             <Modal visible={showEmailRecoveryModal} animationType="slide" transparent={true}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
-                        <TouchableOpacity
-                            style={styles.modalCloseButton}
-                            onPress={() => {
-                                setShowEmailRecoveryModal(false);
-                                setRecoveryEmail('');
-                            }}
-                        >
-                            <Feather name="x" size={24} color="#666" />
-                        </TouchableOpacity>
-
-                        <Text style={styles.modalTitle}>Email Recovery</Text>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>
+                                {emailRecoverySetup ? 'Update Email Recovery' : 'Setup Email Recovery'}
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setShowEmailRecoveryModal(false)}
+                            >
+                                <Feather name="x" size={24} color="#666" />
+                            </TouchableOpacity>
+                        </View>
                         <Text style={styles.modalDescription}>
-                            Add your email to recover your account if you lose access to your phone.
+                            {emailRecoverySetup
+                                ? 'Change your recovery email to a different address.'
+                                : 'Add your email to recover your account if you lose access to your phone.'}
                         </Text>
 
                         <TextInput
@@ -423,6 +489,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingVertical: 16,
+        paddingTop: 24,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
@@ -558,18 +625,14 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#6B7280',
     },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
     modalCloseButton: {
-        position: 'absolute',
-        top: 50,
-        right: 20,
-        padding: 10,
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        padding: 8,
     },
     modalContainer: {
         flex: 1,

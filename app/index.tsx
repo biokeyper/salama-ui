@@ -2,30 +2,37 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, ImageBackground, StyleSheet, Text, View } from 'react-native';
+import { getAuthToken } from '@/services/authService';
 
 export default function BootScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkOnboarding = async () => {
+    const checkBootStatus = async () => {
       try {
         const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
+        const token = await getAuthToken();
 
         // Add a small delay for the splash screen effect
         setTimeout(() => {
-          if (hasSeenOnboarding === 'true') {
-            router.replace('/(tabs)');
-          } else {
+          if (hasSeenOnboarding !== 'true') {
+            // Never seen onboarding → go to onboarding
             router.replace('/onboarding');
+          } else if (!token) {
+            // Seen onboarding but no auth token → go to login
+            router.replace('/login');
+          } else {
+            // Seen onboarding and logged in → go to home
+            router.replace('/(tabs)');
           }
         }, 2000);
       } catch (error) {
-        console.error('Error checking onboarding status:', error);
-        router.replace('/(tabs)');
+        console.error('Error checking boot status:', error);
+        router.replace('/login');
       }
     };
 
-    checkOnboarding();
+    checkBootStatus();
   }, []);
 
   return (

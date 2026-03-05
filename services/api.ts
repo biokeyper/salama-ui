@@ -8,7 +8,8 @@ import { Report } from '@/types/report';
 import { apiConfig } from '@/config/api';
 import { mapReportToResponses, prepareReportMetadata } from '@/utils/reportMapper';
 import { updateReportStatus } from './storage';
-import { getAuthToken, isAuthenticated } from './authService';
+import { getAuthToken, isAuthenticated, logout } from './authService';
+import * as SecureStore from 'expo-secure-store';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -40,11 +41,25 @@ apiClient.interceptors.request.use(
 // Add response interceptor to handle errors
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      console.error('401 Unauthorized for URL:', error.config?.url);
-      console.error('Response data:', error.response?.data);
-      console.error('Request Authorization header:', error.config?.headers?.Authorization?.substring(0, 60) || 'NO HEADER');
+      console.error('🔐 401 Unauthorized - Token expired or invalid');
+      console.error('URL:', error.config?.url);
+      console.error('Response:', error.response?.data);
+
+      // Force logout due to expired/invalid token
+      console.log('⏰ Forcing logout due to token expiry/invalidity');
+      try {
+        // Clear auth data locally
+        await SecureStore.deleteItemAsync('salama_auth_token');
+        await SecureStore.deleteItemAsync('salama_auth_user');
+        console.log('✅ Local auth data cleared');
+
+        // Set a flag to indicate token expiry so screens can handle it
+        await SecureStore.setItemAsync('salama_token_expired', 'true');
+      } catch (err) {
+        console.error('Error clearing auth on 401:', err);
+      }
     }
     return Promise.reject(error);
   }
@@ -137,8 +152,7 @@ export async function submitReportToBackend(
     // Submit to backend (backend handles encryption)
     const response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
 
-    console.log('Submit response status:', response.status);
-    console.log('Submit response data:', JSON.stringify(response.data, null, 2));
+    console.log('✅ BACKEND RESPONSE:', response.data);
 
     if (response.status === 200 || response.status === 201) {
       const data = response.data;

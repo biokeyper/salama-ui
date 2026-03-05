@@ -64,7 +64,7 @@ export default function TextReportScreen() {
     setIsSubmitting(true);
     try {
       await saveReport({
-        id: editingReport.id,
+        ...editingReport,
         textContent: report.trim(),
         updatedAt: new Date().toISOString(),
       });
@@ -79,7 +79,7 @@ export default function TextReportScreen() {
     }
   };
 
-  const handleSaveLocally = async () => {
+  const handleSaveDraft = async () => {
     if (!report.trim()) {
       Alert.alert('Please enter your report or details.');
       return;
@@ -88,15 +88,20 @@ export default function TextReportScreen() {
     setIsSavingLocally(true);
     try {
       const reportType: ReportType = audioUri ? 'mixed' : 'text';
+      const now = new Date().toISOString();
+      const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       await saveReport({
+        id: reportId,
         type: reportType,
         status: 'saved',
         textContent: report.trim(),
         audioUri: audioUri || undefined,
+        createdAt: now,
+        updatedAt: now,
       });
 
-      Alert.alert('Success', 'Your report has been saved locally.', [
+      Alert.alert('Success', 'Your draft has been saved.', [
         {
           text: 'OK',
           onPress: () => {
@@ -119,16 +124,45 @@ export default function TextReportScreen() {
       return;
     }
 
+    // Show confirmation modal first
+    Alert.alert(
+      'Submit Report?',
+      'Are you sure you want to submit this report? Once submitted, it will be recorded on the blockchain.',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => {
+            // Do nothing, stay on page
+          },
+          style: 'cancel',
+        },
+        {
+          text: 'Submit',
+          onPress: async () => {
+            await performSubmission();
+          },
+          style: 'destructive',
+        },
+      ]
+    );
+  };
+
+  const performSubmission = async () => {
     setIsSubmitting(true);
     try {
       const reportType: ReportType = audioUri ? 'mixed' : 'text';
+      const now = new Date().toISOString();
+      const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // First save locally
       const savedReport = await saveReport({
+        id: reportId,
         type: reportType,
         status: 'saved',
         textContent: report.trim(),
         audioUri: audioUri || undefined,
+        createdAt: now,
+        updatedAt: now,
       });
 
       // Then submit to backend
@@ -216,6 +250,14 @@ export default function TextReportScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ThemedView style={styles.container}>
+        {!editingReport && (
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => router.navigate('/record')}
+          >
+            <ThemedText style={styles.toggleButtonText}>🎤 Record</ThemedText>
+          </TouchableOpacity>
+        )}
         <ThemedText type="title" style={styles.title}>
           {editingReport ? 'Edit your report' : 'Type your report'}
         </ThemedText>
@@ -260,13 +302,13 @@ export default function TextReportScreen() {
             <>
               <TouchableOpacity
                 style={[styles.button, styles.secondaryButton, isSavingLocally && styles.buttonDisabled]}
-                onPress={handleSaveLocally}
+                onPress={handleSaveDraft}
                 disabled={isSavingLocally || isSubmitting}
               >
                 {isSavingLocally ? (
                   <ActivityIndicator color="#8A4FFF" />
                 ) : (
-                  <ThemedText style={styles.secondaryButtonText}>Save Locally</ThemedText>
+                  <ThemedText style={styles.secondaryButtonText}>Save Draft</ThemedText>
                 )}
               </TouchableOpacity>
 
@@ -345,5 +387,21 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  toggleButton: {
+    position: 'absolute',
+    top: 16,
+    right: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8A4FFF',
+  },
+  toggleButtonText: {
+    color: '#8A4FFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

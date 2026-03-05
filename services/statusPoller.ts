@@ -47,46 +47,20 @@ export function startStatusPolling(reportId: string): void {
 
       // Get current status
       const statusResult = await checkReportStatus(reportId);
-
-      // Get current report to update blockchain status separately
-      const report = await getReportById(reportId);
-      if (!report) {
-        console.error(`Report ${reportId} not found`);
-        stopStatusPolling(reportId);
-        return;
-      }
-
-      // Update blockchain status and confirmations (separate from frontend status)
-      const blockchainStatus = statusResult.status === 'failed' ? 'failed' : 'pending';
       const confirmations = statusResult.confirmations || 0;
 
       // Check if confirmed (12+ confirmations)
       if (confirmations >= apiConfig.statusPolling.confirmationThreshold) {
         console.log(`Report ${reportId} confirmed with ${confirmations} confirmations`);
 
-        // Update blockchain status to confirmed (keep frontend status as 'submitted')
-        await updateReportStatus(reportId, report.status || 'submitted', report.submissionId);
-        const updatedReport = await getReportById(reportId);
-        if (updatedReport) {
-          updatedReport.blockchainStatus = 'confirmed';
-          updatedReport.confirmations = confirmations;
-          updatedReport.txHash = statusResult.txHash;
-          updatedReport.ipfsHash = statusResult.ipfsHash;
-          await updateReportStatus(
-            reportId,
-            report.status || 'submitted',
-            report.submissionId
-          );
-          // Save blockchain status separately
-          const { saveReport } = await import('./storage');
-          await saveReport({
-            id: reportId,
-            blockchainStatus: 'confirmed',
-            confirmations: confirmations,
-            txHash: statusResult.txHash,
-            ipfsHash: statusResult.ipfsHash,
-          });
-        }
+        const { saveReport } = await import('./storage');
+        await saveReport({
+          id: reportId,
+          status: 'confirmed',
+          confirmations: confirmations,
+          txHash: statusResult.txHash,
+          ipfsHash: statusResult.ipfsHash,
+        });
 
         // Stop polling
         stopStatusPolling(reportId);
@@ -99,17 +73,17 @@ export function startStatusPolling(reportId: string): void {
         const { saveReport } = await import('./storage');
         await saveReport({
           id: reportId,
-          blockchainStatus: 'failed',
+          status: 'failed',
         });
         stopStatusPolling(reportId);
         return;
       }
 
-      // Update with latest blockchain status and confirmations
+      // Update with latest status and confirmations (still pending)
       const { saveReport } = await import('./storage');
       await saveReport({
         id: reportId,
-        blockchainStatus: 'pending',
+        status: 'pending',
         confirmations: confirmations,
         txHash: statusResult.txHash,
         ipfsHash: statusResult.ipfsHash,

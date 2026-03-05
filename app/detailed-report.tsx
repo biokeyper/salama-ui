@@ -23,7 +23,7 @@ export default function DetailedReportScreen() {
           {/* Voice Input Button */}
           <TouchableOpacity
             style={styles.inputOption}
-            onPress={() => router.push({ pathname: '../record-past', params })}
+            onPress={() => router.push({ pathname: '/record', params })}
             accessibilityLabel="Voice Input"
           >
             <View style={styles.iconContainer}>
@@ -35,7 +35,7 @@ export default function DetailedReportScreen() {
           {/* Text Input Button */}
           <TouchableOpacity
             style={styles.inputOption}
-            onPress={() => router.push({ pathname: './text-report', params })}
+            onPress={() => router.push({ pathname: '/text-report', params })}
             accessibilityLabel="Text Input"
           >
             <View style={styles.iconContainer}>

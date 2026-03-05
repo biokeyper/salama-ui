@@ -97,12 +97,16 @@ export default function FakeCalendarScreen() {
             setIsRecording(false);
 
             if (uri) {
+                const now = new Date().toISOString();
+                const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 const savedReport = await saveReport({
+                    id: reportId,
                     type: 'audio',
                     status: 'saved',
                     audioUri: uri,
                     audioDuration: durationMs,
-                    createdAt: new Date().toISOString(),
+                    createdAt: now,
+                    updatedAt: now,
                     metadata: { notes: 'Background recording from calendar' },
                 });
 

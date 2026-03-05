@@ -7,16 +7,16 @@ export default function SafetyCheckScreen() {
   const params = useLocalSearchParams();
 
   const handleYes = () => {
-    // Pass along any params (like audioUri) to the detailed report screen
+    // Continue to detailed report (choose Voice or Text)
     router.push({
-      pathname: './detailed-report',
+      pathname: '/detailed-report',
       params,
     });
   };
 
   const handleNo = () => {
-    // You can customize this action (e.g., show resources, go back, etc.)
-    router.push('./(tabs)/record'); // Or show a modal, or go back, etc.
+    // Go back to home if not safe
+    router.replace('/(tabs)');
   };
 
   return (

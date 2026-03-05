@@ -1,6 +1,6 @@
 import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
+import { AudioModule, RecordingPresets, useAudioRecorder, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
@@ -21,7 +21,13 @@ export default function RecordScreen() {
   const [isExiting, setIsExiting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false); // Prevent multiple stop calls
+  const [isPlayingRecording, setIsPlayingRecording] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
+
+  // Audio player for listening to recorded audio
+  const audioPlayer = recordedUri ? useAudioPlayer(recordedUri, { updateInterval: 100 }) : null;
+  const playerStatus = audioPlayer ? useAudioPlayerStatus(audioPlayer) : null;
 
   // Animation value for pulsing effect
   const pulseScale = useSharedValue(1);
@@ -58,6 +64,45 @@ export default function RecordScreen() {
     }
   }, [isRecording]);
 
+  // Handle audio playback
+  useEffect(() => {
+    if (!audioPlayer) return;
+
+    if (isPlayingRecording) {
+      try {
+        if (!audioPlayer.playing) {
+          audioPlayer.play();
+        }
+      } catch (err) {
+        console.error('Play failed:', err);
+        setIsPlayingRecording(false);
+      }
+    } else {
+      try {
+        if (audioPlayer.playing) {
+          audioPlayer.pause();
+        }
+      } catch (err) {
+        // Player already released
+      }
+    }
+  }, [isPlayingRecording, audioPlayer]);
+
+  // Auto-stop when playback finishes
+  useEffect(() => {
+    if (!audioPlayer || !playerStatus) return;
+
+    if (playerStatus.currentTime && playerStatus.duration && playerStatus.currentTime >= playerStatus.duration) {
+      try {
+        audioPlayer.pause();
+        audioPlayer.seekTo(0);
+        setIsPlayingRecording(false);
+      } catch (err) {
+        setIsPlayingRecording(false);
+      }
+    }
+  }, [playerStatus?.currentTime, playerStatus?.duration, audioPlayer]);
+
   const startRecording = async () => {
     try {
       await audioRecorder.prepareToRecordAsync();
@@ -72,10 +117,19 @@ export default function RecordScreen() {
 
   const stopRecording = async () => {
     try {
+      // Prevent multiple simultaneous stop calls
+      if (isStopping || !isRecording) {
+        console.warn('Recording stop already in progress or not recording');
+        return;
+      }
+
+      setIsStopping(true);
+
       // Verify recorder exists and hasn't been released
       if (!audioRecorder) {
         console.warn('Audio recorder was already released');
         setIsRecording(false);
+        setIsStopping(false);
         return;
       }
 
@@ -90,11 +144,16 @@ export default function RecordScreen() {
 
       if (uri) {
         try {
+          const now = new Date().toISOString();
+          const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const savedReport = await saveReport({
+            id: reportId,
             type: 'audio',
             status: 'saved',
             audioUri: uri,
             audioDuration: durationMs, // Save duration in milliseconds
+            createdAt: now,
+            updatedAt: now,
           });
           setReportId(savedReport.id);
         } catch (error) {
@@ -102,7 +161,10 @@ export default function RecordScreen() {
         }
       }
     } catch (err) {
+      console.error('Error stopping recording:', err);
       Alert.alert('Error', 'Failed to save recording');
+    } finally {
+      setIsStopping(false);
     }
   };
 
@@ -110,34 +172,25 @@ export default function RecordScreen() {
     if (isExiting) return;
     setIsExiting(true);
 
-    // 1. Stop recording if active
-    if (isRecording) {
+    // 1. Stop recording if active (use stopRecording to avoid duplicate stop calls)
+    if (isRecording && !isStopping) {
       try {
-        await audioRecorder.stop();
-        const endTime = Date.now();
-        const durationMs = recordingStartTime ? (endTime - recordingStartTime) : 0;
-        const uri = audioRecorder.uri ?? null;
-
-        // 2. Save the recording
-        if (uri) {
-          await saveReport({
-            type: 'audio',
-            status: 'saved',
-            audioUri: uri,
-            audioDuration: durationMs,
-          });
-          console.log('Emergency exit: Recording saved');
-        }
+        await stopRecording();
       } catch (error) {
-        console.error('Error saving on emergency exit:', error);
+        console.error('Error stopping recording on emergency exit:', error);
       }
     } else if (recordedUri && !reportId) {
       // If stopped but not yet saved (rare race condition), try to save
       try {
+        const now = new Date().toISOString();
+        const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await saveReport({
+          id: tempReportId,
           type: 'audio',
           status: 'saved',
           audioUri: recordedUri,
+          createdAt: now,
+          updatedAt: now,
         });
       } catch (error) {
         console.error('Error saving existing recording on exit:', error);
@@ -163,25 +216,27 @@ export default function RecordScreen() {
 
     setIsSavingDraft(true);
     try {
-      // Navigate to safety check for additional details
-      let currentReportId = reportId;
-
-      if (recordedUri && !currentReportId) {
-        const savedReport = await saveReport({
-          type: 'audio',
-          status: 'saved',
-          audioUri: recordedUri,
-        });
-        currentReportId = savedReport.id;
-      }
-
-      router.push({
-        pathname: '../safety-check',
-        params: {
-          audioUri: recordedUri || '',
-          reportId: currentReportId || ''
-        }
+      // Save the report locally
+      const now = new Date().toISOString();
+      const draftReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const savedReport = await saveReport({
+        id: draftReportId,
+        type: 'audio',
+        status: 'saved',
+        audioUri: recordedUri,
+        createdAt: now,
+        updatedAt: now,
       });
+
+      Alert.alert('Success', 'Your draft has been saved.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Clear recording and stay on page
+            setRecordedUri(null);
+          },
+        },
+      ]);
     } catch (error) {
       console.error('Error:', error);
       Alert.alert('Error', 'Failed to save draft');
@@ -196,6 +251,30 @@ export default function RecordScreen() {
       return;
     }
 
+    // Show confirmation modal first
+    Alert.alert(
+      'Submit Report?',
+      'Are you sure you want to submit this report? Once submitted, it will be recorded on the blockchain.',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => {
+            // Do nothing, stay on page
+          },
+          style: 'cancel',
+        },
+        {
+          text: 'Submit',
+          onPress: async () => {
+            await performSubmission();
+          },
+          style: 'destructive',
+        },
+      ]
+    );
+  };
+
+  const performSubmission = async () => {
     setIsSubmitting(true);
     try {
       // Get the saved report for submission
@@ -290,10 +369,15 @@ export default function RecordScreen() {
 
     if (recordedUri && !currentReportId) {
       try {
+        const now = new Date().toISOString();
+        const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const savedReport = await saveReport({
+          id: tempReportId,
           type: 'audio',
           status: 'saved',
           audioUri: recordedUri,
+          createdAt: now,
+          updatedAt: now,
         });
         currentReportId = savedReport.id;
       } catch (error) {
@@ -314,9 +398,8 @@ export default function RecordScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={navigateToDetailedReport} style={styles.skipButton}>
-          <Feather name="edit-3" size={16} color="#8A4FFF" />
-          <Text style={styles.skipText}>Skip and type instead</Text>
+        <TouchableOpacity onPress={() => router.navigate('/text-report')} style={styles.skipButton}>
+          <Text style={styles.skipText}>📝 Type Instead</Text>
         </TouchableOpacity>
       </View>
 
@@ -352,18 +435,43 @@ export default function RecordScreen() {
       </TouchableOpacity>
 
       {recordedUri && !isRecording && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.playButton}
-            onPress={() => router.push({
-              pathname: './audio-player',
-              params: { audioUri: recordedUri || '' }
-            })}
-          >
-            <MaterialIcons name="play-arrow" size={24} color="white" />
-            <Text style={styles.playButtonText}>Listen</Text>
-          </TouchableOpacity>
-        </View>
+        <>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.playButton}
+              onPress={() => setIsPlayingRecording(!isPlayingRecording)}
+            >
+              <MaterialIcons
+                name={isPlayingRecording ? "pause" : "play-arrow"}
+                size={24}
+                color="white"
+              />
+              <Text style={styles.playButtonText}>{isPlayingRecording ? 'Pause' : 'Listen'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {playerStatus && (
+            <View style={styles.playbackProgressContainer}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${
+                        playerStatus.duration && playerStatus.duration > 0
+                          ? (playerStatus.currentTime / playerStatus.duration) * 100
+                          : 0
+                      }%`,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.playbackTime}>
+                {Math.floor((playerStatus.currentTime || 0) / 1000)}s / {Math.floor((playerStatus.duration || 0) / 1000)}s
+              </Text>
+            </View>
+          )}
+        </>
       )}
 
       {recordedUri && !isRecording && (
@@ -378,7 +486,7 @@ export default function RecordScreen() {
             ) : (
               <>
                 <MaterialIcons name="save" size={20} color="#8A4FFF" />
-                <Text style={styles.draftButtonText}>Save as Draft</Text>
+                <Text style={styles.draftButtonText}>Save Draft</Text>
               </>
             )}
           </TouchableOpacity>
@@ -534,6 +642,28 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  playbackProgressContainer: {
+    marginVertical: 16,
+    paddingHorizontal: 16,
+  },
+  progressBar: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#8A4FFF',
+    borderRadius: 2,
+  },
+  playbackTime: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
   },
   submissionButtons: {
     flexDirection: 'row',

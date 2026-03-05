@@ -131,12 +131,16 @@ export default function TrackerScreen() {
 
             if (uri) {
                 // Save as a hidden report
+                const now = new Date().toISOString();
+                const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 await saveReport({
+                    id: reportId,
                     type: 'audio',
                     status: 'saved',
                     audioUri: uri,
                     audioDuration: durationMs,
-                    createdAt: new Date().toISOString(),
+                    createdAt: now,
+                    updatedAt: now,
                     metadata: { notes: 'Background recording from Tracker' },
                 });
                 setBackgroundRecordingUri(uri);
@@ -222,10 +226,15 @@ export default function TrackerScreen() {
 
             if (fullLog && shouldCreateAbuseReport(fullLog)) {
                 const reportText = generateAbuseReportText(fullLog);
+                const now = new Date().toISOString();
+                const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 await saveReport({
+                    id: reportId,
                     type: 'text',
                     status: 'saved',
                     textContent: reportText,
+                    createdAt: now,
+                    updatedAt: now,
                 });
                 console.log('Abuse indicator detected - report created silently');
             }

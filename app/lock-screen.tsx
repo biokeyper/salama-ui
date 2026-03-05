@@ -6,7 +6,8 @@ import { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { verifyPin } from '@/services/security';
+import { verifyPin, hasPin } from '@/services/security';
+import { getAuthToken } from '@/services/authService';
 
 interface LockScreenProps {
     onUnlock: () => void;
@@ -71,12 +72,36 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
             }
         } else {
             // Verify mode
-            const isValid = await verifyPin(pin);
-            if (isValid) {
+            try {
+              const token = await getAuthToken();
+              const pinSet = await hasPin();
+
+              // Check if user is logged in
+              if (!token) {
+                Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+                setPin('');
+                return;
+              }
+
+              // Check if PIN is set
+              if (!pinSet) {
+                Alert.alert('Set PIN First', 'Please set a PIN first to access your library.');
+                setPin('');
+                return;
+              }
+
+              // Verify PIN
+              const isValid = await verifyPin(pin);
+              if (isValid) {
                 onUnlock();
-            } else {
+              } else {
                 Alert.alert('Incorrect PIN', 'Please try again');
                 setPin('');
+              }
+            } catch (error) {
+              console.error('Error during PIN verification:', error);
+              Alert.alert('Error', 'An error occurred. Please try again.');
+              setPin('');
             }
         }
     };

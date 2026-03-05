@@ -18,10 +18,14 @@ import {
   dbSaveReport,
 } from './database';
 
-// Export all database functions with the same API
+// Export wrapper functions to properly handle database calls
+export async function saveReport(report: Report): Promise<Report> {
+  await dbSaveReport(report);
+  return report;
+}
+
 export const getAllReports = dbGetAllReports;
 export const getReportById = dbGetReportById;
-export const saveReport = dbSaveReport;
 export const deleteReport = dbDeleteReport;
 export const deleteAllReports = dbDeleteAllReports;
 export const getReportsByStatus = dbGetReportsByStatus;

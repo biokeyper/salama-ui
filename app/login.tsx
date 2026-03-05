@@ -245,9 +245,14 @@ export default function LoginScreen() {
                   <ThemedText style={styles.buttonText}>Continue</ThemedText>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setStep('forgot-email'); setRecoveryEmail(''); }}>
-                <ThemedText style={styles.forgotPhoneText}>Forgot phone number?</ThemedText>
-              </TouchableOpacity>
+              <View style={styles.bottomActionRow}>
+                <TouchableOpacity onPress={() => { setStep('forgot-email'); setRecoveryEmail(''); }}>
+                  <ThemedText style={styles.forgotPhoneText}>Forgot phone number?</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.back()}>
+                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                </TouchableOpacity>
+              </View>
             </>
           ) : step === 'otp' ? (
             <>
@@ -425,10 +430,6 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.bottomContainer}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <ThemedText style={styles.cancelText}>Cancel</ThemedText>
-          </TouchableOpacity>
-
           <View style={styles.signupLinkContainer}>
             <ThemedText style={styles.signupLinkText}>Don't have an account? </ThemedText>
             <TouchableOpacity onPress={() => router.navigate('/signup')}>
@@ -535,6 +536,17 @@ const styles = StyleSheet.create({
     color: '#8A4FFF',
     fontSize: 14,
     fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  bottomActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  cancelButtonText: {
+    color: '#8A4FFF',
+    fontSize: 14,
     textDecorationLine: 'underline',
   },
 });

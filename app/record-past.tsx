@@ -14,6 +14,7 @@ export default function RecordPastScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
+  const [isStopping, setIsStopping] = useState(false); // Prevent multiple stop calls
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Animation value for pulsing effect
@@ -63,10 +64,19 @@ export default function RecordPastScreen() {
 
   const stopRecording = async () => {
     try {
+      // Prevent multiple simultaneous stop calls
+      if (isStopping || !isRecording) {
+        console.warn('Recording stop already in progress or not recording');
+        return;
+      }
+
+      setIsStopping(true);
+
       // Verify recorder exists and hasn't been released
       if (!audioRecorder) {
         console.warn('Audio recorder was already released');
         setIsRecording(false);
+        setIsStopping(false);
         return;
       }
 
@@ -78,10 +88,15 @@ export default function RecordPastScreen() {
 
       if (uri) {
         try {
+          const now = new Date().toISOString();
+          const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const savedReport = await saveReport({
+            id: reportId,
             type: 'audio',
             status: 'saved',
             audioUri: uri,
+            createdAt: now,
+            updatedAt: now,
           });
           setReportId(savedReport.id);
         } catch (error) {
@@ -89,36 +104,33 @@ export default function RecordPastScreen() {
         }
       }
     } catch (err) {
+      console.error('Error stopping recording:', err);
       Alert.alert('Error', 'Failed to save recording');
+    } finally {
+      setIsStopping(false);
     }
   };
 
   const handleEmergencyExit = async () => {
-    // 1. Stop recording if active
-    if (isRecording) {
+    // 1. Stop recording if active (use stopRecording to avoid duplicate stop calls)
+    if (isRecording && !isStopping) {
       try {
-        await audioRecorder.stop();
-        const uri = audioRecorder.uri ?? null;
-
-        // 2. Save the recording
-        if (uri) {
-          await saveReport({
-            type: 'audio',
-            status: 'saved',
-            audioUri: uri,
-          });
-          console.log('Emergency exit: Recording saved');
-        }
+        await stopRecording();
       } catch (error) {
-        console.error('Error saving on emergency exit:', error);
+        console.error('Error stopping recording on emergency exit:', error);
       }
     } else if (recordedUri && !reportId) {
       // If stopped but not yet saved (rare race condition), try to save
       try {
+        const now = new Date().toISOString();
+        const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await saveReport({
+          id: tempReportId,
           type: 'audio',
           status: 'saved',
           audioUri: recordedUri,
+          createdAt: now,
+          updatedAt: now,
         });
       } catch (error) {
         console.error('Error saving existing recording on exit:', error);
@@ -142,10 +154,15 @@ export default function RecordPastScreen() {
 
     if (recordedUri && !currentReportId) {
       try {
+        const now = new Date().toISOString();
+        const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const savedReport = await saveReport({
+          id: tempReportId,
           type: 'audio',
           status: 'saved',
           audioUri: recordedUri,
+          createdAt: now,
+          updatedAt: now,
         });
         currentReportId = savedReport.id;
       } catch (error) {

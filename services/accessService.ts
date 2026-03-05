@@ -209,3 +209,37 @@ export async function getSharedReport(
     };
   }
 }
+
+/**
+ * Unarchive a report (authenticated)
+ * Restores an archived report back to active status
+ */
+export async function unarchiveReport(
+  reportId: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const apiClient = getApiClient();
+    const endpoint = apiConfig.endpoints.unarchiveReport.replace(':reportId', reportId);
+    const response = await apiClient.post(endpoint, {});
+
+    if (response.status === 200 || response.status === 201) {
+      return {
+        success: true,
+        data: response.data.data,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Unexpected response from backend',
+    };
+  } catch (error) {
+    console.error('Error unarchiving report:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to unarchive report';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}

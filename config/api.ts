@@ -71,5 +71,9 @@ export const apiConfig = {
 
     // Account Management
     deleteAccount: '/api/auth/delete-account',  // Delete user account (authenticated)
+    logout: '/api/auth/logout',  // Logout (authenticated)
+
+    // Report Management
+    unarchiveReport: '/api/report/:reportId/unarchive',  // Unarchive a report
   },
 };

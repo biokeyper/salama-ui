@@ -82,9 +82,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.success && result.user) {
         setUser(result.user);
         setIsLoggedIn(true);
-        // Show email recovery modal on first signup
-        const isSetup = await checkEmailRecoverySetup();
-        if (!isSetup) {
+        // Show email recovery modal on first signup only if user doesn't have email from backend
+        if (!result.user.email) {
           setShowEmailRecoveryModal(true);
         }
       }
@@ -105,9 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.success && result.user) {
         setUser(result.user);
         setIsLoggedIn(true);
-        // Show email recovery modal on first login if not set up
-        const isSetup = await checkEmailRecoverySetup();
-        if (!isSetup) {
+        // Show email recovery modal on first login only if user doesn't have email from backend
+        if (!result.user.email) {
           setShowEmailRecoveryModal(true);
         }
       }

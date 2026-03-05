@@ -12,6 +12,7 @@ import {
   markNotificationRead,
   Notification,
 } from '@/services/notificationService';
+import { playNotificationSound, initializeAudio } from '@/services/soundService';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -20,6 +21,8 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -29,6 +32,11 @@ export default function NotificationsScreen() {
     }
   }, [user]);
 
+  // Initialize audio for notification sounds
+  useEffect(() => {
+    initializeAudio();
+  }, []);
+
   const loadNotifications = async () => {
     setIsLoading(true);
     setError('');
@@ -36,7 +44,30 @@ export default function NotificationsScreen() {
     try {
       const result = await getNotifications({ limit: 50, offset: 0 });
       if (result.success && result.notifications) {
+        const newCount = result.notifications.length;
+        console.log('📬 Notifications loaded:', newCount);
+        result.notifications.forEach((notif, idx) => {
+          console.log(`  [${idx}] ${notif.type}:`);
+          console.log(`       id: ${notif.id}`);
+          console.log(`       createdAt: "${notif.createdAt}" (type: ${typeof notif.createdAt})`);
+          console.log(`       Full object:`, JSON.stringify(notif, null, 2));
+        });
         setNotifications(result.notifications);
+
+        // Play notification sound ONLY if:
+        // 1. App has initialized (not first load)
+        // 2. There are NEW notifications (more than before)
+        if (hasInitialized && newCount > previousNotificationCount) {
+          console.log(`🔔 New notifications detected! (${previousNotificationCount} → ${newCount})`);
+          await playNotificationSound();
+        }
+
+        // Update counts for next comparison
+        setPreviousNotificationCount(newCount);
+        if (!hasInitialized) {
+          setHasInitialized(true);
+          console.log('✅ Notifications initialized');
+        }
       } else {
         setError(result.error || 'Failed to load notifications');
       }
@@ -91,7 +122,19 @@ export default function NotificationsScreen() {
 
   const formatDate = (dateString: string) => {
     try {
+      if (!dateString) {
+        console.warn('formatDate: No date string provided');
+        return 'Unknown date';
+      }
+
       const date = new Date(dateString);
+
+      // Validate the date
+      if (isNaN(date.getTime())) {
+        console.warn('formatDate: Invalid date string -', dateString);
+        return 'Invalid date';
+      }
+
       const now = new Date();
       const diff = now.getTime() - date.getTime();
       const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -105,8 +148,9 @@ export default function NotificationsScreen() {
         month: 'short',
         day: 'numeric',
       });
-    } catch {
-      return dateString;
+    } catch (error) {
+      console.error('formatDate error:', error, 'for string:', dateString);
+      return 'Invalid date';
     }
   };
 
@@ -125,25 +169,29 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderNotification = ({ item }: { item: Notification }) => (
-    <TouchableOpacity
-      style={[
-        styles.notificationCard,
-        !item.isRead && styles.notificationCardUnread,
-      ]}
-      onPress={() => !item.isRead && handleMarkRead(item.id)}
-    >
-      <View style={styles.notificationContent}>
-        <View style={styles.notificationIcon}>
-          <Feather name={getTypeIcon(item.type) as any} size={18} color="#8B5CF6" />
-        </View>
-        <View style={styles.notificationTextContainer}>
-          <Text style={styles.notificationTitle}>{item.title}</Text>
-          <Text style={styles.notificationMessage} numberOfLines={2}>
-            {item.message}
-          </Text>
-          <Text style={styles.notificationTime}>{formatDate(item.createdAt)}</Text>
-        </View>
+  const renderNotification = ({ item }: { item: Notification }) => {
+    // Log each notification's date for debugging
+    console.log(`Rendering ${item.type} notification - createdAt: ${item.createdAt}`);
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.notificationCard,
+          !item.isRead && styles.notificationCardUnread,
+        ]}
+        onPress={() => !item.isRead && handleMarkRead(item.id)}
+      >
+        <View style={styles.notificationContent}>
+          <View style={styles.notificationIcon}>
+            <Feather name={getTypeIcon(item.type) as any} size={18} color="#8B5CF6" />
+          </View>
+          <View style={styles.notificationTextContainer}>
+            <Text style={styles.notificationTitle}>{item.title}</Text>
+            <Text style={styles.notificationMessage} numberOfLines={2}>
+              {item.message}
+            </Text>
+            <Text style={styles.notificationTime}>{formatDate(item.createdAt)}</Text>
+          </View>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDelete(item.id)}
@@ -152,7 +200,8 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -221,6 +270,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    paddingTop: 24,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',

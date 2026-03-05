@@ -367,7 +367,6 @@ export async function verifyLogin(
 export async function getAuthToken(): Promise<string | null> {
   try {
     const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-    console.log('getAuthToken retrieved:', token ? `token exists (${token.substring(0, 20)}...)` : 'NO TOKEN FOUND');
     return token;
   } catch (error) {
     console.error('Error reading auth token:', error);
@@ -400,10 +399,37 @@ export async function isAuthenticated(): Promise<boolean> {
 /**
  * Logout user (remove token and user info)
  */
+/**
+ * Logout user
+ * Calls backend to confirm logout, then clears local auth data
+ */
 export async function logout(): Promise<void> {
   try {
+    const token = await getAuthToken();
+
+    // Call backend logout endpoint if token exists
+    if (token) {
+      try {
+        await axios.post(
+          `${apiConfig.baseURL}${apiConfig.endpoints.logout}`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        console.log('✅ Logged out from backend');
+      } catch (error) {
+        // Even if backend call fails, continue with local logout
+        console.warn('⚠️ Backend logout call failed, clearing local auth anyway');
+      }
+    }
+
+    // Clear local auth data
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(AUTH_USER_KEY);
+    console.log('🔓 Local auth data cleared');
   } catch (error) {
     console.error('Error during logout:', error);
   }

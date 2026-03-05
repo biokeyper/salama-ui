@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -31,9 +32,17 @@ function RootNavigator({
 }: RootNavigatorProps) {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
+  const route = useRoute();
 
-  // Hide emergency components on auth and onboarding pages
-  const showEmergencyComponents = !pathname.includes('index') && !pathname.includes('onboarding') && !pathname.includes('auth');
+  // Show emergency components on all app pages EXCEPT boot, onboarding, auth flows, and fake apps
+  // Hide on: boot (index), onboarding, login, signup, auth, fake apps (calculator, calendar)
+  const showEmergencyComponents =
+    route.name !== 'index' &&
+    !pathname.includes('onboarding') &&
+    !pathname.includes('login') &&
+    !pathname.includes('signup') &&
+    !pathname.includes('auth') &&
+    !pathname.includes('fake-');
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
