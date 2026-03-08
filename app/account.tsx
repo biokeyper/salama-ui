@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Clipboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { initiateChangePhone, verifyChangePhone } from '@/services/authService';
 
@@ -72,6 +72,13 @@ export default function AccountScreen() {
     setError('');
   };
 
+  const handleCopyUserId = async () => {
+    if (user?.userId) {
+      await Clipboard.setString(user.userId);
+      Alert.alert('Success', 'User ID copied to clipboard');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -101,8 +108,20 @@ export default function AccountScreen() {
           </View>
 
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>User ID</Text>
-            <Text style={styles.infoValue}>{user?.userId || 'Not available'}</Text>
+            <View style={styles.userIdContainer}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.infoLabel}>User ID</Text>
+                <Text style={styles.infoValue}>{user?.userId || 'Not available'}</Text>
+              </View>
+              {user?.userId && (
+                <TouchableOpacity
+                  style={styles.copyButton}
+                  onPress={handleCopyUserId}
+                >
+                  <Feather name="copy" size={18} color="#8B5CF6" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
 
@@ -267,6 +286,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1F2937',
   },
+  userIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  copyButton: {
+    padding: 8,
+    backgroundColor: '#F5F3FF',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -294,11 +326,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F3FF',
+    backgroundColor: '#fff',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: '#8B5CF6',
     gap: 10,
     marginBottom: 12,
   },
@@ -308,7 +340,7 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
   },
   secondaryButton: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },

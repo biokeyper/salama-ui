@@ -142,7 +142,10 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
         Alert.alert('🚨 Alert Sent', 'Your emergency alert has been sent successfully.', [
           {
             text: 'OK',
-            onPress: onClose,
+            onPress: () => {
+              setIsSending(false);
+              onClose();
+            },
           },
         ]);
       } else {
@@ -158,6 +161,7 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
 
   const handleClose = () => {
     setTapCount(0);
+    setIsSending(false);
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -198,19 +202,25 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
             onPress={handleTap}
             disabled={isSending}
           >
-            {isSending ? (
-              <ActivityIndicator color="white" size="large" />
-            ) : (
-              <>
-                <MaterialIcons name="favorite" size={48} color="#EF4444" />
-                {tapCount === 1 && (
-                  <View style={styles.confirmIndicator}>
-                    <Text style={styles.confirmText}>!</Text>
-                  </View>
-                )}
-              </>
+            <MaterialIcons name="favorite" size={48} color="#EF4444" />
+            {isSending && (
+              <ActivityIndicator
+                color="#EF4444"
+                size="large"
+                style={styles.loadingOverlay}
+              />
+            )}
+            {tapCount === 1 && !isSending && (
+              <View style={styles.confirmIndicator}>
+                <Text style={styles.confirmText}>!</Text>
+              </View>
             )}
           </TouchableOpacity>
+
+          {/* Sending status */}
+          {isSending && (
+            <Text style={styles.sendingText}>Sending alert...</Text>
+          )}
 
           {/* Info text */}
           <Text style={styles.infoText}>
@@ -281,6 +291,9 @@ const styles = StyleSheet.create({
   alertButtonDisabled: {
     opacity: 0.7,
   },
+  loadingOverlay: {
+    position: 'absolute',
+  },
   confirmIndicator: {
     position: 'absolute',
     top: -12,
@@ -298,6 +311,13 @@ const styles = StyleSheet.create({
     color: '#7F1D1D',
     fontWeight: 'bold',
     fontSize: 20,
+  },
+  sendingText: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 12,
   },
   infoText: {
     fontSize: 12,

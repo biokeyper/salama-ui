@@ -120,7 +120,9 @@ export async function verifySignup(
       // Extract token from nested data structure (backend wraps response in { data: { token } })
       let token = response_data.token;
       let pin = response_data.pin;
+      let userId = response_data.userId;
       let userData = {
+        userId: userId || '',
         phone: response_data.phone || phone,
         email: response_data.email || '',
       };
@@ -129,7 +131,9 @@ export async function verifySignup(
       if (!token && response_data.data?.token) {
         token = response_data.data.token;
         pin = response_data.data.pin;
+        userId = response_data.data.userId;
         userData = {
+          userId: userId || '',
           phone: response_data.data.phone || phone,
           email: response_data.data.email || '',
         };
@@ -156,13 +160,13 @@ export async function verifySignup(
       await storePinFromBackend(pin);
 
       // Save user info
-      const user: User = {
-        userId: '', // Backend doesn't return userId in signup response
-        ...userData,
-      };
+      const user: User = userData as User;
+      console.log('🆔 Extracted userId in signup:', userId);
+      console.log('👤 User object before saving:', user);
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
+      console.log('💾 User data saved to SecureStore:', user);
 
-      console.log('Signup successful, user data saved');
+      console.log('✅ Signup successful, user data saved');
       return { success: true, user };
     }
 
@@ -281,7 +285,9 @@ export async function verifyLogin(
       // Extract token from nested data structure (backend wraps response in { data: { token } })
       let token = response_data.token;
       let pin = response_data.pin;
+      let userId = response_data.userId;
       let userData = {
+        userId: userId || '',
         phone: response_data.phone || phone,
         email: response_data.email || '',
       };
@@ -290,7 +296,9 @@ export async function verifyLogin(
       if (!token && response_data.data?.token) {
         token = response_data.data.token;
         pin = response_data.data.pin;
+        userId = response_data.data.userId;
         userData = {
+          userId: userId || '',
           phone: response_data.data.phone || phone,
           email: response_data.data.email || '',
         };
@@ -298,6 +306,7 @@ export async function verifyLogin(
 
       console.log('🔐 Extracted PIN:', pin);
       console.log('🔑 Extracted Token:', token ? '✅ Present' : '❌ Missing');
+      console.log('👤 User ID:', userId);
       console.log('👤 User Data:', userData);
 
       if (!token) {
@@ -321,13 +330,13 @@ export async function verifyLogin(
       await storePinFromBackend(pin);
 
       // Save user info
-      const user: User = {
-        userId: '', // Backend doesn't return userId in login response
-        ...userData,
-      };
+      const user: User = userData as User;
+      console.log('🆔 Extracted userId in login:', userId);
+      console.log('👤 User object before saving:', user);
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
+      console.log('💾 User data saved to SecureStore:', user);
 
-      console.log('Login successful, user data saved');
+      console.log('✅ Login successful, user data saved');
       return { success: true, user };
     }
 

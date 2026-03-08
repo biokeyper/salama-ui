@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {
   addEmergencyContact,
   getEmergencyContacts,
   removeEmergencyContact,
+  editEmergencyContact,
   getPanicMessage,
   setPanicMessage,
   EmergencyContact,
@@ -36,6 +37,17 @@ export default function EmergencyContactsSection() {
   const [isSavingMessage, setIsSavingMessage] = useState(false);
   const [deviceContacts, setDeviceContacts] = useState<any[]>([]);
   const [showDeviceContacts, setShowDeviceContacts] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<EmergencyContact | null>(null);
+  const [editPhone, setEditPhone] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editRelationship, setEditRelationship] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Refs for TextInputs in edit modal
+  const editPhoneRef = useRef<TextInput>(null);
+  const editNameRef = useRef<TextInput>(null);
+  const editRelationshipRef = useRef<TextInput>(null);
 
   useEffect(() => {
     loadContacts();
@@ -59,8 +71,11 @@ export default function EmergencyContactsSection() {
   const loadPanicMessage = async () => {
     try {
       const result = await getPanicMessage();
-      if (result.success && result.data) {
+      if (result.success && typeof result.data === 'string') {
         setPanicMsg(result.data);
+      } else if (result.success && result.data) {
+        console.warn('Panic message is not a string:', typeof result.data, result.data);
+        setPanicMsg('');
       }
     } catch (error) {
       console.error('Error loading panic message:', error);
@@ -181,6 +196,66 @@ export default function EmergencyContactsSection() {
     }
   };
 
+  const handleEditContact = (contact: EmergencyContact) => {
+    setEditingContact(contact);
+    setEditPhone(contact.phone);
+    setEditName(contact.name);
+    setEditRelationship(contact.relationship);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    console.log('🔵 handleSaveEdit called - isEditing:', isEditing, 'editingContact:', editingContact);
+
+    // Prevent duplicate submissions
+    if (isEditing || !editingContact) {
+      console.log('⚠️ Preventing duplicate submission - isEditing:', isEditing);
+      return;
+    }
+
+    if (!editName.trim() || !editPhone.trim() || !editRelationship.trim()) {
+      console.log('❌ Validation failed - missing fields');
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    console.log('✅ Validation passed');
+    setIsEditing(true);
+    console.log('⏳ Set isEditing to true');
+
+    try {
+      const updatePayload = {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        relationship: editRelationship.trim(),
+      };
+      console.log('📝 Editing contact with payload:', JSON.stringify(updatePayload, null, 2));
+
+      const result = await editEmergencyContact(editingContact.contactId, updatePayload);
+      console.log('📞 Edit response received:', result.success, result.error);
+
+      if (result.success) {
+        console.log('✨ Edit successful');
+        Alert.alert('Success', 'Contact updated successfully');
+        setShowEditModal(false);
+        setEditingContact(null);
+        setEditPhone('');
+        setEditName('');
+        setEditRelationship('');
+        await loadContacts();
+      } else {
+        console.log('❌ Edit failed:', result.error);
+        Alert.alert('Error', result.error || 'Failed to update contact');
+      }
+    } catch (error) {
+      console.log('💥 Exception in edit:', error);
+      Alert.alert('Error', 'An error occurred while updating contact');
+    } finally {
+      console.log('🔚 Finally - setting isEditing to false');
+      setIsEditing(false);
+    }
+  };
+
   const renderContact = ({ item }: { item: EmergencyContact }) => (
     <View style={styles.contactCard}>
       <View style={styles.contactInfo}>
@@ -190,12 +265,20 @@ export default function EmergencyContactsSection() {
         </View>
         <Text style={styles.contactPhone}>{item.phone}</Text>
       </View>
-      <TouchableOpacity
-        onPress={() => handleRemoveContact(item.contactId, item.name)}
-        style={styles.deleteButton}
-      >
-        <Feather name="trash-2" size={20} color="#EF4444" />
-      </TouchableOpacity>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          onPress={() => handleEditContact(item)}
+          style={styles.editButton}
+        >
+          <Feather name="edit-2" size={20} color="#8B5CF6" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleRemoveContact(item.contactId, item.name)}
+          style={styles.deleteButton}
+        >
+          <Feather name="trash-2" size={20} color="#EF4444" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -335,6 +418,64 @@ export default function EmergencyContactsSection() {
                 )}
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Contact Modal */}
+      <Modal visible={showEditModal} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Emergency Contact</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Feather name="x" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.inputLabel}>Name</Text>
+              <TextInput
+                ref={editNameRef}
+                style={styles.input}
+                placeholder="Contact name"
+                value={editName}
+                onChangeText={setEditName}
+                editable={!isEditing}
+              />
+
+              <Text style={styles.inputLabel}>Phone</Text>
+              <TextInput
+                ref={editPhoneRef}
+                style={styles.input}
+                placeholder="Phone number"
+                value={editPhone}
+                onChangeText={setEditPhone}
+                keyboardType="phone-pad"
+                editable={!isEditing}
+              />
+
+              <Text style={styles.inputLabel}>Relationship</Text>
+              <TextInput
+                ref={editRelationshipRef}
+                style={styles.input}
+                placeholder="e.g., Sister, Mom, Friend"
+                value={editRelationship}
+                onChangeText={setEditRelationship}
+                editable={!isEditing}
+              />
+
+              <TouchableOpacity
+                style={[styles.saveButton, isEditing && styles.saveButtonDisabled]}
+                onPress={handleSaveEdit}
+              >
+                {isEditing ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -555,6 +696,13 @@ const styles = StyleSheet.create({
   separator: {
     height: 0,
     marginBottom: 0,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    padding: 8,
   },
   deleteButton: {
     padding: 8,

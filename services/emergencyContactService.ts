@@ -148,6 +148,53 @@ export async function removeEmergencyContact(
 }
 
 /**
+ * Edit an emergency contact
+ */
+export async function editEmergencyContact(
+  contactId: number,
+  updates: { phone?: string; name?: string; relationship?: string }
+): Promise<{ success: boolean; data?: EmergencyContact; error?: string }> {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const response = await axios.put(
+      `${apiConfig.baseURL}/api/emergency/edit-contact/${contactId}`,
+      updates,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    console.log('📝 Edit contact response:', response.status, JSON.stringify(response.data, null, 2));
+
+    if (response.status === 200) {
+      return { success: true, data: response.data.data };
+    }
+
+    return {
+      success: false,
+      error: response.data?.error || 'Failed to edit emergency contact',
+    };
+  } catch (error) {
+    let message = 'Failed to edit emergency contact';
+    console.error('❌ Error editing emergency contact:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('Response data:', JSON.stringify(error.response?.data, null, 2));
+      message = error.response?.data?.error || error.message;
+    } else if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      message = error.message;
+    }
+    return { success: false, error: message };
+  }
+}
+
+/**
  * Set custom panic message
  * Backend returns the saved message in response
  */
@@ -220,7 +267,10 @@ export async function getPanicMessage(): Promise<{
     );
 
     if (response.status === 200) {
-      return { success: true, data: response.data.data?.panicMessage };
+      const panicMessage = response.data.data?.panicMessage;
+      console.log('💬 Panic message response:', JSON.stringify(response.data.data, null, 2));
+      console.log('💬 Extracted panicMessage:', panicMessage, typeof panicMessage);
+      return { success: true, data: panicMessage };
     }
 
     return {

@@ -537,8 +537,8 @@ export default function LibraryScreen() {
     try {
       const result = await decryptReportFromBackend(report.submissionId);
       console.log('View Details Response:', JSON.stringify(result, null, 2));
-      console.log('Metadata:', result.data?.metadata);
-      console.log('Responses:', result.data?.responses);
+      console.log('Metadata:', result.data?.payload?.metadata);
+      console.log('Responses:', result.data?.payload?.responses);
       if (result.success && result.data) {
         setDecryptedContent(result.data);
       } else {
@@ -1156,34 +1156,90 @@ export default function LibraryScreen() {
               {/* Status */}
               <View style={styles.contentSection}>
                 <Text style={styles.contentLabel}>Status:</Text>
-                <View style={[
-                  styles.statusBadge,
-                  decryptedContent.status === 'confirmed' && { backgroundColor: '#4CAF50' },
-                  decryptedContent.status === 'pending' && { backgroundColor: '#FFEB3B' },
-                  decryptedContent.status === 'failed' && { backgroundColor: '#FF3B30' },
-                ]}>
-                  <Text style={styles.statusBadgeText}>
-                    {decryptedContent.status?.charAt(0).toUpperCase() + decryptedContent.status?.slice(1)}
-                  </Text>
+                <View style={{ alignSelf: 'flex-start' }}>
+                  <View style={[
+                    styles.statusBadge,
+                    decryptedContent.status === 'confirmed' && { backgroundColor: '#4CAF50' },
+                    decryptedContent.status === 'pending' && { backgroundColor: '#FFEB3B' },
+                    decryptedContent.status === 'failed' && { backgroundColor: '#FF3B30' },
+                  ]}>
+                    <Text style={styles.statusBadgeText}>
+                      {decryptedContent.status?.charAt(0).toUpperCase() + decryptedContent.status?.slice(1)}
+                    </Text>
+                  </View>
                 </View>
               </View>
+
+              {/* Metadata */}
+              {decryptedContent.payload?.metadata && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Metadata:</Text>
+                  {decryptedContent.payload.metadata.location && (
+                    <View style={styles.metadataItem}>
+                      <MaterialIcons name="location-on" size={16} color="#8A4FFF" />
+                      <Text style={styles.metadataText}>{decryptedContent.payload.metadata.location}</Text>
+                    </View>
+                  )}
+                  {decryptedContent.payload.metadata.timestamp && (
+                    <View style={styles.metadataItem}>
+                      <MaterialIcons name="access-time" size={16} color="#8A4FFF" />
+                      <Text style={styles.metadataText}>{formatDate(decryptedContent.payload.metadata.timestamp)}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Responses */}
+              {decryptedContent.payload?.responses && decryptedContent.payload.responses.length > 0 && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Survey Responses:</Text>
+                  {decryptedContent.payload.responses.map((response: string, index: number) => (
+                    response && (
+                      <View key={index} style={styles.responseItem}>
+                        <Text style={styles.responseIndex}>{index + 1}.</Text>
+                        <Text style={styles.responseText}>{response}</Text>
+                      </View>
+                    )
+                  ))}
+                </View>
+              )}
 
               {/* Timeline */}
               <View style={styles.contentSection}>
                 <Text style={styles.contentLabel}>Timeline:</Text>
-                <View style={styles.timelineItem}>
-                  <MaterialIcons name="schedule" size={18} color="#8A4FFF" />
-                  <View style={styles.timelineText}>
-                    <Text style={styles.timelineLabel}>Submitted</Text>
-                    <Text style={styles.timelineDate}>{formatDate(decryptedContent.createdAt)}</Text>
+                {decryptedContent.timestamps?.createdAt && (
+                  <View style={styles.timelineItem}>
+                    <MaterialIcons name="schedule" size={18} color="#8A4FFF" />
+                    <View style={styles.timelineText}>
+                      <Text style={styles.timelineLabel}>Created</Text>
+                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.createdAt)}</Text>
+                    </View>
                   </View>
-                </View>
-                {decryptedContent.confirmedAt && (
+                )}
+                {decryptedContent.timestamps?.submittedAt && (
+                  <View style={styles.timelineItem}>
+                    <MaterialIcons name="cloud-upload" size={18} color="#2196F3" />
+                    <View style={styles.timelineText}>
+                      <Text style={styles.timelineLabel}>Submitted</Text>
+                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.submittedAt)}</Text>
+                    </View>
+                  </View>
+                )}
+                {decryptedContent.timestamps?.confirmedAt && (
                   <View style={styles.timelineItem}>
                     <MaterialIcons name="check-circle" size={18} color="#4CAF50" />
                     <View style={styles.timelineText}>
                       <Text style={styles.timelineLabel}>Confirmed</Text>
-                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.confirmedAt)}</Text>
+                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.confirmedAt)}</Text>
+                    </View>
+                  </View>
+                )}
+                {decryptedContent.timestamps?.updatedAt && (
+                  <View style={styles.timelineItem}>
+                    <MaterialIcons name="edit" size={18} color="#FF9800" />
+                    <View style={styles.timelineText}>
+                      <Text style={styles.timelineLabel}>Updated</Text>
+                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.updatedAt)}</Text>
                     </View>
                   </View>
                 )}
@@ -1736,6 +1792,44 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     padding: 8,
     borderRadius: 4,
+  },
+  metadataItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#F5F3FF',
+    borderRadius: 6,
+  },
+  metadataText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  responseItem: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#8A4FFF',
+  },
+  responseIndex: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8A4FFF',
+    marginTop: 2,
+  },
+  responseText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+    lineHeight: 20,
   },
   shareContainer: {
     flex: 1,
