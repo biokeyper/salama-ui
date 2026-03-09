@@ -24,11 +24,6 @@ apiClient.interceptors.request.use(
       const token = await getAuthToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Auth token added to request for:', config.url);
-        console.log('Token preview (first 50 chars):', token.substring(0, 50));
-        console.log('Full header:', `Bearer ${token.substring(0, 50)}...`);
-      } else {
-        console.log('No auth token found for request:', config.url);
       }
     } catch (error) {
       console.error('Error reading auth token:', error);
@@ -43,22 +38,16 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      console.error('🔐 401 Unauthorized - Token expired or invalid');
-      console.error('URL:', error.config?.url);
-      console.error('Response:', error.response?.data);
-
-      // Force logout due to expired/invalid token
-      console.log('⏰ Forcing logout due to token expiry/invalidity');
+      // Silent token expiry handling - no need to spam console
       try {
         // Clear auth data locally
         await SecureStore.deleteItemAsync('salama_auth_token');
         await SecureStore.deleteItemAsync('salama_auth_user');
-        console.log('✅ Local auth data cleared');
 
         // Set a flag to indicate token expiry so screens can handle it
         await SecureStore.setItemAsync('salama_token_expired', 'true');
       } catch (err) {
-        console.error('Error clearing auth on 401:', err);
+        // Silently ignore - token clearing issues are not critical
       }
     }
     return Promise.reject(error);

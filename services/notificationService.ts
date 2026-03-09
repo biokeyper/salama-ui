@@ -106,7 +106,11 @@ export async function getUnreadCount(): Promise<{ success: boolean; count?: numb
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching unread count:', error);
+    // Silently handle 401 errors (token expiry) - this is normal
+    // Only log other errors
+    if (!((error as any)?.response?.status === 401)) {
+      console.error('Error fetching unread count:', error);
+    }
     const errorMessage =
       error instanceof Error ? error.message : 'Failed to fetch unread count';
     return {

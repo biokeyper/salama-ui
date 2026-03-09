@@ -1,7 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack, usePathname } from 'expo-router';
+import { Stack, usePathname, LinkingOptions } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -18,6 +18,21 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { initDatabase } from '@/services/database';
 import FloatingEmergencyButton from '@/components/FloatingEmergencyButton';
 import EmergencyAlertModal from '@/components/EmergencyAlertModal';
+
+// Deep linking configuration
+const linking: LinkingOptions<any> = {
+  prefixes: ['safegirlapp://', 'https://safegirl.app'],
+  config: {
+    screens: {
+      'verify-email': 'verify-email/:email/:userId',
+      'recovery': 'recovery/:token',
+      index: '',
+      '(tabs)': '(tabs)',
+      login: 'login',
+      signup: 'signup',
+    },
+  },
+};
 
 interface RootNavigatorProps {
   emergencyModalVisible: boolean;
@@ -47,7 +62,7 @@ function RootNavigator({
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <View style={{ flex: 1 }}>
-        <Stack>
+        <Stack linking={linking}>
           <Stack.Screen
             name="index"
             options={{
@@ -108,6 +123,22 @@ function RootNavigator({
           />
           <Stack.Screen
             name="signup"
+            options={{
+              headerShown: false,
+              animationEnabled: true,
+            }}
+          />
+
+          <Stack.Screen
+            name="verify-email"
+            options={{
+              headerShown: false,
+              animationEnabled: true,
+            }}
+          />
+
+          <Stack.Screen
+            name="recovery"
             options={{
               headerShown: false,
               animationEnabled: true,
