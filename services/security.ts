@@ -39,7 +39,6 @@ export async function setPin(pin: string): Promise<boolean> {
 
     if (response.status === 200 || response.status === 201) {
       // Store PIN locally after successful backend save
-      console.log('PIN set on backend, caching locally');
       await SecureStore.setItemAsync(PIN_KEY, pin);
       return true;
     }

@@ -9,14 +9,19 @@ import { startStatusPolling } from '@/services/statusPoller';
 import { Report, ReportType } from '@/types/report';
 import { getAvailableActions } from '@/utils/reportActions';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthToken } from '@/services/authService';
+import AuthGateModal from '@/components/AuthGateModal';
+import * as Location from 'expo-location';
 
 export default function TextReportScreen() {
   const [report, setReport] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingLocally, setIsSavingLocally] = useState(false);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { user } = useAuth();
   const audioUri = params.audioUri as string | undefined;
   const editReportId = params.editReportId as string | undefined;
 
@@ -124,7 +129,14 @@ export default function TextReportScreen() {
       return;
     }
 
-    // Show confirmation modal first
+    // Check authentication BEFORE allowing submission
+    const token = await getAuthToken();
+    if (!token || !user) {
+      setShowAuthGate(true);
+      return;
+    }
+
+    // Show confirmation modal
     Alert.alert(
       'Submit Report?',
       'Are you sure you want to submit this report? Once submitted, it will be recorded on the blockchain.',
@@ -154,6 +166,42 @@ export default function TextReportScreen() {
       const now = new Date().toISOString();
       const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+      // Capture location if available
+      let metadata: any = {};
+      console.log('🔍 Starting location capture...');
+      try {
+        console.log('🔍 Requesting location permissions...');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('🔍 Location permission status:', status);
+
+        if (status === 'granted') {
+          console.log('🔍 Permission granted, getting current position...');
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+
+          console.log('🔍 Location received:', location);
+          const mapLink = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+          const locationData = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            mapLink,
+            timestamp: new Date().toISOString(),
+          };
+
+          metadata.location = JSON.stringify(locationData);
+
+          console.log('📍 Location captured for report:', locationData);
+          console.log('📍 Map link:', mapLink);
+          console.log('📍 Metadata:', metadata);
+        } else {
+          console.log('🔍 Permission not granted, status:', status);
+        }
+      } catch (locError) {
+        console.error('🔍 Location capture error:', locError);
+        // Continue without location if permission denied or GPS fails
+      }
+
       // First save locally
       const savedReport = await saveReport({
         id: reportId,
@@ -163,6 +211,7 @@ export default function TextReportScreen() {
         audioUri: audioUri || undefined,
         createdAt: now,
         updatedAt: now,
+        metadata,
       });
 
       // Then submit to backend
@@ -177,32 +226,6 @@ export default function TextReportScreen() {
               text: 'OK',
               onPress: async () => {
                 router.replace('/');
-              },
-            },
-          ]
-        );
-      } else if (result.requiresAuth) {
-        // Authentication required - redirect to login
-        Alert.alert(
-          'Login Required',
-          'You need to be logged in to submit reports.',
-          [
-            {
-              text: 'Login',
-              onPress: () => {
-                router.navigate('/login');
-              },
-            },
-            {
-              text: 'Sign Up',
-              onPress: () => {
-                router.navigate('/signup');
-              },
-            },
-            {
-              text: 'Cancel',
-              onPress: () => {
-                // Report stays saved locally
               },
             },
           ]
@@ -241,89 +264,99 @@ export default function TextReportScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#fff' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ThemedView style={styles.container}>
-        {!editingReport && (
-          <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={() => router.navigate('/record')}
-          >
-            <ThemedText style={styles.toggleButtonText}>🎤 Record</ThemedText>
-          </TouchableOpacity>
-        )}
-        <ThemedText type="title" style={styles.title}>
-          {editingReport ? 'Edit your report' : 'Type your report'}
-        </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          {editingReport
-            ? 'Update your report with any changes.'
-            : 'Please describe what happened in your own words. You can write as much or as little as you want.'}
-        </ThemedText>
-        <TextInput
-          style={styles.input}
-          multiline
-          placeholder="Type your report here..."
-          placeholderTextColor="#aaa"
-          value={report}
-          onChangeText={setReport}
-          textAlignVertical="top"
-        />
-        <View style={styles.buttonContainer}>
-          {editingReport ? (
-            <>
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
-                onPress={() => router.back()}
-                disabled={isSubmitting}
-              >
-                <ThemedText style={styles.secondaryButtonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-                onPress={handleUpdate}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <ThemedText style={styles.buttonText}>Update Report</ThemedText>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton, isSavingLocally && styles.buttonDisabled]}
-                onPress={handleSaveDraft}
-                disabled={isSavingLocally || isSubmitting}
-              >
-                {isSavingLocally ? (
-                  <ActivityIndicator color="#8A4FFF" />
-                ) : (
-                  <ThemedText style={styles.secondaryButtonText}>Save Draft</ThemedText>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-                onPress={handleSubmitToBackend}
-                disabled={isSubmitting || isSavingLocally}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <ThemedText style={styles.buttonText}>Submit Report</ThemedText>
-                )}
-              </TouchableOpacity>
-            </>
+    <>
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: '#fff' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ThemedView style={styles.container}>
+          {!editingReport && (
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={() => router.navigate('/record')}
+            >
+              <ThemedText style={styles.toggleButtonText}>🎤 Record</ThemedText>
+            </TouchableOpacity>
           )}
-        </View>
-      </ThemedView>
-    </KeyboardAvoidingView>
+          <ThemedText type="title" style={styles.title}>
+            {editingReport ? 'Edit your report' : 'Type your report'}
+          </ThemedText>
+          <ThemedText style={styles.subtitle}>
+            {editingReport
+              ? 'Update your report with any changes.'
+              : 'Please describe what happened in your own words. You can write as much or as little as you want.'}
+          </ThemedText>
+          <TextInput
+            style={styles.input}
+            multiline
+            placeholder="Type your report here..."
+            placeholderTextColor="#aaa"
+            value={report}
+            onChangeText={setReport}
+            textAlignVertical="top"
+          />
+          <View style={styles.buttonContainer}>
+            {editingReport ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.button, styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+                  onPress={() => router.back()}
+                  disabled={isSubmitting}
+                >
+                  <ThemedText style={styles.secondaryButtonText}>Cancel</ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+                  onPress={handleUpdate}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <ThemedText style={styles.buttonText}>Update Report</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.button, styles.secondaryButton, isSavingLocally && styles.buttonDisabled]}
+                  onPress={handleSaveDraft}
+                  disabled={isSavingLocally || isSubmitting}
+                >
+                  {isSavingLocally ? (
+                    <ActivityIndicator color="#8A4FFF" />
+                  ) : (
+                    <ThemedText style={styles.secondaryButtonText}>Save Draft</ThemedText>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+                  onPress={handleSubmitToBackend}
+                  disabled={isSubmitting || isSavingLocally}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <ThemedText style={styles.buttonText}>Submit Report</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </ThemedView>
+      </KeyboardAvoidingView>
+
+      {/* Auth gate for unauthenticated users */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => {
+          setShowAuthGate(false);
+        }}
+      />
+    </>
   );
 }
 

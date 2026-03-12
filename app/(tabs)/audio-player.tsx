@@ -2,10 +2,11 @@ import LockScreen from '@/app/lock-screen';
 import AudioReportItem from '@/components/AudioReportItem';
 import { hasPin } from '@/services/security';
 import { getAuthToken } from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
 import { deleteReport, getAllReports, updateReportStatus, archiveReport, saveReport } from '@/services/storage';
 import { submitReportToBackend, archiveReportOnBackend, decryptReportFromBackend, searchBackendReports, getReportStats } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
-import { grantAccess, getReportViewers, revokeAccess, getSharedWithMe, unarchiveReport } from '@/services/accessService';
+import { grantAccess, getReportViewers, revokeAccess, getSharedWithMe, getMySharedReports, getSharedReport, unarchiveReport } from '@/services/accessService';
 import { Report } from '@/types/report';
 import { getAvailableActions } from '@/utils/reportActions';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Clipboard,
   Modal,
   Platform,
   Pressable,
@@ -31,6 +33,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LibraryScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,23 +41,32 @@ export default function LibraryScreen() {
   const [activeTab, setActiveTab] = useState<'audio' | 'text'>('audio');
   const [showPinRequired, setShowPinRequired] = useState(false);
   const [showPinVerify, setShowPinVerify] = useState(false);
+  const [showSetPinModal, setShowSetPinModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasNoAuthToken, setHasNoAuthToken] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [showSharedTab, setShowSharedTab] = useState(false);
+  const [sharedTabMode, setSharedTabMode] = useState<'with-me' | 'my-shared'>('with-me');
   const [openMenuReportId, setOpenMenuReportId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showViewersModal, setShowViewersModal] = useState(false);
   const [showSharedWithMeTab, setShowSharedWithMeTab] = useState(false);
   const [showDecryptedModal, setShowDecryptedModal] = useState(false);
+  const [showSharedWithMeDetailsModal, setShowSharedWithMeDetailsModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [selectedSharedWithMeReport, setSelectedSharedWithMeReport] = useState<any>(null);
   const [shareUserId, setShareUserId] = useState('');
   const [viewers, setViewers] = useState<any[]>([]);
   const [sharedReports, setSharedReports] = useState<any[]>([]);
+  const [mySharedReports, setMySharedReports] = useState<any[]>([]);
   const [isLoadingViewers, setIsLoadingViewers] = useState(false);
   const [isLoadingShared, setIsLoadingShared] = useState(false);
+  const [isLoadingMyShared, setIsLoadingMyShared] = useState(false);
+  const [isLoadingShare, setIsLoadingShare] = useState(false);
   const [decryptedContent, setDecryptedContent] = useState<any>(null);
   const [isLoadingDecrypt, setIsLoadingDecrypt] = useState(false);
+  const [isLoadingSharedWithMeDetails, setIsLoadingSharedWithMeDetails] = useState(false);
   const [isSubmittingReportId, setIsSubmittingReportId] = useState<string | null>(null);
 
   // Search functionality state
@@ -72,10 +84,24 @@ export default function LibraryScreen() {
     useCallback(() => {
       const checkPinStatus = async () => {
         setIsCheckingAuth(true);
+
+        // Check if user is authenticated
+        const token = await getAuthToken();
+        const isAuthenticatedUser = token && user;
+
+        if (!isAuthenticatedUser) {
+          // Not authenticated - don't show PIN modals
+          setIsAuthenticated(false);
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        // User is authenticated - check PIN status
         const pinIsSet = await hasPin();
+
         if (!pinIsSet) {
-          // No PIN set - show modal to set PIN
-          setShowPinRequired(true);
+          // Authenticated but no PIN - show set PIN modal
+          setShowSetPinModal(true);
           setIsAuthenticated(false);
         } else {
           // PIN exists - require verification
@@ -90,12 +116,19 @@ export default function LibraryScreen() {
       return () => {
         setIsAuthenticated(false);
         setPlayingReportId(null);
+        setOpenMenuReportId(null);
       };
-    }, [])
+    }, [user])
   );
 
   const handlePinVerified = () => {
     setShowPinVerify(false);
+    setIsAuthenticated(true);
+  };
+
+  const handlePinSet = (pin: string) => {
+    // PIN has been set - mark as authenticated and load reports
+    setShowSetPinModal(false);
     setIsAuthenticated(true);
   };
 
@@ -167,31 +200,13 @@ export default function LibraryScreen() {
         const token = await getAuthToken();
         if (!token) {
           setHasNoAuthToken(true);
-          Alert.alert(
-            'Session Expired',
-            'Your session has expired. Please log in again to access your reports.',
-            [
-              {
-                text: 'Go to Login',
-                onPress: () => router.replace('/'),
-              },
-            ]
-          );
+          // Silent - PIN screen handles guidance
           return;
         }
       } catch (error) {
         console.error('Error checking auth:', error);
         setHasNoAuthToken(true);
-        Alert.alert(
-          'Authentication Error',
-          'Unable to verify your session. Please log in again.',
-          [
-            {
-              text: 'Go to Login',
-              onPress: () => router.replace('/'),
-            },
-          ]
-        );
+        // Silent - PIN screen handles guidance
       }
     };
 
@@ -615,17 +630,26 @@ export default function LibraryScreen() {
     }
 
     try {
+      setIsLoadingShare(true);
+      console.log('🔐 Granting access to user:', shareUserId.trim());
       const result = await grantAccess(selectedReport.submissionId!, shareUserId.trim());
+      console.log('🔐 Grant access response:', result);
+
       if (result.success) {
+        console.log('✅ Access granted successfully');
         Alert.alert('Success', 'Access granted to the user');
         setShowShareModal(false);
         setShareUserId('');
         setSelectedReport(null);
       } else {
+        console.log('❌ Grant access failed:', result.error);
         Alert.alert('Error', result.error || 'Failed to grant access');
       }
     } catch (error) {
+      console.error('❌ Grant access error:', error);
       Alert.alert('Error', 'An error occurred');
+    } finally {
+      setIsLoadingShare(false);
     }
   };
 
@@ -640,7 +664,9 @@ export default function LibraryScreen() {
 
     try {
       const result = await getReportViewers(report.submissionId);
+      console.log('👁️ Viewers response:', result);
       if (result.success) {
+        console.log('👁️ Viewers list:', result.viewers);
         setViewers(result.viewers || []);
         setShowViewersModal(true);
       } else {
@@ -672,15 +698,21 @@ export default function LibraryScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const result = await revokeAccess(selectedReport.submissionId!, userId);
+              const reportId = selectedReport.submissionId || selectedReport.reportId;
+              console.log('🔐 Revoking access for user:', userId);
+              const result = await revokeAccess(reportId!, userId);
+              console.log('🔐 Revoke access response:', result);
+
               if (result.success) {
+                console.log('✅ Access revoked successfully');
                 Alert.alert('Success', 'Access revoked successfully');
                 // Refresh viewers list
-                const viewersResult = await getReportViewers(selectedReport.submissionId!);
+                const viewersResult = await getReportViewers(reportId!);
                 if (viewersResult.success) {
                   setViewers(viewersResult.viewers || []);
                 }
               } else {
+                console.log('❌ Revoke access failed:', result.error);
                 Alert.alert('Error', result.error || 'Failed to revoke access');
               }
             } catch (error) {
@@ -696,6 +728,11 @@ export default function LibraryScreen() {
     setIsLoadingShared(true);
     try {
       const result = await getSharedWithMe();
+      console.log('📥 === SHARED WITH ME (getSharedWithMe) ===');
+      console.log('📥 Full Response:', JSON.stringify(result, null, 2));
+      console.log('📥 Reports Count:', result.reports?.length || 0);
+      console.log('📥 First Report Example:', result.reports?.[0]);
+      console.log('📥 All Reports:', result.reports);
       if (result.success) {
         setSharedReports(result.reports || []);
       } else {
@@ -705,6 +742,47 @@ export default function LibraryScreen() {
       Alert.alert('Error', 'An error occurred');
     } finally {
       setIsLoadingShared(false);
+    }
+  };
+
+  const loadMySharedReports = async () => {
+    setIsLoadingMyShared(true);
+    try {
+      const result = await getMySharedReports();
+      console.log('📤 === MY SHARED (getMySharedReports) ===');
+      console.log('📤 Full Response:', JSON.stringify(result, null, 2));
+      console.log('📤 Reports Count:', result.reports?.length || 0);
+      console.log('📤 First Report Example:', result.reports?.[0]);
+      console.log('📤 All Reports:', result.reports);
+      if (result.success) {
+        setMySharedReports(result.reports || []);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to load your shared reports');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred');
+    } finally {
+      setIsLoadingMyShared(false);
+    }
+  };
+
+  const handleViewSharedWithMeReport = async (report: any) => {
+    setSelectedSharedWithMeReport(report);
+    setIsLoadingSharedWithMeDetails(true);
+    try {
+      const result = await getSharedReport(report.reportId);
+      console.log('📄 Full response from getSharedReport (Shared With Me):', JSON.stringify(result, null, 2));
+      console.log('📄 Payload (data):', result.data);
+      if (result.success) {
+        setDecryptedContent(result.data);
+        setShowSharedWithMeDetailsModal(true);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to load report details');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while loading report details');
+    } finally {
+      setIsLoadingSharedWithMeDetails(false);
     }
   };
 
@@ -750,6 +828,27 @@ export default function LibraryScreen() {
       );
     }
 
+    if (showSetPinModal) {
+      return (
+        <Modal
+          visible={showSetPinModal}
+          animationType="slide"
+          transparent={false}
+        >
+          <LockScreen
+            mode="set"
+            onSetPin={(pin) => {
+              handlePinSet(pin);
+            }}
+            onClose={() => {
+              setShowSetPinModal(false);
+              router.back();
+            }}
+          />
+        </Modal>
+      );
+    }
+
     if (showPinVerify) {
       return (
         <Modal
@@ -766,15 +865,6 @@ export default function LibraryScreen() {
             onSetPin={() => { }}
             onClose={() => setShowPinVerify(false)}
           />
-          <TouchableOpacity
-            style={styles.modalCloseButton}
-            onPress={() => {
-              setShowPinVerify(false);
-              router.back();
-            }}
-          >
-            <Feather name="x" size={24} color="#666" />
-          </TouchableOpacity>
         </Modal>
       );
     }
@@ -845,8 +935,13 @@ export default function LibraryScreen() {
             style={[styles.tab, showSharedWithMeTab && styles.activeTab]}
             onPress={() => {
               setShowSharedWithMeTab(!showSharedWithMeTab);
-              if (!showSharedWithMeTab && sharedReports.length === 0) {
-                loadSharedReports();
+              if (!showSharedWithMeTab) {
+                if (sharedReports.length === 0) {
+                  loadSharedReports();
+                }
+                if (mySharedReports.length === 0) {
+                  loadMySharedReports();
+                }
               }
             }}
           >
@@ -859,58 +954,144 @@ export default function LibraryScreen() {
           style={styles.scrollView}
           refreshControl={
             <RefreshControl
-              refreshing={showSharedWithMeTab ? isLoadingShared : refreshing}
-              onRefresh={showSharedWithMeTab ? loadSharedReports : loadReports}
+              refreshing={showSharedWithMeTab ? (sharedTabMode === 'with-me' ? isLoadingShared : isLoadingMyShared) : refreshing}
+              onRefresh={showSharedWithMeTab ? (sharedTabMode === 'with-me' ? loadSharedReports : loadMySharedReports) : loadReports}
             />
           }
         >
           {showSharedWithMeTab ? (
-            // Shared With Me tab
-            isLoadingShared ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#8A4FFF" />
+            <>
+              {/* Shared Tab Sub-tabs */}
+              <View style={styles.sharedSubTabContainer}>
+                <TouchableOpacity
+                  style={[styles.sharedSubTab, sharedTabMode === 'with-me' && styles.activeSharedSubTab]}
+                  onPress={() => setSharedTabMode('with-me')}
+                >
+                  <Text style={[styles.sharedSubTabText, sharedTabMode === 'with-me' && styles.activeSharedSubTabText]}>
+                    Shared With Me
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sharedSubTab, sharedTabMode === 'my-shared' && styles.activeSharedSubTab]}
+                  onPress={() => setSharedTabMode('my-shared')}
+                >
+                  <Text style={[styles.sharedSubTabText, sharedTabMode === 'my-shared' && styles.activeSharedSubTabText]}>
+                    My Shared
+                  </Text>
+                </TouchableOpacity>
               </View>
-            ) : !sharedReports || sharedReports.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Feather name="share-2" size={64} color="#CCC" />
-                <Text style={styles.emptyText}>No reports shared with you</Text>
-                <Text style={styles.emptySubtext}>Reports others share will appear here</Text>
-              </View>
-            ) : (
-              <View style={styles.reportsList}>
-                {(sharedReports || []).map((report) => (
-                  <View key={report.reportId || report.id} style={styles.sharedReportCard}>
-                    <View style={styles.sharedReportHeader}>
-                      <View>
-                        <Text style={styles.sharedReportTitle}>
-                          Report from {report.sharedBy?.substring(0, 8) || 'Unknown'}
-                        </Text>
-                        <Text style={styles.sharedReportSubtitle}>
-                          {new Date(report.grantedAt).toLocaleDateString()}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          {
-                            backgroundColor:
-                              report.status === 'confirmed'
-                                ? '#10B981'
-                                : report.status === 'pending'
-                                  ? '#F59E0B'
-                                  : '#EF4444',
-                          },
-                        ]}
-                      >
-                        <Text style={styles.statusBadgeText}>
-                          {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
-                        </Text>
-                      </View>
-                    </View>
+
+              {/* Shared With Me Mode */}
+              {sharedTabMode === 'with-me' ? (
+                isLoadingShared ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#8A4FFF" />
                   </View>
-                ))}
-              </View>
-            )
+                ) : !sharedReports || sharedReports.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Feather name="share-2" size={64} color="#CCC" />
+                    <Text style={styles.emptyText}>No reports shared with you</Text>
+                    <Text style={styles.emptySubtext}>Reports others share will appear here</Text>
+                  </View>
+                ) : (
+                  <View style={styles.reportsList}>
+                    {(sharedReports || []).map((report) => (
+                      <TouchableOpacity
+                        key={report.reportId || report.id}
+                        style={styles.sharedReportCard}
+                        onPress={() => handleViewSharedWithMeReport(report)}
+                      >
+                        <View style={styles.sharedReportHeader}>
+                          <View>
+                            <Text style={styles.sharedReportTitle}>
+                              Report from {report.reporterPhone || report.reporterEmail || 'Unknown'}
+                            </Text>
+                            <Text style={styles.sharedReportSubtitle}>
+                              {new Date(report.grantedAt).toLocaleDateString()} • ID: {report.reporterId?.substring(0, 8)}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              {
+                                backgroundColor: report.isActive ? '#10B981' : '#EF4444',
+                              },
+                            ]}
+                          >
+                            <Text style={styles.statusBadgeText}>
+                              {report.isActive ? 'Active' : 'Inactive'}
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )
+              ) : !mySharedReports || mySharedReports.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Feather name="share-2" size={64} color="#CCC" />
+                  <Text style={styles.emptyText}>No reports shared yet</Text>
+                  <Text style={styles.emptySubtext}>Reports you share will appear here</Text>
+                </View>
+              ) : (
+                <View style={styles.reportsList}>
+                  {(mySharedReports || []).map((report) => (
+                    <TouchableOpacity
+                      key={report.reportId || report.id}
+                      style={styles.sharedReportCard}
+                      onPress={async () => {
+                        setSelectedReport(report as any);
+                        setIsLoadingViewers(true);
+                        try {
+                          // Fetch latest viewers from backend
+                          const result = await getReportViewers(report.reportId);
+                          console.log('👁️ Viewers response for My Shared report:', result);
+                          if (result.success) {
+                            setViewers(result.viewers || []);
+                            setShowViewersModal(true);
+                          } else {
+                            Alert.alert('Error', result.error || 'Failed to load viewers');
+                          }
+                        } catch (error) {
+                          console.error('Error fetching viewers:', error);
+                          Alert.alert('Error', 'Failed to load viewers');
+                        } finally {
+                          setIsLoadingViewers(false);
+                        }
+                      }}
+                    >
+                      <View style={styles.sharedReportHeader}>
+                        <View>
+                          <Text style={styles.sharedReportTitle}>
+                            {report.reportId}
+                          </Text>
+                          <Text style={styles.sharedReportSubtitle}>
+                            {new Date(report.createdAt).toLocaleDateString()} • {report.viewerCount} viewer{report.viewerCount !== 1 ? 's' : ''}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            {
+                              backgroundColor:
+                                report.status === 'confirmed'
+                                  ? '#10B981'
+                                  : report.status === 'pending'
+                                    ? '#F59E0B'
+                                    : '#EF4444',
+                            },
+                          ]}
+                        >
+                          <Text style={styles.statusBadgeText}>
+                            {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
           ) : filteredReports.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Feather name={activeTab === 'audio' ? "mic-off" : "file-text"} size={64} color="#CCC" />
@@ -1291,10 +1472,15 @@ export default function LibraryScreen() {
               placeholderTextColor="#aaa"
             />
             <TouchableOpacity
-              style={styles.shareButton}
+              style={[styles.shareButton, isLoadingShare && styles.shareButtonDisabled]}
               onPress={handleGrantAccess}
+              disabled={isLoadingShare}
             >
-              <Text style={styles.shareButtonText}>Grant Access</Text>
+              {isLoadingShare ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.shareButtonText}>Grant Access</Text>
+              )}
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -1339,23 +1525,62 @@ export default function LibraryScreen() {
             <ScrollView style={styles.decryptedContent}>
               {viewers.map((viewer, index) => (
                 <View key={index} style={styles.viewerItem}>
-                  <View style={styles.viewerInfo}>
-                    <Text style={styles.viewerUserId}>User ID: {viewer.userId}</Text>
-                    <Text style={styles.viewerGrantedAt}>
-                      Granted: {new Date(viewer.grantedAt).toLocaleDateString()}
-                    </Text>
-                    {viewer.expiresAt && (
-                      <Text style={styles.viewerExpiresAt}>
-                        Expires: {new Date(viewer.expiresAt).toLocaleDateString()}
+                  {/* Header: ID and Revoke Button */}
+                  <View style={styles.viewerItemHeader}>
+                    <TouchableOpacity
+                      style={styles.viewerIdContainer}
+                      onPress={() => {
+                        Clipboard.setString(viewer.viewerId);
+                        Alert.alert('Copied', 'Viewer ID copied to clipboard');
+                      }}
+                    >
+                      <Text style={styles.viewerIdLabel}>ID</Text>
+                      <Text style={styles.viewerIdValue}>{viewer.viewerId}</Text>
+                      <Feather name="copy" size={14} color="#8A4FFF" style={styles.copyIcon} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.revokeButtonContainer}
+                      onPress={() => handleRevokeAccess(viewer.viewerId)}
+                    >
+                      <Text style={styles.revokeButtonText}>Revoke</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Details Grid */}
+                  <View style={styles.viewerDetailsGrid}>
+                    {viewer.phone && (
+                      <View style={styles.viewerDetailItem}>
+                        <Text style={styles.viewerDetailLabel}>Phone</Text>
+                        <Text style={styles.viewerDetailValue}>{viewer.phone}</Text>
+                      </View>
+                    )}
+                    {viewer.email && (
+                      <View style={styles.viewerDetailItem}>
+                        <Text style={styles.viewerDetailLabel}>Email</Text>
+                        <Text style={styles.viewerDetailValue}>{viewer.email}</Text>
+                      </View>
+                    )}
+                    <View style={styles.viewerDetailItem}>
+                      <Text style={styles.viewerDetailLabel}>Status</Text>
+                      <Text style={[styles.viewerDetailValue, viewer.isActive ? styles.statusActive : styles.statusInactive]}>
+                        {viewer.isActive ? 'Active' : 'Inactive'}
                       </Text>
+                    </View>
+                    <View style={styles.viewerDetailItem}>
+                      <Text style={styles.viewerDetailLabel}>Granted</Text>
+                      <Text style={styles.viewerDetailValue}>
+                        {new Date(viewer.grantedAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    {viewer.expiresAt && (
+                      <View style={styles.viewerDetailItem}>
+                        <Text style={styles.viewerDetailLabel}>Expires</Text>
+                        <Text style={[styles.viewerDetailValue, styles.expiryColor]}>
+                          {new Date(viewer.expiresAt).toLocaleDateString()}
+                        </Text>
+                      </View>
                     )}
                   </View>
-                  <TouchableOpacity
-                    style={styles.revokeButton}
-                    onPress={() => handleRevokeAccess(viewer.userId)}
-                  >
-                    <MaterialIcons name="clear" size={20} color="#EF4444" />
-                  </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
@@ -1428,6 +1653,94 @@ export default function LibraryScreen() {
         >
           <Feather name="x" size={24} color="#666" />
         </TouchableOpacity>
+      </Modal>
+
+      {/* Shared With Me Report Details Modal */}
+      <Modal
+        visible={showSharedWithMeDetailsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setShowSharedWithMeDetailsModal(false);
+          setSelectedSharedWithMeReport(null);
+          setDecryptedContent(null);
+        }}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowSharedWithMeDetailsModal(false);
+                setSelectedSharedWithMeReport(null);
+                setDecryptedContent(null);
+              }}
+            >
+              <MaterialIcons name="close" size={24} color="#8A4FFF" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Report Details</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {isLoadingSharedWithMeDetails ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8A4FFF" />
+            </View>
+          ) : (
+            <ScrollView style={styles.decryptedContent}>
+              {selectedSharedWithMeReport && (
+                <View style={styles.detailsSection}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Report ID</Text>
+                    <Text style={styles.detailValue}>{selectedSharedWithMeReport.reportId}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>From</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedSharedWithMeReport.reporterPhone || selectedSharedWithMeReport.reporterEmail || 'Unknown'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Reporter ID</Text>
+                    <Text style={styles.detailValue}>{selectedSharedWithMeReport.reporterId}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Granted Date</Text>
+                    <Text style={styles.detailValue}>
+                      {new Date(selectedSharedWithMeReport.grantedAt).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Expires</Text>
+                    <Text style={styles.detailValue}>
+                      {new Date(selectedSharedWithMeReport.expiresAt).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Status</Text>
+                    <Text style={[styles.detailValue, selectedSharedWithMeReport.isActive ? styles.statusActiveText : styles.statusInactiveText]}>
+                      {selectedSharedWithMeReport.isActive ? 'Active' : 'Inactive'}
+                    </Text>
+                  </View>
+
+                  {decryptedContent && (
+                    <>
+                      <View style={styles.divider} />
+                      <Text style={styles.contentTitle}>Report Content</Text>
+                      <Text style={styles.contentText}>
+                        {decryptedContent.payload || decryptedContent.textContent || JSON.stringify(decryptedContent)}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+          )}
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1506,6 +1819,32 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#fff',
   },
+  sharedSubTabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sharedSubTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
+  },
+  activeSharedSubTab: {
+    backgroundColor: '#8A4FFF',
+  },
+  sharedSubTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeSharedSubTabText: {
+    color: '#fff',
+  },
   scrollView: {
     flex: 1,
   },
@@ -1539,6 +1878,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'visible',
+    zIndex: 1,
   },
   textReportHeader: {
     flexDirection: 'row',
@@ -1736,6 +2077,42 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
   },
+  detailsSection: {
+    paddingVertical: 16,
+  },
+  detailRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  statusActiveText: {
+    color: '#10B981',
+  },
+  statusInactiveText: {
+    color: '#EF4444',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginVertical: 20,
+  },
+  contentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
   contentText: {
     fontSize: 16,
     color: '#666',
@@ -1862,6 +2239,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  shareButtonDisabled: {
+    opacity: 0.6,
+  },
   reportActionButtons: {
     flexDirection: 'row',
     gap: 8,
@@ -1948,35 +2328,83 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   viewerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  viewerInfo: {
+  viewerItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 12,
+  },
+  viewerIdContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 8,
+  },
+  viewerIdLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  viewerIdValue: {
+    fontSize: 11,
+    color: '#1F2937',
+    fontFamily: 'monospace',
     flex: 1,
   },
-  viewerUserId: {
+  copyIcon: {
+    marginLeft: 4,
+  },
+  viewerDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  viewerDetailItem: {
+    flex: 1,
+    minWidth: 140,
+  },
+  viewerDetailLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  viewerDetailValue: {
+    fontSize: 13,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  statusActive: {
+    color: '#10B981',
+  },
+  statusInactive: {
+    color: '#EF4444',
+  },
+  expiryColor: {
+    color: '#F59E0B',
+  },
+  revokeButtonContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  revokeButtonText: {
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
-  },
-  viewerGrantedAt: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  viewerExpiresAt: {
-    fontSize: 12,
-    color: '#F59E0B',
-    marginTop: 2,
-  },
-  revokeButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
   },
   menuContainer: {
     flexDirection: 'row',
@@ -1988,6 +2416,14 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 8,
     marginRight: -8,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
   },
   dropdownMenu: {
     position: 'absolute',

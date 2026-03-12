@@ -10,10 +10,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { hasPin, setPin as savePin } from '@/services/security';
 import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
 import { usePinProtection } from '@/contexts/PinProtectionContext';
-import { setupEmailRecovery, deleteUserAccount } from '@/services/authService';
+import { setupEmailRecovery, deleteUserAccount, getAuthToken } from '@/services/authService';
 import LockScreen from './lock-screen';
 import * as SecureStore from 'expo-secure-store';
 import EmergencyContactsSection from '@/components/EmergencyContactsSection';
+import AuthGateModal from '@/components/AuthGateModal';
 
 const EMAIL_RECOVERY_KEY = 'salama_email_recovery_setup';
 
@@ -32,21 +33,26 @@ export default function SettingsScreen() {
     const [recoveryEmail, setRecoveryEmail] = useState('');
     const [isSettingUpEmail, setIsSettingUpEmail] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [showAuthGate, setShowAuthGate] = useState(false);
 
     useEffect(() => {
+        checkAuth();
         checkPin();
         // Pre-fill with user's email if it exists
         if (user?.email) {
-            console.log('📧 Email Recovery - Using email from backend login response:', user.email);
             setRecoveryEmail(user.email);
-        } else {
-            console.log('📧 Email Recovery - No email set from backend');
         }
     }, [user]);
 
     // Check if email is set (not null and not empty)
     const emailRecoverySetup = user?.email ? true : false;
-    console.log('📧 Email Recovery Setup Status:', emailRecoverySetup ? `ENABLED (${user?.email})` : 'NOT SET UP');
+
+    const checkAuth = async () => {
+        const token = await getAuthToken();
+        if (!token || !user) {
+            setShowAuthGate(true);
+        }
+    };
 
     const checkPin = async () => {
         const exists = await hasPin();
@@ -474,6 +480,14 @@ export default function SettingsScreen() {
                     </View>
                 </View>
             </Modal>
+
+            {/* Auth gate for unauthenticated users */}
+            <AuthGateModal
+                visible={showAuthGate}
+                onClose={() => {
+                    router.back();
+                }}
+            />
         </SafeAreaView>
     );
 }

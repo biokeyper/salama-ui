@@ -127,6 +127,18 @@ export async function submitReportToBackend(
     const metadata = prepareReportMetadata(report);
     console.log('Report metadata prepared:', JSON.stringify(metadata, null, 2));
 
+    // Log location if included
+    if (report.metadata?.location) {
+      console.log('📍 LOCATION BEING SENT:', report.metadata.location);
+      try {
+        const locationObj = JSON.parse(report.metadata.location);
+        console.log('📍 Parsed location:', locationObj);
+        console.log('📍 Map link:', locationObj.mapLink);
+      } catch (e) {
+        console.log('📍 Location (raw):', report.metadata.location);
+      }
+    }
+
     // Build final payload - wrapped in "payload" field as backend expects
     const submitPayload = {
       payload: {

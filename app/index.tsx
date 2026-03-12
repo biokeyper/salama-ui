@@ -11,24 +11,22 @@ export default function BootScreen() {
     const checkBootStatus = async () => {
       try {
         const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
-        const token = await getAuthToken();
 
         // Add a small delay for the splash screen effect
         setTimeout(() => {
           if (hasSeenOnboarding !== 'true') {
             // Never seen onboarding → go to onboarding
             router.replace('/onboarding');
-          } else if (!token) {
-            // Seen onboarding but no auth token → go to login
-            router.replace('/login');
           } else {
-            // Seen onboarding and logged in → go to home
+            // Seen onboarding → go to home (whether logged in or not)
+            // Auth check happens on protected routes
             router.replace('/(tabs)');
           }
         }, 2000);
       } catch (error) {
         console.error('Error checking boot status:', error);
-        router.replace('/login');
+        // Still go to home on error - auth checks will catch it
+        router.replace('/(tabs)');
       }
     };
 

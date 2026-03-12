@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Clipboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { initiateChangePhone, verifyChangePhone } from '@/services/authService';
+import { initiateChangePhone, verifyChangePhone, getAuthToken } from '@/services/authService';
+import AuthGateModal from '@/components/AuthGateModal';
 
 export default function AccountScreen() {
   const router = useRouter();
@@ -14,6 +15,19 @@ export default function AccountScreen() {
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showAuthGate, setShowAuthGate] = useState(false);
+
+  // Check authentication on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const token = await getAuthToken();
+    if (!token || !user) {
+      setShowAuthGate(true);
+    }
+  };
 
   const handleInitiateChange = async () => {
     if (!newPhone.trim()) {
@@ -219,6 +233,15 @@ export default function AccountScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Auth gate for unauthenticated users */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => {
+          // User chose "Continue as Guest" or closed modal
+          router.back();
+        }}
+      />
     </SafeAreaView>
   );
 }

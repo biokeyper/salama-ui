@@ -5,6 +5,8 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPanicAlertHistory, PanicAlertHistoryItem } from '@/services/panicService';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthToken } from '@/services/authService';
+import AuthGateModal from '@/components/AuthGateModal';
 
 export default function PanicHistoryScreen() {
   const router = useRouter();
@@ -12,14 +14,21 @@ export default function PanicHistoryScreen() {
   const [alerts, setAlerts] = useState<PanicAlertHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadAlerts();
-    } else {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const token = await getAuthToken();
+    if (!token || !user) {
+      setShowAuthGate(true);
       setIsLoading(false);
+    } else {
+      loadAlerts();
     }
-  }, [user]);
+  };
 
   const loadAlerts = async () => {
     setIsLoading(true);
@@ -119,6 +128,14 @@ export default function PanicHistoryScreen() {
           scrollEnabled={true}
         />
       )}
+
+      {/* Auth gate for unauthenticated users */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => {
+          router.back();
+        }}
+      />
     </SafeAreaView>
   );
 }

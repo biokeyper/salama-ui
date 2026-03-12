@@ -52,6 +52,7 @@ export const apiConfig = {
     // Phase 2B - Access / Sharing
     accessGrant: '/api/access/grant',
     accessRevoke: '/api/access/revoke',
+    accessMySharedReports: '/api/access/my-shared-reports',
     accessSharedWithMe: '/api/access/shared-with-me',
     accessReportViewers: '/api/access/my-report',
     accessViewSharedReport: '/api/access/report',

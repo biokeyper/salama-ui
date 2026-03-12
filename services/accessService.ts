@@ -97,6 +97,43 @@ export async function revokeAccess(
 /**
  * Get reports shared with current user (authenticated)
  */
+export async function getMySharedReports(): Promise<{ success: boolean; reports?: SharedReport[]; error?: string }> {
+  try {
+    const apiClient = getApiClient();
+    const response = await apiClient.get(apiConfig.endpoints.accessMySharedReports);
+
+    if (response.status === 200) {
+      // Ensure we always return an array
+      let reports: any[] = [];
+
+      if (response.data.data?.reports) {
+        reports = Array.isArray(response.data.data.reports) ? response.data.data.reports : [];
+      } else if (response.data.data) {
+        reports = Array.isArray(response.data.data) ? response.data.data : [];
+      }
+
+      console.log('📤 My shared reports fetched:', reports.length);
+      return {
+        success: true,
+        reports,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Unexpected response from backend',
+    };
+  } catch (error) {
+    console.error('Error fetching my shared reports:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to fetch my shared reports';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
 export async function getSharedWithMe(): Promise<{ success: boolean; reports?: SharedReport[]; error?: string }> {
   try {
     const apiClient = getApiClient();
@@ -112,6 +149,7 @@ export async function getSharedWithMe(): Promise<{ success: boolean; reports?: S
         reports = Array.isArray(response.data.data) ? response.data.data : [];
       }
 
+      console.log('📥 Shared with me reports fetched:', reports.length);
       return {
         success: true,
         reports,

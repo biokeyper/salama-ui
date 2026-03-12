@@ -1,13 +1,15 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { verifyPin, hasPin } from '@/services/security';
+import { verifyPin, hasPin, setPin as savePinToBackend } from '@/services/security';
 import { getAuthToken } from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthGateModal from '@/components/AuthGateModal';
 
 interface LockScreenProps {
     onUnlock: () => void;
@@ -20,7 +22,9 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
     const [isConfirming, setIsConfirming] = useState(false);
+    const [showAuthGate, setShowAuthGate] = useState(false);
     const router = useRouter();
+    const { user } = useAuth();
 
     const handleNumberPress = (num: string) => {
         if (mode === 'set') {
@@ -62,7 +66,24 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                 }
             } else {
                 if (pin === confirmPin) {
-                    onSetPin?.(pin);
+                    // Save PIN to backend and local storage
+                    try {
+                        const success = await savePinToBackend(pin);
+                        if (success) {
+                            onSetPin?.(pin);
+                        } else {
+                            Alert.alert('Error', 'Failed to set PIN. Please try again.');
+                            setPin('');
+                            setConfirmPin('');
+                            setIsConfirming(false);
+                        }
+                    } catch (error) {
+                        console.error('Error setting PIN:', error);
+                        Alert.alert('Error', 'An error occurred while setting PIN');
+                        setPin('');
+                        setConfirmPin('');
+                        setIsConfirming(false);
+                    }
                 } else {
                     Alert.alert('Error', 'PINs do not match');
                     setPin('');
@@ -77,8 +98,9 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
               const pinSet = await hasPin();
 
               // Check if user is logged in
-              if (!token) {
-                Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+              if (!token || !user) {
+                // Not logged in - show AuthGateModal instead of alert
+                setShowAuthGate(true);
                 setPin('');
                 return;
               }
@@ -110,6 +132,14 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Close button in top-right */}
+            <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => onClose?.()}
+            >
+                <Feather name="x" size={28} color="#8B5CF6" />
+            </TouchableOpacity>
+
             <ThemedView style={styles.content}>
                 <View style={styles.header}>
                     <Ionicons name="lock-closed" size={60} color="#8B5CF6" />
@@ -189,7 +219,7 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                   </ThemedText>
                 </TouchableOpacity>
 
-                {/* Cancel (only in verify mode) */}
+                {/* Cancel button (optional secondary action) */}
                 {mode === 'verify' && (
                     <TouchableOpacity
                         style={styles.cancelButton}
@@ -199,6 +229,15 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                     </TouchableOpacity>
                 )}
             </ThemedView>
+
+            {/* Auth gate for unauthenticated users */}
+            <AuthGateModal
+                visible={showAuthGate}
+                onClose={() => {
+                    setShowAuthGate(false);
+                    router.back();
+                }}
+            />
         </SafeAreaView>
     );
 }
@@ -207,6 +246,13 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f9f9f9',
+    },
+    closeButton: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 100,
+        padding: 8,
     },
     content: {
         flex: 1,

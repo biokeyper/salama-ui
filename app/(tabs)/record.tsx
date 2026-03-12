@@ -6,13 +6,17 @@ import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Location from 'expo-location';
 import { saveReport } from '../../services/storage';
 import { submitReportToBackend } from '@/services/api';
 import { startStatusPolling } from '@/services/statusPoller';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthToken } from '@/services/authService';
+import AuthGateModal from '@/components/AuthGateModal';
 
 export default function RecordScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
@@ -23,6 +27,7 @@ export default function RecordScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStopping, setIsStopping] = useState(false); // Prevent multiple stop calls
   const [isPlayingRecording, setIsPlayingRecording] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Audio player for listening to recorded audio
@@ -105,6 +110,7 @@ export default function RecordScreen() {
   }, [playerStatus?.currentTime, playerStatus?.duration, audioPlayer, recordedUri]);
 
   const startRecording = async () => {
+    // No auth check - users can record offline!
     try {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
@@ -269,6 +275,13 @@ export default function RecordScreen() {
       return;
     }
 
+    // Check authentication BEFORE allowing submission
+    const token = await getAuthToken();
+    if (!token || !user) {
+      setShowAuthGate(true);
+      return;
+    }
+
     // Show confirmation modal first
     Alert.alert(
       'Submit Report?',
@@ -302,6 +315,45 @@ export default function RecordScreen() {
       if (!report) {
         Alert.alert('Error', 'Report not found');
         return;
+      }
+
+      // Capture location if available
+      console.log('🔍 Starting location capture...');
+      try {
+        console.log('🔍 Requesting location permissions...');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('🔍 Location permission status:', status);
+
+        if (status === 'granted') {
+          console.log('🔍 Permission granted, getting current position...');
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+
+          console.log('🔍 Location received:', location);
+          const mapLink = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+          const locationData = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            mapLink,
+            timestamp: new Date().toISOString(),
+          };
+
+          // Add location to report metadata
+          if (!report.metadata) {
+            report.metadata = {};
+          }
+          report.metadata.location = JSON.stringify(locationData);
+
+          console.log('📍 Location captured for report:', locationData);
+          console.log('📍 Map link:', mapLink);
+          console.log('📍 Report metadata updated:', report.metadata);
+        } else {
+          console.log('🔍 Permission not granted, status:', status);
+        }
+      } catch (locError) {
+        console.error('🔍 Location capture error:', locError);
+        // Continue without location if permission denied or GPS fails
       }
 
       const result = await submitReportToBackend(report);
@@ -534,6 +586,15 @@ export default function RecordScreen() {
       >
         <Text style={styles.emergencyText}>EXIT NOW</Text>
       </TouchableOpacity>
+
+      {/* Auth gate for unauthenticated users */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => {
+          // User chose "Continue as Guest" - allow browsing but block recording
+          setShowAuthGate(false);
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -13,6 +13,8 @@ import {
   Notification,
 } from '@/services/notificationService';
 import { playNotificationSound, initializeAudio } from '@/services/soundService';
+import { getAuthToken } from '@/services/authService';
+import AuthGateModal from '@/components/AuthGateModal';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -23,14 +25,21 @@ export default function NotificationsScreen() {
   const [error, setError] = useState('');
   const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadNotifications();
-    } else {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const token = await getAuthToken();
+    if (!token || !user) {
+      setShowAuthGate(true);
       setIsLoading(false);
+    } else {
+      loadNotifications();
     }
-  }, [user]);
+  };
 
   // Initialize audio for notification sounds
   useEffect(() => {
@@ -255,6 +264,14 @@ export default function NotificationsScreen() {
           scrollEnabled={true}
         />
       )}
+
+      {/* Auth gate for unauthenticated users */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => {
+          router.back();
+        }}
+      />
     </SafeAreaView>
   );
 }

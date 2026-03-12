@@ -14,6 +14,8 @@ import * as Location from 'expo-location';
 import { sendPanicAlert } from '@/services/panicService';
 import { getEmergencyContacts } from '@/services/emergencyContactService';
 import { getAuthToken } from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthGateModal from './AuthGateModal';
 
 interface EmergencyAlertModalProps {
   visible: boolean;
@@ -22,8 +24,10 @@ interface EmergencyAlertModalProps {
 
 export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlertModalProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [tapCount, setTapCount] = useState(0);
   const [isSending, setIsSending] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTap = async () => {
@@ -49,26 +53,10 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
       try {
         // Check if user is authenticated
         const token = await getAuthToken();
-        if (!token) {
-          Alert.alert(
-            'Session Expired',
-            'Your session has expired. Please log in to send emergency alerts.',
-            [
-              {
-                text: 'Login',
-                onPress: () => {
-                  setIsSending(false);
-                  onClose();
-                  router.navigate('/login');
-                },
-              },
-              {
-                text: 'Cancel',
-                onPress: () => setIsSending(false),
-                style: 'cancel',
-              },
-            ]
-          );
+        if (!token || !user) {
+          // Not authenticated - show AuthGateModal instead of alert
+          setIsSending(false);
+          setShowAuthGate(true);
           return;
         }
 
@@ -169,66 +157,76 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <MaterialIcons name="close" size={24} color="#666" />
-          </TouchableOpacity>
+    <>
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleClose}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.modalContainer}>
+            {/* Close button */}
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+              <MaterialIcons name="close" size={24} color="#666" />
+            </TouchableOpacity>
 
-          {/* Title */}
-          <Text style={styles.title}>Emergency Alert</Text>
+            {/* Title */}
+            <Text style={styles.title}>Emergency Alert</Text>
 
-          {/* Instruction */}
-          <Text style={styles.instruction}>
-            {tapCount === 1
-              ? 'Tap again to confirm and send'
-              : 'Tap twice on the button below to send emergency alert'}
-          </Text>
+            {/* Instruction */}
+            <Text style={styles.instruction}>
+              {tapCount === 1
+                ? 'Tap again to confirm and send'
+                : 'Tap twice on the button below to send emergency alert'}
+            </Text>
 
-          {/* Alert Button */}
-          <TouchableOpacity
-            style={[
-              styles.alertButton,
-              tapCount === 1 && styles.alertButtonConfirm,
-              isSending && styles.alertButtonDisabled,
-            ]}
-            onPress={handleTap}
-            disabled={isSending}
-          >
-            <MaterialIcons name="favorite" size={48} color="#EF4444" />
+            {/* Alert Button */}
+            <TouchableOpacity
+              style={[
+                styles.alertButton,
+                tapCount === 1 && styles.alertButtonConfirm,
+                isSending && styles.alertButtonDisabled,
+              ]}
+              onPress={handleTap}
+              disabled={isSending}
+            >
+              <MaterialIcons name="favorite" size={48} color="#EF4444" />
+              {isSending && (
+                <ActivityIndicator
+                  color="#EF4444"
+                  size="large"
+                  style={styles.loadingOverlay}
+                />
+              )}
+              {tapCount === 1 && !isSending && (
+                <View style={styles.confirmIndicator}>
+                  <Text style={styles.confirmText}>!</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Sending status */}
             {isSending && (
-              <ActivityIndicator
-                color="#EF4444"
-                size="large"
-                style={styles.loadingOverlay}
-              />
+              <Text style={styles.sendingText}>Sending alert...</Text>
             )}
-            {tapCount === 1 && !isSending && (
-              <View style={styles.confirmIndicator}>
-                <Text style={styles.confirmText}>!</Text>
-              </View>
-            )}
-          </TouchableOpacity>
 
-          {/* Sending status */}
-          {isSending && (
-            <Text style={styles.sendingText}>Sending alert...</Text>
-          )}
-
-          {/* Info text */}
-          <Text style={styles.infoText}>
-            Your location and custom message will be sent to emergency contacts via SMS.
-          </Text>
+            {/* Info text */}
+            <Text style={styles.infoText}>
+              Your location and custom message will be sent to emergency contacts via SMS.
+            </Text>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+
+      {/* Auth gate for unauthenticated users */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => {
+          setShowAuthGate(false);
+        }}
+      />
+    </>
   );
 }
 
