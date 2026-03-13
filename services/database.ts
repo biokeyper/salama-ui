@@ -44,6 +44,7 @@ async function initDatabaseAsync(): Promise<void> {
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS reports (
         id TEXT PRIMARY KEY,
+        user_id TEXT,
         type TEXT NOT NULL,
         status TEXT NOT NULL,
         created_at TEXT NOT NULL,
@@ -82,7 +83,6 @@ async function initDatabaseAsync(): Promise<void> {
         await runDatabaseMigrations();
         await migrateFromAsyncStorage();
     } catch (error) {
-        console.error('Error initializing database:', error);
         throw error;
     }
 }
@@ -100,7 +100,6 @@ async function runDatabaseMigrations(): Promise<void> {
         // const tableInfo = await database.getAllAsync("PRAGMA table_info(reports)");
         // if column exists, do migration
     } catch (error) {
-        console.error('Error running migrations:', error);
     }
 }
 
@@ -129,7 +128,6 @@ async function migrateFromAsyncStorage(): Promise<void> {
         // Mark migration as complete
         await AsyncStorage.setItem(MIGRATION_KEY, 'true');
     } catch (error) {
-        console.error('Error during migration:', error);
     }
 }
 
@@ -149,14 +147,11 @@ function getDb(): SQLite.SQLiteDatabase {
 export async function resetDatabase(): Promise<void> {
     try {
         const database = getDb();
-        console.log('Resetting database...');
         await database.execAsync(`
             DELETE FROM reports;
             DELETE FROM health_logs;
         `);
-        console.log('Database reset complete');
     } catch (error) {
-        console.error('Error resetting database:', error);
         throw error;
     }
 }
@@ -169,21 +164,31 @@ export async function dbDeleteReport(reportId: string): Promise<void> {
         const database = getDb();
         await database.runAsync('DELETE FROM reports WHERE id = ?', [reportId]);
     } catch (error) {
-        console.error('Error deleting report:', error);
         throw error;
     }
 }
 
 /**
- * Get reports database
+ * Get reports database (filtered by user if userId provided)
  */
-export async function dbGetAllReports(): Promise<Report[]> {
+export async function dbGetAllReports(userId?: string): Promise<Report[]> {
     try {
         const database = getDb();
-        const result = await database.getAllAsync<any>('SELECT * FROM reports ORDER BY created_at DESC');
+        let result: any[];
+
+        if (userId) {
+            // If userId provided, filter by that user
+            console.log('[DB] Loading reports for userId:', userId);
+            result = await database.getAllAsync<any>('SELECT * FROM reports WHERE user_id = ? ORDER BY created_at DESC', [userId]);
+        } else {
+            // If no userId (not logged in), load all reports
+            console.log('[DB] Loading all reports (no user filter)');
+            result = await database.getAllAsync<any>('SELECT * FROM reports WHERE user_id IS NULL ORDER BY created_at DESC');
+        }
+        console.log('[DB] Query returned', result?.length || 0, 'reports');
         return result ? result.map(rowToReport) : [];
     } catch (error) {
-        console.error('Error fetching all reports:', error);
+        console.log('[DB] Error loading reports:', error);
         throw error;
     }
 }
@@ -197,7 +202,6 @@ export async function dbGetReportById(reportId: string): Promise<Report | null> 
         const result = await database.getFirstAsync<any>('SELECT * FROM reports WHERE id = ?', [reportId]);
         return result ? rowToReport(result) : null;
     } catch (error) {
-        console.error(`Error fetching report ${reportId}:`, error);
         throw error;
     }
 }
@@ -257,14 +261,15 @@ export async function dbSaveReport(report: Report): Promise<void> {
             // Insert new report
             await database.runAsync(
                 `INSERT INTO reports (
-                    id, type, status, created_at, updated_at,
+                    id, user_id, type, status, created_at, updated_at,
                     audio_uri, audio_duration, text_content, metadata,
                     submitted_at, submission_id, submission_error,
                     confirmations, tx_hash, ipfs_hash,
                     is_archived, archived_at, archived_reason
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     report.id,
+                    report.userId,
                     report.type,
                     report.status,
                     report.createdAt,
@@ -286,7 +291,6 @@ export async function dbSaveReport(report: Report): Promise<void> {
             );
         }
     } catch (error) {
-        console.error('Error saving report:', error);
         throw error;
     }
 }
@@ -297,6 +301,7 @@ export async function dbSaveReport(report: Report): Promise<void> {
 function rowToReport(row: any): Report {
     return {
         id: row.id,
+        userId: row.user_id,
         type: row.type,
         status: row.status,
         createdAt: row.created_at,
@@ -350,9 +355,9 @@ export async function deleteReport(reportId: string): Promise<void> {
     await dbDeleteReport(reportId);
 }
 
-export async function getAllReports(): Promise<Report[]> {
+export async function getAllReports(userId?: string): Promise<Report[]> {
     await waitForDatabaseInit();
-    return dbGetAllReports();
+    return dbGetAllReports(userId);
 }
 
 export async function updateReportStatus(reportId: string, status: string, submissionId?: string, error?: string): Promise<void> {
@@ -368,29 +373,27 @@ export async function updateReportStatus(reportId: string, status: string, submi
 }
 
 /**
- * Get reports by status
+ * Get reports by status (filtered by user)
  */
-export async function dbGetReportsByStatus(status: string): Promise<Report[]> {
+export async function dbGetReportsByStatus(userId: string, status: string): Promise<Report[]> {
     try {
         const database = getDb();
-        const result = await database.getAllAsync<any>('SELECT * FROM reports WHERE status = ? ORDER BY created_at DESC', [status]);
+        const result = await database.getAllAsync<any>('SELECT * FROM reports WHERE user_id = ? AND status = ? ORDER BY created_at DESC', [userId, status]);
         return result ? result.map(rowToReport) : [];
     } catch (error) {
-        console.error('Error fetching reports by status:', error);
         throw error;
     }
 }
 
 /**
- * Get reports by type
+ * Get reports by type (filtered by user)
  */
-export async function dbGetReportsByType(type: string): Promise<Report[]> {
+export async function dbGetReportsByType(userId: string, type: string): Promise<Report[]> {
     try {
         const database = getDb();
-        const result = await database.getAllAsync<any>('SELECT * FROM reports WHERE type = ? ORDER BY created_at DESC', [type]);
+        const result = await database.getAllAsync<any>('SELECT * FROM reports WHERE user_id = ? AND type = ? ORDER BY created_at DESC', [userId, type]);
         return result ? result.map(rowToReport) : [];
     } catch (error) {
-        console.error('Error fetching reports by type:', error);
         throw error;
     }
 }
@@ -403,7 +406,6 @@ export async function dbDeleteAllReports(): Promise<void> {
         const database = getDb();
         await database.runAsync('DELETE FROM reports');
     } catch (error) {
-        console.error('Error deleting all reports:', error);
         throw error;
     }
 }
@@ -417,7 +419,6 @@ export async function dbGetHealthLogs(): Promise<HealthLog[]> {
         const result = await database.getAllAsync<any>('SELECT * FROM health_logs ORDER BY date DESC');
         return result ? result.map(rowToHealthLog) : [];
     } catch (error) {
-        console.error('Error fetching health logs:', error);
         throw error;
     }
 }
@@ -469,7 +470,6 @@ export async function dbSaveHealthLog(log: HealthLog): Promise<void> {
             );
         }
     } catch (error) {
-        console.error('Error saving health log:', error);
         throw error;
     }
 }
@@ -482,7 +482,6 @@ export async function dbDeleteHealthLog(logId: string): Promise<void> {
         const database = getDb();
         await database.runAsync('DELETE FROM health_logs WHERE id = ?', [logId]);
     } catch (error) {
-        console.error('Error deleting health log:', error);
         throw error;
     }
 }
@@ -495,7 +494,6 @@ export async function dbDeleteAllHealthLogs(): Promise<void> {
         const database = getDb();
         await database.runAsync('DELETE FROM health_logs');
     } catch (error) {
-        console.error('Error deleting all health logs:', error);
         throw error;
     }
 }

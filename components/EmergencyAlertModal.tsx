@@ -90,7 +90,6 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
 
         await sendAlert();
       } catch (error) {
-        console.error('Error in panic alert handler:', error);
         Alert.alert('Error', 'An error occurred');
         setIsSending(false);
       }
@@ -119,7 +118,6 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
           });
         }
       } catch (locError) {
-        console.error('Error getting location:', locError);
         // Continue without location if permission denied or GPS fails
       }
 
@@ -141,7 +139,6 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
         setIsSending(false);
       }
     } catch (error) {
-      console.error('Error sending panic alert:', error);
       Alert.alert('Error', 'An error occurred while sending the alert');
       setIsSending(false);
     }

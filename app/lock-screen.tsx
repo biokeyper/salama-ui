@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import AuthGateModal from '@/components/AuthGateModal';
 
 interface LockScreenProps {
-    onUnlock: () => void;
+    onUnlock?: () => void;
     mode?: 'verify' | 'set';
     onSetPin?: (pin: string) => void;
     onClose?: () => void;
@@ -66,10 +66,12 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                 }
             } else {
                 if (pin === confirmPin) {
-                    // Save PIN to backend and local storage
+                    // Save PIN (with or without login)
                     try {
-                        const success = await savePinToBackend(pin);
+                        const success = await savePinToBackend(pin, user?.userId);
                         if (success) {
+                            const logStatus = user?.userId ? `✅ PIN set for user: ${user.userId}` : '✅ PIN set locally (not logged in)';
+                            console.log('[LOCK-SCREEN] ' + logStatus);
                             onSetPin?.(pin);
                         } else {
                             Alert.alert('Error', 'Failed to set PIN. Please try again.');
@@ -78,7 +80,6 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                             setIsConfirming(false);
                         }
                     } catch (error) {
-                        console.error('Error setting PIN:', error);
                         Alert.alert('Error', 'An error occurred while setting PIN');
                         setPin('');
                         setConfirmPin('');
@@ -92,36 +93,29 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                 }
             }
         } else {
-            // Verify mode
+            // Verify mode - works whether logged in or not
             try {
-              const token = await getAuthToken();
-              const pinSet = await hasPin();
+              // Check if PIN is set (temp PIN or user PIN)
+              const pinSet = await hasPin(user?.userId);
 
-              // Check if user is logged in
-              if (!token || !user) {
-                // Not logged in - show AuthGateModal instead of alert
-                setShowAuthGate(true);
-                setPin('');
-                return;
-              }
-
-              // Check if PIN is set
               if (!pinSet) {
                 Alert.alert('Set PIN First', 'Please set a PIN first to access your library.');
                 setPin('');
                 return;
               }
 
-              // Verify PIN
-              const isValid = await verifyPin(pin);
+              // Verify PIN (checks appropriate PIN based on login status)
+              const isValid = await verifyPin(pin, user?.userId);
               if (isValid) {
+                console.log('[LOCK-SCREEN] ✅ PIN verified for user:', user?.userId || 'NOT LOGGED IN');
                 onUnlock();
               } else {
+                console.log('[LOCK-SCREEN] ❌ Invalid PIN');
                 Alert.alert('Incorrect PIN', 'Please try again');
                 setPin('');
               }
             } catch (error) {
-              console.error('Error during PIN verification:', error);
+              console.log('[LOCK-SCREEN] Error verifying PIN:', error instanceof Error ? error.message : 'Unknown error');
               Alert.alert('Error', 'An error occurred. Please try again.');
               setPin('');
             }

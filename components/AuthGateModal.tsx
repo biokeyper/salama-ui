@@ -31,6 +31,11 @@ export default function AuthGateModal({
     router.push('/signup');
   };
 
+  const handleClose = () => {
+    onClose();
+    router.replace('/(tabs)');
+  };
+
   return (
     <Modal visible={visible} animationType="fade" transparent={true}>
       <SafeAreaView style={styles.container}>

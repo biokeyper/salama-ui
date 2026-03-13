@@ -24,12 +24,12 @@ export async function saveReport(report: Report): Promise<Report> {
   return report;
 }
 
-export const getAllReports = dbGetAllReports;
+export const getAllReports = (userId?: string) => dbGetAllReports(userId);
 export const getReportById = dbGetReportById;
 export const deleteReport = dbDeleteReport;
 export const deleteAllReports = dbDeleteAllReports;
-export const getReportsByStatus = dbGetReportsByStatus;
-export const getReportsByType = dbGetReportsByType;
+export const getReportsByStatus = (userId: string, status: string) => dbGetReportsByStatus(userId, status);
+export const getReportsByType = (userId: string, type: string) => dbGetReportsByType(userId, type);
 export const getHealthLogs = dbGetHealthLogs;
 export const saveHealthLog = dbSaveHealthLog;
 export const deleteHealthLog = dbDeleteHealthLog;
@@ -58,7 +58,6 @@ export async function updateReportStatus(
       submissionError: error || report.submissionError,
     });
   } catch (error) {
-    console.error('Error updating report status:', error);
     return null;
   }
 }
@@ -83,7 +82,6 @@ export async function archiveReport(
       archivedReason: reason || 'User archived',
     });
   } catch (error) {
-    console.error('Error archiving report:', error);
     return null;
   }
 }

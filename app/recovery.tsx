@@ -28,7 +28,6 @@ export default function RecoveryScreen() {
 
   useEffect(() => {
     if (!token) {
-      console.error('❌ Missing recovery token');
       Alert.alert('Error', 'Invalid recovery link');
       router.replace('/');
     }
@@ -41,7 +40,6 @@ export default function RecoveryScreen() {
     setError(null);
 
     try {
-      console.log('🔐 Verifying recovery token');
 
       const response = await axios.post(
         `${apiConfig.baseURL}/api/auth/verify-recovery`,
@@ -51,11 +49,9 @@ export default function RecoveryScreen() {
       );
 
       if (response.status === 200) {
-        console.log('✅ Token verified successfully');
         setStep('newpin');
       }
     } catch (error) {
-      console.error('❌ Token verification failed:', error);
       let message = 'Invalid or expired recovery link';
 
       if (axios.isAxiosError(error)) {
@@ -93,7 +89,6 @@ export default function RecoveryScreen() {
     setError(null);
 
     try {
-      console.log('🔐 Resetting PIN with recovery token');
 
       const response = await axios.post(
         `${apiConfig.baseURL}/api/auth/recovery-set-pin`,
@@ -104,7 +99,6 @@ export default function RecoveryScreen() {
       );
 
       if (response.status === 200) {
-        console.log('✅ PIN reset successfully');
         Alert.alert(
           'Success',
           'Your PIN has been reset successfully!',
@@ -119,7 +113,6 @@ export default function RecoveryScreen() {
         );
       }
     } catch (error) {
-      console.error('❌ PIN reset failed:', error);
       let message = 'Failed to reset PIN. Please try again.';
 
       if (axios.isAxiosError(error)) {

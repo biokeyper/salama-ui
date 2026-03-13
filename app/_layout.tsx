@@ -1,7 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack, usePathname, LinkingOptions } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -20,7 +20,7 @@ import FloatingEmergencyButton from '@/components/FloatingEmergencyButton';
 import EmergencyAlertModal from '@/components/EmergencyAlertModal';
 
 // Deep linking configuration
-const linking: LinkingOptions<any> = {
+const linking = {
   prefixes: ['safegirlapp://', 'https://safegirl.app'],
   config: {
     screens: {
@@ -62,7 +62,7 @@ function RootNavigator({
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <View style={{ flex: 1 }}>
-        <Stack linking={linking}>
+        <Stack>
           <Stack.Screen
             name="index"
             options={{
@@ -191,20 +191,16 @@ export default function RootLayout() {
   useEffect(() => {
     initDatabase()
       .then(() => {
-        console.log('Database initialized successfully');
         setDbInitialized(true);
       })
       .catch((error) => {
-        console.error('Error initializing database:', error);
         // Retry after a delay
         setTimeout(() => {
           initDatabase()
             .then(() => {
-              console.log('Database initialized successfully (retry)');
               setDbInitialized(true);
             })
             .catch((retryError) => {
-              console.error('Database initialization failed after retry:', retryError);
               setDbInitialized(true); // Allow app to continue anyway
             });
         }, 1000);

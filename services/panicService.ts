@@ -5,6 +5,7 @@
 
 import { getApiClient } from './api';
 import { apiConfig } from '@/config/api';
+import { extractErrorMessage } from '@/utils/errorExtractor';
 
 export interface PanicAlert {
   alertId: string;
@@ -45,12 +46,9 @@ export async function sendPanicAlert(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error sending panic alert:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to send panic alert';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to send panic alert'),
     };
   }
 }
@@ -80,12 +78,9 @@ export async function getPanicAlertHistory(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching panic alert history:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to fetch panic alert history';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to fetch panic alert history'),
     };
   }
 }

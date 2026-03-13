@@ -1,9 +1,16 @@
-import { Report } from '@/types/report';
-import { MaterialIcons, Feather } from '@expo/vector-icons';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View, Pressable } from 'react-native';
-import { getAvailableActions } from '@/utils/reportActions';
+import { Report } from "@/types/report";
+import { getAvailableActions } from "@/utils/reportActions";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import { useEffect } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 interface AudioReportItemProps {
   report: Report;
@@ -40,6 +47,8 @@ export default function AudioReportItem({
   onViewViewers,
   onViewDetails,
 }: AudioReportItemProps) {
+  const isMenuOpen = openMenuReportId === report.id;
+
   // Early return if no audio URI - this shouldn't render in the first place
   if (!report.audioUri) {
     return null;
@@ -55,9 +64,7 @@ export default function AudioReportItem({
       if (!player.playing) {
         try {
           player.play();
-        } catch (err) {
-          console.error('Play failed:', err);
-        }
+        } catch (err) {}
       }
     } else {
       if (player.playing) {
@@ -74,7 +81,11 @@ export default function AudioReportItem({
   useEffect(() => {
     if (!player) return;
 
-    if (status?.currentTime && status?.duration && status.currentTime >= status.duration) {
+    if (
+      status?.currentTime &&
+      status?.duration &&
+      status.currentTime >= status.duration
+    ) {
       try {
         player.pause();
         player.seekTo(0);
@@ -108,7 +119,6 @@ export default function AudioReportItem({
       player.seekTo(0);
       onPlayingChange(null);
     } catch (error) {
-      console.error('Stop error:', error);
       onPlayingChange(null);
     }
   };
@@ -118,9 +128,7 @@ export default function AudioReportItem({
     try {
       const newTime = Math.max(0, status.currentTime - 10);
       player.seekTo(newTime);
-    } catch (err) {
-      console.error('Seek backward failed:', err);
-    }
+    } catch (err) {}
   };
 
   const seekForward = () => {
@@ -128,78 +136,84 @@ export default function AudioReportItem({
     try {
       const newTime = Math.min(status.duration, status.currentTime + 10);
       player.seekTo(newTime);
-    } catch (err) {
-      console.error('Seek forward failed:', err);
-    }
+    } catch (err) {}
   };
 
   const formatTime = (seconds: number | null | undefined): string => {
-    if (seconds === null || seconds === undefined || isNaN(seconds) || seconds < 0) return '0:00';
+    if (
+      seconds === null ||
+      seconds === undefined ||
+      isNaN(seconds) ||
+      seconds < 0
+    )
+      return "0:00";
     const totalSeconds = Math.floor(seconds);
     const minutes = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getStatusDisplay = (): { color: string; label: string } => {
     // Archived reports
     if (report.isArchived) {
-      return { color: '#795548', label: 'Archived' };
+      return { color: "#795548", label: "Archived" };
     }
 
     // Draft or Saved (locally stored, not submitted)
-    if (report.status === 'draft' || report.status === 'saved') {
-      return { color: '#FFA500', label: 'Draft' };
+    if (report.status === "draft" || report.status === "saved") {
+      return { color: "#FFA500", label: "Draft" };
     }
 
     // Submitted (sent to backend, waiting for blockchain to process)
-    if (report.status === 'submitted') {
-      return { color: '#2196F3', label: 'Submitted' };
+    if (report.status === "submitted") {
+      return { color: "#2196F3", label: "Submitted" };
     }
 
     // Pending (blockchain is processing, waiting for confirmations)
-    if (report.status === 'pending') {
+    if (report.status === "pending") {
       const confirmations = report.confirmations || 0;
       return {
-        color: '#FFEB3B',
+        color: "#8A4FFF",
         label: `Pending ${confirmations}/12`,
       };
     }
 
     // Confirmed (blockchain confirmed)
-    if (report.status === 'confirmed') {
-      return { color: '#4CAF50', label: 'Confirmed ✓' };
+    if (report.status === "confirmed") {
+      return { color: "#4CAF50", label: "Confirmed ✓" };
     }
 
     // Failed (blockchain failed)
-    if (report.status === 'failed') {
-      return { color: '#FF3B30', label: 'Failed' };
+    if (report.status === "failed") {
+      return { color: "#FF3B30", label: "Failed" };
     }
 
-    return { color: '#9E9E9E', label: 'Unknown' };
+    return { color: "#9E9E9E", label: "Unknown" };
   };
 
   const position = status?.currentTime || 0;
   // Use stored duration if player duration is not yet available (lazy loading)
   // audioDuration is stored in milliseconds, convert to seconds to match status.duration
-  const duration = status?.duration || (report.audioDuration ? report.audioDuration / 1000 : 0);
+  const duration =
+    status?.duration ||
+    (report.audioDuration ? report.audioDuration / 1000 : 0);
   const progress = duration > 0 ? (position / duration) * 100 : 0;
 
   return (
-    <View style={styles.reportCard}>
+    <View style={[styles.reportCard, isMenuOpen && styles.reportCardMenuOpen]}>
       {/* Click outside to close menu overlay */}
-      {openMenuReportId === report.id && (
+      {isMenuOpen && (
         <Pressable
           style={styles.menuOverlay}
           onPress={() => onMenuToggle?.(report.id)}
@@ -218,23 +232,11 @@ export default function AudioReportItem({
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: statusDisplay.color }
+                      { backgroundColor: statusDisplay.color },
                     ]}
                   >
                     <Text style={styles.statusText}>{statusDisplay.label}</Text>
                   </View>
-
-                  {/* Show confirmation progress for pending reports */}
-                  {report.status === 'pending' && report.confirmations !== undefined && (
-                    <View style={styles.progressBarSmall}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${(report.confirmations / 12) * 100}%` }
-                        ]}
-                      />
-                    </View>
-                  )}
                 </>
               );
             })()}
@@ -252,7 +254,11 @@ export default function AudioReportItem({
                     style={styles.actionButton}
                     onPress={() => onDelete(report)}
                   >
-                    <MaterialIcons name="delete-outline" size={20} color="#FF3B30" />
+                    <MaterialIcons
+                      name="delete-outline"
+                      size={20}
+                      color="#FF3B30"
+                    />
                   </TouchableOpacity>
                 )}
 
@@ -270,7 +276,7 @@ export default function AudioReportItem({
                   </TouchableOpacity>
                 )}
 
-                {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && (
+                {report.status === "submitted" && (
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => onMenuToggle?.(report.id)}
@@ -284,46 +290,61 @@ export default function AudioReportItem({
         </View>
 
         {/* Dropdown Menu */}
-        {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && openMenuReportId === report.id && (
-          <View style={styles.dropdownMenu}>
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={() => onViewDetails?.(report)}
-            >
-              <Feather name="eye" size={18} color="#8B5CF6" />
-              <Text style={styles.menuOptionText}>View Details</Text>
-            </TouchableOpacity>
+        {report.status === "submitted" && isMenuOpen && (
+            <View style={styles.dropdownMenu}>
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  onMenuToggle?.(report.id);
+                  onViewDetails?.(report);
+                }}
+              >
+                <Feather name="eye" size={18} color="#8B5CF6" />
+                <Text style={styles.menuOptionText}>View Details</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={() => onShare?.(report)}
-            >
-              <Feather name="share-2" size={18} color="#8B5CF6" />
-              <Text style={styles.menuOptionText}>Share</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  onMenuToggle?.(report.id);
+                  onShare?.(report);
+                }}
+              >
+                <Feather name="share-2" size={18} color="#8B5CF6" />
+                <Text style={styles.menuOptionText}>Share</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={() => onViewViewers?.(report)}
-            >
-              <Feather name="users" size={18} color="#8B5CF6" />
-              <Text style={styles.menuOptionText}>Viewers</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  onMenuToggle?.(report.id);
+                  onViewViewers?.(report);
+                }}
+              >
+                <Feather name="users" size={18} color="#8B5CF6" />
+                <Text style={styles.menuOptionText}>Viewers</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.menuOption, styles.menuOptionDanger]}
-              onPress={() => {
-                onArchive?.(report);
-                onMenuToggle?.(report.id);
-              }}
-            >
-              <Feather name={report.isArchived ? "inbox" : "archive"} size={18} color="#FF3B30" />
-              <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>
-                {report.isArchived ? 'Unarchive' : 'Archive'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+              <TouchableOpacity
+                style={[styles.menuOption, styles.menuOptionDanger]}
+                onPress={() => {
+                  onArchive?.(report);
+                  onMenuToggle?.(report.id);
+                }}
+              >
+                <Feather
+                  name={report.isArchived ? "inbox" : "archive"}
+                  size={18}
+                  color="#FF3B30"
+                />
+                <Text
+                  style={[styles.menuOptionText, styles.menuOptionDangerText]}
+                >
+                  {report.isArchived ? "Unarchive" : "Archive"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
       </View>
 
       {/* Playback Controls */}
@@ -367,13 +388,16 @@ export default function AudioReportItem({
       </View>
 
       {/* Submission Status and Submit/Resubmit */}
-      {(report.status === 'failed' || report.status === 'saved') && (
+      {(report.status === "failed" || report.status === "saved") && (
         <View style={styles.submissionContainer}>
-          {report.status === 'failed' && report.submissionError && (
+          {report.status === "failed" && report.submissionError && (
             <Text style={styles.errorText}>{report.submissionError}</Text>
           )}
           <TouchableOpacity
-            style={[styles.resubmitButton, isSubmitting && styles.resubmitButtonDisabled]}
+            style={[
+              styles.resubmitButton,
+              isSubmitting && styles.resubmitButtonDisabled,
+            ]}
             onPress={() => onResubmit(report)}
             disabled={isSubmitting}
           >
@@ -381,15 +405,21 @@ export default function AudioReportItem({
               <ActivityIndicator size="small" color="#8A4FFF" />
             ) : (
               <>
-                <MaterialIcons name={report.status === 'saved' ? 'cloud-upload' : 'refresh'} size={20} color="#8A4FFF" />
-                <Text style={styles.resubmitText}>{report.status === 'saved' ? 'Submit' : 'Resubmit'}</Text>
+                <MaterialIcons
+                  name={report.status === "saved" ? "cloud-upload" : "refresh"}
+                  size={20}
+                  color="#8A4FFF"
+                />
+                <Text style={styles.resubmitText}>
+                  {report.status === "saved" ? "Submit" : "Resubmit"}
+                </Text>
               </>
             )}
           </TouchableOpacity>
         </View>
       )}
 
-      {report.status === 'submitted' && report.submittedAt && (
+      {report.status === "submitted" && report.submittedAt && (
         <View style={styles.submittedContainer}>
           <MaterialIcons name="check-circle" size={16} color="#4CAF50" />
           <Text style={styles.submittedText}>
@@ -397,44 +427,48 @@ export default function AudioReportItem({
           </Text>
         </View>
       )}
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   reportCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginHorizontal: 16,
     marginVertical: 8,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    shadowColor: '#000',
+    borderColor: "#E0E0E0",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: "visible",
+  },
+  reportCardMenuOpen: {
+    zIndex: 999,
+    elevation: 50,
   },
   reportHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 12,
-    position: 'relative',
+    position: "relative",
   },
   reportInfo: {
     flex: 1,
   },
   reportDate: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 8,
   },
   statusContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -443,21 +477,21 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionButton: {
     padding: 4,
   },
   controlsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
     gap: 12,
   },
@@ -468,88 +502,88 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   timeInfoContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 8,
   },
   timeText: {
     fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
+    color: "#666",
+    fontWeight: "500",
   },
   progressBarContainer: {
-    width: '100%',
+    width: "100%",
     height: 4,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: "#E0E0E0",
     borderRadius: 2,
     marginBottom: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressBar: {
-    height: '100%',
-    backgroundColor: '#8A4FFF',
+    height: "100%",
+    backgroundColor: "#8A4FFF",
     borderRadius: 2,
   },
   submissionContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: "#E0E0E0",
   },
   errorText: {
     flex: 1,
     fontSize: 12,
-    color: '#FF3B30',
+    color: "#FF3B30",
     marginRight: 8,
   },
   resubmitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#8A4FFF',
+    borderColor: "#8A4FFF",
     gap: 6,
   },
   resubmitText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#8A4FFF',
+    fontWeight: "600",
+    color: "#8A4FFF",
   },
   resubmitButtonDisabled: {
     opacity: 0.6,
   },
   submittedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: "#E0E0E0",
     gap: 6,
   },
   submittedText: {
     fontSize: 12,
-    color: '#4CAF50',
+    color: "#4CAF50",
   },
   progressBarSmall: {
-    width: '100%',
+    width: "100%",
     height: 3,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: "#E0E0E0",
     borderRadius: 1.5,
     marginTop: 6,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
-    backgroundColor: '#FFEB3B',
+    height: "100%",
+    backgroundColor: "#FFEB3B",
     borderRadius: 1.5,
   },
   menuOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -557,14 +591,14 @@ const styles = StyleSheet.create({
     zIndex: 99998,
   },
   dropdownMenu: {
-    position: 'absolute',
+    position: "absolute",
     top: 35,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -573,23 +607,23 @@ const styles = StyleSheet.create({
     zIndex: 99999,
   },
   menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
   menuOptionDanger: {
     borderBottomWidth: 0,
   },
   menuOptionText: {
     fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
+    color: "#374151",
+    fontWeight: "500",
   },
   menuOptionDangerText: {
-    color: '#FF3B30',
+    color: "#FF3B30",
   },
 });

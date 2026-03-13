@@ -44,8 +44,6 @@ export async function initiateSignup(
   phone: string
 ): Promise<{ success: boolean; error?: string }> {
   const payload = { phone };
-  console.log('Initiating signup with payload:', JSON.stringify(payload));
-  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.signupInitiate}`);
 
   try {
     const response = await axios.post(
@@ -68,9 +66,6 @@ export async function initiateSignup(
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-      console.log('Signup error - Status:', status);
-      console.log('Signup error - Message:', errorData?.message);
-      console.log('Signup error - Error:', errorData?.error);
 
       // Handle specific status codes
       if (status === 409) {
@@ -88,7 +83,6 @@ export async function initiateSignup(
       message = error.message;
     }
 
-    console.log('Signup initiation final error message:', message);
     return { success: false, error: message };
   }
 }
@@ -102,8 +96,6 @@ export async function verifySignup(
   otp: string
 ): Promise<{ success: boolean; error?: string; user?: User }> {
   const payload = { phone, otp };
-  console.log('Verifying signup with payload:', JSON.stringify(payload));
-  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.signupVerify}`);
 
   try {
     const response = await axios.post(
@@ -111,8 +103,6 @@ export async function verifySignup(
       payload
     );
 
-    console.log('Signup verification response status:', response.status);
-    console.log('Signup verification response data:', JSON.stringify(response.data));
 
     if (response.status === 200 || response.status === 201) {
       const response_data: AuthResponse = response.data;
@@ -147,13 +137,10 @@ export async function verifySignup(
       }
 
       // Save token
-      console.log('Saving token to SecureStore:', token.substring(0, 20) + '...');
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
-      console.log('Token saved, verifying...');
 
       // Verify token was saved
       const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-      console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
 
       // Store PIN from backend response (signup always returns null for new users)
       const { storePinFromBackend } = await import('./security');
@@ -161,12 +148,8 @@ export async function verifySignup(
 
       // Save user info
       const user: User = userData as User;
-      console.log('🆔 Extracted userId in signup:', userId);
-      console.log('👤 User object before saving:', user);
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
-      console.log('💾 User data saved to SecureStore:', user);
 
-      console.log('✅ Signup successful, user data saved');
       return { success: true, user };
     }
 
@@ -181,8 +164,6 @@ export async function verifySignup(
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-      console.log('Signup verify error - Status:', status);
-      console.log('Signup verify error - Message:', errorData?.message);
 
       if (status === 401) {
         message = errorData?.message || 'Invalid OTP. Please try again.';
@@ -195,7 +176,6 @@ export async function verifySignup(
       message = error.message;
     }
 
-    console.log('Signup verification final error:', message);
     return { success: false, error: message };
   }
 }
@@ -208,8 +188,6 @@ export async function initiateLogin(
   phone: string
 ): Promise<{ success: boolean; error?: string; _testOTP?: string }> {
   const payload = { phone };
-  console.log('Initiating login with payload:', JSON.stringify(payload));
-  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.loginInitiate}`);
 
   try {
     const response = await axios.post(
@@ -235,9 +213,6 @@ export async function initiateLogin(
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-      console.log('Login error - Status:', status);
-      console.log('Login error - Message:', errorData?.message);
-      console.log('Login error - Error:', errorData?.error);
 
       // Handle specific status codes
       if (status === 404) {
@@ -253,7 +228,6 @@ export async function initiateLogin(
       message = error.message;
     }
 
-    console.log('Login initiation final error message:', message);
     return { success: false, error: message };
   }
 }
@@ -267,8 +241,6 @@ export async function verifyLogin(
   otp: string
 ): Promise<{ success: boolean; error?: string; user?: User }> {
   const payload = { phone, otp };
-  console.log('Verifying login with payload:', JSON.stringify(payload));
-  console.log('API URL:', `${apiConfig.baseURL}${apiConfig.endpoints.loginVerify}`);
 
   try {
     const response = await axios.post(
@@ -276,8 +248,6 @@ export async function verifyLogin(
       payload
     );
 
-    console.log('Login verification response status:', response.status);
-    console.log('📱 FULL LOGIN RESPONSE:', JSON.stringify(response.data, null, 2));
 
     if (response.status === 200 || response.status === 201) {
       const response_data: AuthResponse = response.data;
@@ -304,10 +274,6 @@ export async function verifyLogin(
         };
       }
 
-      console.log('🔐 Extracted PIN:', pin);
-      console.log('🔑 Extracted Token:', token ? '✅ Present' : '❌ Missing');
-      console.log('👤 User ID:', userId);
-      console.log('👤 User Data:', userData);
 
       if (!token) {
         return {
@@ -317,13 +283,10 @@ export async function verifyLogin(
       }
 
       // Save token
-      console.log('Saving token to SecureStore:', token.substring(0, 20) + '...');
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
-      console.log('Token saved, verifying...');
 
       // Verify token was saved
       const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-      console.log('Verification - Token retrieved from SecureStore:', retrievedToken ? 'YES' : 'NO');
 
       // Store PIN from backend response
       const { storePinFromBackend } = await import('./security');
@@ -331,12 +294,8 @@ export async function verifyLogin(
 
       // Save user info
       const user: User = userData as User;
-      console.log('🆔 Extracted userId in login:', userId);
-      console.log('👤 User object before saving:', user);
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
-      console.log('💾 User data saved to SecureStore:', user);
 
-      console.log('✅ Login successful, user data saved');
       return { success: true, user };
     }
 
@@ -351,8 +310,6 @@ export async function verifyLogin(
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-      console.log('Login verify error - Status:', status);
-      console.log('Login verify error - Message:', errorData?.message);
 
       if (status === 401) {
         message = errorData?.message || 'Invalid OTP. Please try again.';
@@ -365,7 +322,6 @@ export async function verifyLogin(
       message = error.message;
     }
 
-    console.log('Login verification final error:', message);
     return { success: false, error: message };
   }
 }
@@ -378,7 +334,6 @@ export async function getAuthToken(): Promise<string | null> {
     const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
     return token;
   } catch (error) {
-    console.error('Error reading auth token:', error);
     return null;
   }
 }
@@ -392,7 +347,6 @@ export async function getUserInfo(): Promise<User | null> {
     if (!userJson) return null;
     return JSON.parse(userJson);
   } catch (error) {
-    console.error('Error reading user info:', error);
     return null;
   }
 }
@@ -410,11 +364,14 @@ export async function isAuthenticated(): Promise<boolean> {
  */
 /**
  * Logout user
- * Calls backend to confirm logout, then clears local auth data
+ * Calls backend to confirm logout, then clears local auth data and PIN
  */
 export async function logout(): Promise<void> {
   try {
     const token = await getAuthToken();
+
+    // Get user info before clearing it (needed to delete user's PIN)
+    const userInfo = await getUserInfo();
 
     // Call backend logout endpoint if token exists
     if (token) {
@@ -428,19 +385,36 @@ export async function logout(): Promise<void> {
             },
           }
         );
-        console.log('✅ Logged out from backend');
       } catch (error) {
         // Even if backend call fails, continue with local logout
-        console.warn('⚠️ Backend logout call failed, clearing local auth anyway');
       }
     }
 
     // Clear local auth data
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(AUTH_USER_KEY);
-    console.log('🔓 Local auth data cleared');
+
+    // Clear PIN for the logged-in user
+    if (userInfo?.userId) {
+      const userPinKey = `pin_${userInfo.userId}`;
+      try {
+        await SecureStore.deleteItemAsync(userPinKey);
+        console.log('[AUTH] 🔐 Cleared PIN for user:', userInfo.userId);
+      } catch (error) {
+        // PIN might not exist, that's okay
+      }
+    }
+
+    // Also clear temp PIN if it exists
+    try {
+      await SecureStore.deleteItemAsync('pin_local_temp');
+    } catch (error) {
+      // Temp PIN might not exist, that's okay
+    }
+
+    console.log('[AUTH] ✅ User logged out and PIN cleared');
   } catch (error) {
-    console.error('Error during logout:', error);
+    console.log('[AUTH] Error during logout:', error instanceof Error ? error.message : 'Unknown error');
   }
 }
 
@@ -856,11 +830,9 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
   try {
     const token = await getAuthToken();
     if (!token) {
-      console.log('Delete account - No auth token found');
       return { success: false, error: 'Not authenticated' };
     }
 
-    console.log('Delete account - Token found, sending request...');
 
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.deleteAccount}`,
@@ -872,8 +844,6 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
       }
     );
 
-    console.log('Delete account response status:', response.status);
-    console.log('Delete account response data:', JSON.stringify(response.data));
 
     if (response.status === 200 || response.status === 201) {
       // Clear all local auth data after successful deletion
@@ -892,8 +862,6 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-      console.log('Delete account error - Status:', status);
-      console.log('Delete account error - Message:', errorData?.message);
 
       if (status === 401) {
         message = errorData?.message || 'Authentication failed. Please login again.';
@@ -906,7 +874,6 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
       message = error.message;
     }
 
-    console.log('Delete account final error:', message);
     return { success: false, error: message };
   }
 }

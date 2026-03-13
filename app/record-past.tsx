@@ -66,7 +66,6 @@ export default function RecordPastScreen() {
     try {
       // Prevent multiple simultaneous stop calls
       if (isStopping || !isRecording) {
-        console.warn('Recording stop already in progress or not recording');
         return;
       }
 
@@ -74,7 +73,6 @@ export default function RecordPastScreen() {
 
       // Verify recorder exists and hasn't been released
       if (!audioRecorder) {
-        console.warn('Audio recorder was already released');
         setIsRecording(false);
         setIsStopping(false);
         return;
@@ -84,7 +82,6 @@ export default function RecordPastScreen() {
       setIsRecording(false);
       const uri = audioRecorder.uri ?? null;
       setRecordedUri(uri);
-      console.log('Recording saved to:', uri);
 
       if (uri) {
         try {
@@ -100,11 +97,9 @@ export default function RecordPastScreen() {
           });
           setReportId(savedReport.id);
         } catch (error) {
-          console.error('Error auto-saving audio report:', error);
         }
       }
     } catch (err) {
-      console.error('Error stopping recording:', err);
       Alert.alert('Error', 'Failed to save recording');
     } finally {
       setIsStopping(false);
@@ -117,7 +112,6 @@ export default function RecordPastScreen() {
       try {
         await stopRecording();
       } catch (error) {
-        console.error('Error stopping recording on emergency exit:', error);
       }
     } else if (recordedUri && !reportId) {
       // If stopped but not yet saved (rare race condition), try to save
@@ -133,7 +127,6 @@ export default function RecordPastScreen() {
           updatedAt: now,
         });
       } catch (error) {
-        console.error('Error saving existing recording on exit:', error);
       }
     }
 
@@ -142,7 +135,6 @@ export default function RecordPastScreen() {
       enterDecoyMode();
       router.replace('/fake-calculator');
     } catch (error) {
-      console.error('Error navigating to decoy mode:', error);
       // Fallback
       router.replace('/fake-calculator');
     }
@@ -166,7 +158,6 @@ export default function RecordPastScreen() {
         });
         currentReportId = savedReport.id;
       } catch (error) {
-        console.error('Error saving audio report:', error);
         // Continue navigation even if save fails
       }
     }

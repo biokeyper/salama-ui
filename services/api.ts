@@ -7,6 +7,7 @@ import axios, { AxiosInstance } from 'axios';
 import { Report } from '@/types/report';
 import { apiConfig } from '@/config/api';
 import { mapReportToResponses, prepareReportMetadata } from '@/utils/reportMapper';
+import { extractErrorMessage } from '@/utils/errorExtractor';
 import { updateReportStatus } from './storage';
 import { getAuthToken, isAuthenticated, logout } from './authService';
 import * as SecureStore from 'expo-secure-store';
@@ -26,7 +27,7 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.error('Error reading auth token:', error);
+      // Silently ignore auth token read errors
     }
     return config;
   },
@@ -80,7 +81,6 @@ export async function checkBackendHealth(): Promise<boolean> {
     const response = await apiClient.get(apiConfig.endpoints.health);
     return response.status === 200;
   } catch (error) {
-    console.error('Backend health check failed:', error);
     return false;
   }
 }
@@ -96,11 +96,11 @@ export async function submitReportToBackend(
   report: Report
 ): Promise<SubmissionResult> {
   try {
-    console.log('submitReportToBackend called with report:', JSON.stringify(report, null, 2));
-
+    console.log('[API] submitReportToBackend called for report:', report.id);
     // Check authentication
     const authenticated = await isAuthenticated();
     if (!authenticated) {
+      console.log('[API] Authentication check failed');
       return {
         success: false,
         error: 'Authentication required',
@@ -108,8 +108,11 @@ export async function submitReportToBackend(
       };
     }
 
+    console.log('[API] Authentication verified');
+
     // Validate report
     if (!report.id) {
+      console.log('[API] Report missing ID');
       return {
         success: false,
         error: 'Report missing ID',
@@ -117,27 +120,16 @@ export async function submitReportToBackend(
     }
 
     // Update status to submitted (optimistic)
+    console.log('[API] Updating report status to submitted');
     await updateReportStatus(report.id, 'submitted');
 
     // Map to backend format (flexible responses)
+    console.log('[API] Mapping report to backend format');
     const responses = mapReportToResponses(report);
-    console.log('Report mapped to responses:', JSON.stringify(responses, null, 2));
 
     // Prepare metadata
+    console.log('[API] Preparing report metadata');
     const metadata = prepareReportMetadata(report);
-    console.log('Report metadata prepared:', JSON.stringify(metadata, null, 2));
-
-    // Log location if included
-    if (report.metadata?.location) {
-      console.log('📍 LOCATION BEING SENT:', report.metadata.location);
-      try {
-        const locationObj = JSON.parse(report.metadata.location);
-        console.log('📍 Parsed location:', locationObj);
-        console.log('📍 Map link:', locationObj.mapLink);
-      } catch (e) {
-        console.log('📍 Location (raw):', report.metadata.location);
-      }
-    }
 
     // Build final payload - wrapped in "payload" field as backend expects
     const submitPayload = {
@@ -146,17 +138,16 @@ export async function submitReportToBackend(
         metadata,
       },
     };
-    console.log('FULL SUBMIT PAYLOAD:', JSON.stringify(submitPayload, null, 2));
-    console.log('Submitting to endpoint:', apiConfig.endpoints.submitReport);
-    console.log('API Base URL:', apiConfig.baseURL);
 
+    console.log('[API] Sending report to backend endpoint:', apiConfig.endpoints.submitReport);
     // Submit to backend (backend handles encryption)
     const response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
 
-    console.log('✅ BACKEND RESPONSE:', response.data);
-
     if (response.status === 200 || response.status === 201) {
       const data = response.data;
+
+      console.log('[API] ✅ Backend response received:', JSON.stringify(data, null, 2));
+      console.log('[API] Extracted status from backend:', data.status);
 
       // Update report with submission details
       const submissionId = data.reportId || data.submissionId;
@@ -176,26 +167,21 @@ export async function submitReportToBackend(
       };
     }
 
+    console.log('[API] ❌ Unexpected response status:', response.status);
     return {
       success: false,
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error submitting report:', error);
-    console.error('Error details:', JSON.stringify(error, null, 2));
-
-    if (error instanceof Error && 'response' in error) {
-      const axiosError = error as any;
-      console.error('Response status:', axiosError.response?.status);
-      console.error('Response data:', JSON.stringify(axiosError.response?.data, null, 2));
-      console.error('Request payload:', JSON.stringify(axiosError.config?.data, null, 2));
-    }
+    console.log('[API] ❌ Submission error:', error instanceof Error ? error.message : 'Unknown error');
+    const errorMessage = extractErrorMessage(error, 'Failed to submit report');
 
     // Check if it's an authentication error (401)
-    const isAuthError = error instanceof Error &&
-      (error.message.includes('401') || error.message.includes('Unauthorized'));
+    const isAuthError = errorMessage.toLowerCase().includes('authentication') ||
+      (error instanceof Error && error.message.includes('401'));
 
     if (isAuthError) {
+      console.log('[API] Authentication error detected');
       return {
         success: false,
         error: 'Authentication required',
@@ -205,19 +191,14 @@ export async function submitReportToBackend(
 
     // Update report with error status
     try {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
       await updateReportStatus(report.id, 'failed', undefined, errorMessage);
     } catch (updateError) {
-      console.error('Error updating report status:', updateError);
+      // Silently ignore status update errors
     }
 
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Failed to submit report',
+      error: errorMessage,
     };
   }
 }
@@ -241,7 +222,7 @@ export async function checkReportStatus(
       ipfsHash: data.ipfsHash,
     };
   } catch (error) {
-    console.error('Error checking report status:', error);
+    extractErrorMessage(error, 'Failed to check report status');
     return {
       status: 'error',
       confirmations: 0,
@@ -303,12 +284,9 @@ export async function decryptReportFromBackend(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error decrypting report:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to decrypt report';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to decrypt report'),
     };
   }
 }
@@ -343,12 +321,9 @@ export async function searchBackendReports(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error searching reports:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to search reports';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to search reports'),
     };
   }
 }
@@ -372,12 +347,9 @@ export async function getReportStats(): Promise<{ success: boolean; stats?: any;
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching report stats:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to fetch report stats';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to fetch report stats'),
     };
   }
 }

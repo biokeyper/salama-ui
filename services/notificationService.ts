@@ -5,6 +5,7 @@
 
 import { getApiClient } from './api';
 import { apiConfig } from '@/config/api';
+import { extractErrorMessage } from '@/utils/errorExtractor';
 
 export interface Notification {
   id: number;
@@ -44,9 +45,6 @@ export async function getNotifications(
     });
 
     // Log the entire response from backend
-    console.log('📬 FULL NOTIFICATIONS RESPONSE FROM BACKEND:');
-    console.log(JSON.stringify(response.data, null, 2));
-    console.log('---');
 
     if (response.status === 200) {
       // Ensure we always return an array
@@ -58,10 +56,7 @@ export async function getNotifications(
         notifications = Array.isArray(response.data.data) ? response.data.data : [];
       }
 
-      console.log(`✅ Extracted ${notifications.length} notifications`);
-      console.log('Notification details:');
       notifications.forEach((notif, idx) => {
-        console.log(`  [${idx}] ${notif.type} - createdAt: "${notif.createdAt}"`);
       });
 
       return {
@@ -76,12 +71,9 @@ export async function getNotifications(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching notifications:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to fetch notifications';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to fetch notifications'),
     };
   }
 }
@@ -109,7 +101,6 @@ export async function getUnreadCount(): Promise<{ success: boolean; count?: numb
     // Silently handle 401 errors (token expiry) - this is normal
     // Only log other errors
     if (!((error as any)?.response?.status === 401)) {
-      console.error('Error fetching unread count:', error);
     }
     const errorMessage =
       error instanceof Error ? error.message : 'Failed to fetch unread count';
@@ -142,12 +133,9 @@ export async function markNotificationRead(
       error: 'Failed to mark notification as read',
     };
   } catch (error) {
-    console.error('Error marking notification as read:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to mark notification as read';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to mark notification as read'),
     };
   }
 }
@@ -169,12 +157,9 @@ export async function markAllNotificationsRead(): Promise<{ success: boolean; er
       error: 'Failed to mark all notifications as read',
     };
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to mark all notifications as read';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to mark all notifications as read'),
     };
   }
 }
@@ -200,12 +185,9 @@ export async function deleteNotification(
       error: 'Failed to delete notification',
     };
   } catch (error) {
-    console.error('Error deleting notification:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to delete notification';
     return {
       success: false,
-      error: errorMessage,
+      error: extractErrorMessage(error, 'Failed to delete notification'),
     };
   }
 }

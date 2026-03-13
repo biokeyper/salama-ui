@@ -16,7 +16,6 @@ export default function HomeScreen() {
   const { showEmailRecoveryModal, setupEmailRecovery, skipEmailRecovery } = useAuth();
 
   useEffect(() => {
-    console.log('Home screen - Email recovery modal visible:', showEmailRecoveryModal);
   }, [showEmailRecoveryModal]);
 
   const quickActions = [

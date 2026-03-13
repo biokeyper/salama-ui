@@ -13,9 +13,6 @@ import {
   Notification,
 } from '@/services/notificationService';
 import { playNotificationSound, initializeAudio } from '@/services/soundService';
-import { getAuthToken } from '@/services/authService';
-import AuthGateModal from '@/components/AuthGateModal';
-
 export default function NotificationsScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -25,21 +22,10 @@ export default function NotificationsScreen() {
   const [error, setError] = useState('');
   const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [showAuthGate, setShowAuthGate] = useState(false);
 
   useEffect(() => {
-    checkAuth();
+    loadNotifications();
   }, []);
-
-  const checkAuth = async () => {
-    const token = await getAuthToken();
-    if (!token || !user) {
-      setShowAuthGate(true);
-      setIsLoading(false);
-    } else {
-      loadNotifications();
-    }
-  };
 
   // Initialize audio for notification sounds
   useEffect(() => {
@@ -50,16 +36,18 @@ export default function NotificationsScreen() {
     setIsLoading(true);
     setError('');
 
+    // Check if user is logged in
+    if (!user) {
+      setError('Sign in to view your notifications');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const result = await getNotifications({ limit: 50, offset: 0 });
       if (result.success && result.notifications) {
         const newCount = result.notifications.length;
-        console.log('📬 Notifications loaded:', newCount);
         result.notifications.forEach((notif, idx) => {
-          console.log(`  [${idx}] ${notif.type}:`);
-          console.log(`       id: ${notif.id}`);
-          console.log(`       createdAt: "${notif.createdAt}" (type: ${typeof notif.createdAt})`);
-          console.log(`       Full object:`, JSON.stringify(notif, null, 2));
         });
         setNotifications(result.notifications);
 
@@ -67,7 +55,6 @@ export default function NotificationsScreen() {
         // 1. App has initialized (not first load)
         // 2. There are NEW notifications (more than before)
         if (hasInitialized && newCount > previousNotificationCount) {
-          console.log(`🔔 New notifications detected! (${previousNotificationCount} → ${newCount})`);
           await playNotificationSound();
         }
 
@@ -75,13 +62,15 @@ export default function NotificationsScreen() {
         setPreviousNotificationCount(newCount);
         if (!hasInitialized) {
           setHasInitialized(true);
-          console.log('✅ Notifications initialized');
         }
       } else {
-        setError(result.error || 'Failed to load notifications');
+        // For logged-in users, just show empty state instead of error
+        console.log('[NOTIFICATIONS] Failed to load notifications:', result.error);
+        setNotifications([]);
       }
     } catch (err) {
-      setError('An error occurred');
+      console.log('[NOTIFICATIONS] Error loading notifications:', err instanceof Error ? err.message : 'Unknown error');
+      setNotifications([]);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +88,6 @@ export default function NotificationsScreen() {
         await refreshUnreadCount();
       }
     } catch (err) {
-      console.error('Error marking notification as read:', err);
     }
   };
 
@@ -111,7 +99,6 @@ export default function NotificationsScreen() {
         await refreshUnreadCount();
       }
     } catch (err) {
-      console.error('Error deleting notification:', err);
     }
   };
 
@@ -125,14 +112,12 @@ export default function NotificationsScreen() {
         await refreshUnreadCount();
       }
     } catch (err) {
-      console.error('Error marking all as read:', err);
     }
   };
 
   const formatDate = (dateString: string) => {
     try {
       if (!dateString) {
-        console.warn('formatDate: No date string provided');
         return 'Unknown date';
       }
 
@@ -140,7 +125,6 @@ export default function NotificationsScreen() {
 
       // Validate the date
       if (isNaN(date.getTime())) {
-        console.warn('formatDate: Invalid date string -', dateString);
         return 'Invalid date';
       }
 
@@ -158,7 +142,6 @@ export default function NotificationsScreen() {
         day: 'numeric',
       });
     } catch (error) {
-      console.error('formatDate error:', error, 'for string:', dateString);
       return 'Invalid date';
     }
   };
@@ -180,7 +163,6 @@ export default function NotificationsScreen() {
 
   const renderNotification = ({ item }: { item: Notification }) => {
     // Log each notification's date for debugging
-    console.log(`Rendering ${item.type} notification - createdAt: ${item.createdAt}`);
 
     return (
       <TouchableOpacity
@@ -248,10 +230,13 @@ export default function NotificationsScreen() {
         </View>
       ) : error ? (
         <View style={styles.centerContainer}>
-          <Feather name="alert-triangle" size={48} color="#EF4444" />
+          <Feather name={error.includes('Sign in') ? 'lock' : 'alert-triangle'} size={48} color={error.includes('Sign in') ? '#8B5CF6' : '#EF4444'} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadNotifications}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={error.includes('Sign in') ? () => router.push('/login') : loadNotifications}
+          >
+            <Text style={styles.retryButtonText}>{error.includes('Sign in') ? 'Sign In' : 'Retry'}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -264,14 +249,6 @@ export default function NotificationsScreen() {
           scrollEnabled={true}
         />
       )}
-
-      {/* Auth gate for unauthenticated users */}
-      <AuthGateModal
-        visible={showAuthGate}
-        onClose={() => {
-          router.back();
-        }}
-      />
     </SafeAreaView>
   );
 }

@@ -44,6 +44,14 @@ export default function RecordScreen() {
     };
   });
 
+  // Check if user is logged in - if not, show auth gate
+  useEffect(() => {
+    if (!user) {
+      console.log('[RECORD] User not logged in - showing auth gate');
+      setShowAuthGate(true);
+    }
+  }, [user]);
+
   useEffect(() => {
     (async () => {
       const status = await AudioModule.requestRecordingPermissionsAsync();
@@ -80,7 +88,6 @@ export default function RecordScreen() {
           audioPlayer.play();
         }
       } catch (err) {
-        console.error('Play failed:', err);
         setIsPlayingRecording(false);
       }
     } else {
@@ -126,7 +133,6 @@ export default function RecordScreen() {
     try {
       // Prevent multiple simultaneous stop calls
       if (isStopping || !isRecording) {
-        console.warn('Recording stop already in progress or not recording');
         return;
       }
 
@@ -134,7 +140,6 @@ export default function RecordScreen() {
 
       // Verify recorder exists and hasn't been released
       if (!audioRecorder) {
-        console.warn('Audio recorder was already released');
         setIsRecording(false);
         setIsStopping(false);
         return;
@@ -147,7 +152,6 @@ export default function RecordScreen() {
       setIsRecording(false);
       const uri = audioRecorder.uri ?? null;
       setRecordedUri(uri);
-      console.log('Recording saved to:', uri, 'Duration:', durationMs);
 
       if (uri) {
         try {
@@ -155,6 +159,7 @@ export default function RecordScreen() {
           const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const savedReport = await saveReport({
             id: reportId,
+            ...(user?.userId && { userId: user.userId }),
             type: 'audio',
             status: 'saved',
             audioUri: uri,
@@ -164,11 +169,10 @@ export default function RecordScreen() {
           });
           setReportId(savedReport.id);
         } catch (error) {
-          console.error('Error auto-saving audio report:', error);
+          // Silently ignore auto-save errors
         }
       }
     } catch (err) {
-      console.error('Error stopping recording:', err);
       Alert.alert('Error', 'Failed to save recording');
     } finally {
       setIsStopping(false);
@@ -184,7 +188,7 @@ export default function RecordScreen() {
       try {
         await stopRecording();
       } catch (error) {
-        console.error('Error stopping recording on emergency exit:', error);
+        // Silently ignore stop errors on emergency exit
       }
     } else if (recordedUri && !reportId) {
       // If stopped but not yet saved (rare race condition), try to save
@@ -193,6 +197,7 @@ export default function RecordScreen() {
         const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await saveReport({
           id: tempReportId,
+          ...(user?.userId && { userId: user.userId }),
           type: 'audio',
           status: 'saved',
           audioUri: recordedUri,
@@ -200,7 +205,6 @@ export default function RecordScreen() {
           updatedAt: now,
         });
       } catch (error) {
-        console.error('Error saving existing recording on exit:', error);
       }
     }
 
@@ -209,13 +213,19 @@ export default function RecordScreen() {
       enterDecoyMode();
       router.replace('/fake-calculator');
     } catch (error) {
-      console.error('Error navigating to decoy mode:', error);
       // Fallback: try to navigate even if context update fails or something else happens
       router.replace('/fake-calculator');
     }
   };
 
   const handleSaveDraft = async () => {
+    // Check if user is logged in
+    if (!user) {
+      console.log('[RECORD] Cannot save draft - user not logged in');
+      setShowAuthGate(true);
+      return;
+    }
+
     if (!recordedUri) {
       Alert.alert('Error', 'No recording available');
       return;
@@ -244,6 +254,7 @@ export default function RecordScreen() {
       const draftReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const savedReport = await saveReport({
         id: draftReportId,
+        ...(user?.userId && { userId: user.userId }),
         type: 'audio',
         status: 'saved',
         audioUri: recordedUri,
@@ -262,7 +273,6 @@ export default function RecordScreen() {
         },
       ]);
     } catch (error) {
-      console.error('Error:', error);
       Alert.alert('Error', 'Failed to save draft');
     } finally {
       setIsSavingDraft(false);
@@ -285,7 +295,7 @@ export default function RecordScreen() {
     // Show confirmation modal first
     Alert.alert(
       'Submit Report?',
-      'Are you sure you want to submit this report? Once submitted, it will be recorded on the blockchain.',
+      'Are you sure you want to submit this report?',
       [
         {
           text: 'Cancel',
@@ -308,6 +318,7 @@ export default function RecordScreen() {
   const performSubmission = async () => {
     setIsSubmitting(true);
     try {
+      console.log('[REPORT SUBMISSION] Starting submission for audio report');
       // Get the saved report for submission
       const { getReportById } = require('@/services/storage');
       const report = await getReportById(reportId);
@@ -317,20 +328,19 @@ export default function RecordScreen() {
         return;
       }
 
+      console.log('[REPORT SUBMISSION] Report loaded:', { id: report.id, type: report.type, status: report.status });
+
       // Capture location if available
-      console.log('🔍 Starting location capture...');
       try {
-        console.log('🔍 Requesting location permissions...');
+        console.log('[REPORT SUBMISSION] Requesting location permission...');
         const { status } = await Location.requestForegroundPermissionsAsync();
-        console.log('🔍 Location permission status:', status);
 
         if (status === 'granted') {
-          console.log('🔍 Permission granted, getting current position...');
+          console.log('[REPORT SUBMISSION] Location permission granted, getting GPS coordinates...');
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.High,
           });
 
-          console.log('🔍 Location received:', location);
           const mapLink = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
           const locationData = {
             latitude: location.coords.latitude,
@@ -339,26 +349,28 @@ export default function RecordScreen() {
             timestamp: new Date().toISOString(),
           };
 
+          console.log('[REPORT SUBMISSION] Location captured:', locationData);
+
           // Add location to report metadata
           if (!report.metadata) {
             report.metadata = {};
           }
           report.metadata.location = JSON.stringify(locationData);
-
-          console.log('📍 Location captured for report:', locationData);
-          console.log('📍 Map link:', mapLink);
-          console.log('📍 Report metadata updated:', report.metadata);
         } else {
-          console.log('🔍 Permission not granted, status:', status);
+          console.log('[REPORT SUBMISSION] Location permission denied');
         }
       } catch (locError) {
-        console.error('🔍 Location capture error:', locError);
+        console.log('[REPORT SUBMISSION] Location capture failed:', locError instanceof Error ? locError.message : 'Unknown error');
         // Continue without location if permission denied or GPS fails
       }
 
+      console.log('[REPORT SUBMISSION] Submitting to backend...');
       const result = await submitReportToBackend(report);
 
+      console.log('[REPORT SUBMISSION] Full backend response:', JSON.stringify(result, null, 2));
+
       if (result.success) {
+        console.log('[REPORT SUBMISSION] ✅ Submission successful!', { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
         Alert.alert(
           'Success',
           'Your recording has been submitted to the backend securely.',
@@ -367,6 +379,7 @@ export default function RecordScreen() {
               text: 'OK',
               onPress: () => {
                 if (result.submissionId) {
+                  console.log('[REPORT SUBMISSION] Starting status polling for submission:', result.submissionId);
                   startStatusPolling(result.submissionId);
                 }
                 router.replace('/(tabs)');
@@ -375,6 +388,7 @@ export default function RecordScreen() {
           ]
         );
       } else if (result.requiresAuth) {
+        console.log('[REPORT SUBMISSION] ❌ Authentication required');
         // Authentication required - redirect to login
         Alert.alert(
           'Login Required',
@@ -401,6 +415,7 @@ export default function RecordScreen() {
           ]
         );
       } else {
+        console.log('[REPORT SUBMISSION] ❌ Submission failed:', result.error);
         Alert.alert(
           'Submission Error',
           result.error || 'Failed to submit. Your recording has been saved locally.',
@@ -415,7 +430,7 @@ export default function RecordScreen() {
         );
       }
     } catch (error) {
-      console.error('Error submitting report:', error);
+      console.log('[REPORT SUBMISSION] ❌ Submission exception:', error instanceof Error ? error.message : 'Unknown error');
       Alert.alert(
         'Error',
         'An error occurred. Your recording has been saved locally.',
@@ -443,6 +458,7 @@ export default function RecordScreen() {
         const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const savedReport = await saveReport({
           id: tempReportId,
+          ...(user?.userId && { userId: user.userId }),
           type: 'audio',
           status: 'saved',
           audioUri: recordedUri,
@@ -451,7 +467,6 @@ export default function RecordScreen() {
         });
         currentReportId = savedReport.id;
       } catch (error) {
-        console.error('Error saving audio report:', error);
         // Continue navigation even if save fails
       }
     }

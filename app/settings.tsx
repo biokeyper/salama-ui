@@ -36,7 +36,6 @@ export default function SettingsScreen() {
     const [showAuthGate, setShowAuthGate] = useState(false);
 
     useEffect(() => {
-        checkAuth();
         checkPin();
         // Pre-fill with user's email if it exists
         if (user?.email) {
@@ -47,15 +46,13 @@ export default function SettingsScreen() {
     // Check if email is set (not null and not empty)
     const emailRecoverySetup = user?.email ? true : false;
 
-    const checkAuth = async () => {
+    const checkAuth = async (): Promise<boolean> => {
         const token = await getAuthToken();
-        if (!token || !user) {
-            setShowAuthGate(true);
-        }
+        return !!(token && user);
     };
 
     const checkPin = async () => {
-        const exists = await hasPin();
+        const exists = await hasPin(user?.userId);
         setPinExists(exists);
     };
 
@@ -84,7 +81,14 @@ export default function SettingsScreen() {
         );
     };
 
-    const handleDeleteAccount = () => {
+    const handleDeleteAccount = async () => {
+        // Check authentication before allowing account deletion
+        const isAuth = await checkAuth();
+        if (!isAuth) {
+            setShowAuthGate(true);
+            return;
+        }
+
         Alert.alert(
             '⚠️ Delete Account',
             'All your account data, reports, and settings will be permanently deleted. However, any reports you have submitted to the blockchain will remain there permanently as they are immutable. This action cannot be undone.',
@@ -127,13 +131,15 @@ export default function SettingsScreen() {
     };
 
     const handleSetPin = async (pin: string) => {
-        const success = await savePin(pin);
+        const success = await savePin(pin, user?.userId);
         if (success) {
             setPinExists(true);
             setShowSetPin(false);
             setShowVerifyPin(false);
             // Refresh global PIN state
             await checkPinStatus();
+            const logStatus = user?.userId ? `✅ PIN set for user: ${user.userId}` : '✅ PIN set locally';
+            console.log('[SETTINGS] ' + logStatus);
             Alert.alert('Success', 'PIN has been set successfully');
         } else {
             Alert.alert('Error', 'Failed to set PIN. Please try again.');
@@ -149,6 +155,16 @@ export default function SettingsScreen() {
         // After successful verification, show set PIN modal
         setShowVerifyPin(false);
         setShowSetPin(true);
+    };
+
+    const handleOpenEmailRecovery = async () => {
+        // Check authentication before allowing email recovery setup
+        const isAuth = await checkAuth();
+        if (!isAuth) {
+            setShowAuthGate(true);
+            return;
+        }
+        setShowEmailRecoveryModal(true);
     };
 
     const handleSetupEmailRecovery = async () => {
@@ -327,7 +343,7 @@ export default function SettingsScreen() {
                     {emailRecoverySetup && (
                         <TouchableOpacity
                             style={styles.primaryButton}
-                            onPress={() => setShowEmailRecoveryModal(true)}
+                            onPress={handleOpenEmailRecovery}
                         >
                             <Feather name="edit-2" size={20} color="#8B5CF6" />
                             <Text style={styles.primaryButtonText}>
@@ -339,7 +355,7 @@ export default function SettingsScreen() {
                     {!emailRecoverySetup && (
                         <TouchableOpacity
                             style={styles.primaryButton}
-                            onPress={() => setShowEmailRecoveryModal(true)}
+                            onPress={handleOpenEmailRecovery}
                         >
                             <Feather name="mail" size={20} color="#8B5CF6" />
                             <Text style={styles.primaryButtonText}>
@@ -349,43 +365,47 @@ export default function SettingsScreen() {
                     )}
                 </View>
 
-                {/* Session Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Session</Text>
-                    <Text style={styles.sectionDescription}>
-                        Manage your account session and login status.
-                    </Text>
-
-                    <TouchableOpacity
-                        style={styles.dangerButton}
-                        onPress={handleLogout}
-                        disabled={isLoggingOut}
-                    >
-                        <Feather name="log-out" size={20} color="#EF4444" />
-                        <Text style={styles.dangerButtonText}>
-                            {isLoggingOut ? 'Logging out...' : 'Logout'}
+                {/* Session Section - Only show if logged in */}
+                {user && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Session</Text>
+                        <Text style={styles.sectionDescription}>
+                            Manage your account session and login status.
                         </Text>
-                    </TouchableOpacity>
-                </View>
 
-                {/* Data Management Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Data Management</Text>
-                    <Text style={styles.sectionDescription}>
-                        All your data is stored privately on your device only. No cloud sync.
-                    </Text>
+                        <TouchableOpacity
+                            style={styles.dangerButton}
+                            onPress={handleLogout}
+                            disabled={isLoggingOut}
+                        >
+                            <Feather name="log-out" size={20} color="#EF4444" />
+                            <Text style={styles.dangerButtonText}>
+                                {isLoggingOut ? 'Logging out...' : 'Logout'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
-                    <TouchableOpacity
-                        style={styles.dangerButton}
-                        onPress={handleDeleteAccount}
-                        disabled={isClearing}
-                    >
-                        <Feather name="trash-2" size={20} color="#EF4444" />
-                        <Text style={styles.dangerButtonText}>
-                            {isClearing ? 'Deleting...' : 'Delete Account'}
+                {/* Data Management Section - Only show if logged in */}
+                {user && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Data Management</Text>
+                        <Text style={styles.sectionDescription}>
+                            All your data is stored privately on your device only. No cloud sync.
                         </Text>
-                    </TouchableOpacity>
-                </View>
+
+                        <TouchableOpacity
+                            style={styles.dangerButton}
+                            onPress={handleDeleteAccount}
+                            disabled={isClearing}
+                        >
+                            <Feather name="trash-2" size={20} color="#EF4444" />
+                            <Text style={styles.dangerButtonText}>
+                                {isClearing ? 'Deleting...' : 'Delete Account'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Privacy Notice */}
                 <View style={styles.privacyNotice}>

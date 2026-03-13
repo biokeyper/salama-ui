@@ -8,6 +8,7 @@ export type ReportStatus = 'draft' | 'saved' | 'submitted' | 'pending' | 'confir
 
 export interface Report {
   id: string;
+  userId?: string; // User who created this report (for multi-user devices) - optional if not logged in
   type: ReportType;
   status: ReportStatus;
   createdAt: string; // ISO 8601 timestamp

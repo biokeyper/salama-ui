@@ -18,14 +18,12 @@ export default function VerifyEmailScreen() {
 
   const verifyEmail = async () => {
     if (!email || !userId) {
-      console.error('❌ Missing email or userId:', { email, userId });
       setVerifyError('Invalid verification link');
       setIsVerifying(false);
       return;
     }
 
     try {
-      console.log('📧 Verifying email:', email, 'for userId:', userId);
 
       const response = await axios.post(
         `${apiConfig.baseURL}/api/auth/setup-email`,
@@ -36,7 +34,6 @@ export default function VerifyEmailScreen() {
       );
 
       if (response.status === 200) {
-        console.log('✅ Email verified successfully');
         setIsVerifying(false);
         Alert.alert(
           'Success',
@@ -52,7 +49,6 @@ export default function VerifyEmailScreen() {
         );
       }
     } catch (error) {
-      console.error('❌ Email verification failed:', error);
       let message = 'Failed to verify email. Please try again.';
 
       if (axios.isAxiosError(error)) {

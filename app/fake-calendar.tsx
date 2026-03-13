@@ -54,7 +54,6 @@ export default function FakeCalendarScreen() {
                 try {
                     audioRecorder.stop().catch(() => { });
                 } catch (error) {
-                    console.log('Recorder cleanup skipped - already released');
                 }
             }
         };
@@ -64,7 +63,6 @@ export default function FakeCalendarScreen() {
         try {
             const status = await AudioModule.requestRecordingPermissionsAsync();
             if (!status.granted) {
-                console.error('Microphone permission not granted');
                 return;
             }
 
@@ -72,9 +70,7 @@ export default function FakeCalendarScreen() {
             audioRecorder.record();
             setRecordingStartTime(Date.now());
             setIsRecording(true);
-            console.log('Background recording started in calendar');
         } catch (error) {
-            console.error('Error starting background recording:', error);
         }
     };
 
@@ -84,7 +80,6 @@ export default function FakeCalendarScreen() {
         try {
             // Verify recorder exists and hasn't been released
             if (!audioRecorder) {
-                console.warn('Audio recorder was already released');
                 setIsRecording(false);
                 return null;
             }
@@ -110,13 +105,11 @@ export default function FakeCalendarScreen() {
                     metadata: { notes: 'Background recording from calendar' },
                 });
 
-                console.log('Background recording saved:', savedReport);
                 setBackgroundRecordingUri(uri);
                 return uri;
             }
             return null;
         } catch (error) {
-            console.error('Error stopping background recording:', error);
             setIsRecording(false);
             return null;
         }
@@ -128,7 +121,6 @@ export default function FakeCalendarScreen() {
             exitDecoyMode();
             router.replace('/(tabs)');
         } catch (error) {
-            console.error('Error during emergency exit:', error);
             exitDecoyMode();
             router.replace('/(tabs)');
         }

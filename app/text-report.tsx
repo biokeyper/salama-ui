@@ -25,6 +25,14 @@ export default function TextReportScreen() {
   const audioUri = params.audioUri as string | undefined;
   const editReportId = params.editReportId as string | undefined;
 
+  // Check if user is logged in - if not, show auth gate
+  useEffect(() => {
+    if (!user) {
+      console.log('[TEXT-REPORT] User not logged in - showing auth gate');
+      setShowAuthGate(true);
+    }
+  }, [user]);
+
   // Load existing report if editing
   useEffect(() => {
     if (editReportId) {
@@ -52,7 +60,6 @@ export default function TextReportScreen() {
       setEditingReport(existingReport);
       setReport(existingReport.textContent || '');
     } catch (error) {
-      console.error('Error loading report for editing:', error);
       Alert.alert('Error', 'Failed to load report');
       router.back();
     }
@@ -77,7 +84,6 @@ export default function TextReportScreen() {
       Alert.alert('Success', 'Report updated successfully');
       router.back();
     } catch (error) {
-      console.error('Error updating report:', error);
       Alert.alert('Error', 'Failed to update report');
     } finally {
       setIsSubmitting(false);
@@ -85,6 +91,13 @@ export default function TextReportScreen() {
   };
 
   const handleSaveDraft = async () => {
+    // Check if user is logged in
+    if (!user) {
+      console.log('[TEXT-REPORT] Cannot save draft - user not logged in');
+      setShowAuthGate(true);
+      return;
+    }
+
     if (!report.trim()) {
       Alert.alert('Please enter your report or details.');
       return;
@@ -98,6 +111,7 @@ export default function TextReportScreen() {
 
       await saveReport({
         id: reportId,
+        ...(user?.userId && { userId: user.userId }),
         type: reportType,
         status: 'saved',
         textContent: report.trim(),
@@ -116,7 +130,6 @@ export default function TextReportScreen() {
         },
       ]);
     } catch (error) {
-      console.error('Error saving report:', error);
       Alert.alert('Error', 'Failed to save your report. Please try again.');
     } finally {
       setIsSavingLocally(false);
@@ -139,7 +152,7 @@ export default function TextReportScreen() {
     // Show confirmation modal
     Alert.alert(
       'Submit Report?',
-      'Are you sure you want to submit this report? Once submitted, it will be recorded on the blockchain.',
+      'Are you sure you want to submit this report?',
       [
         {
           text: 'Cancel',
@@ -162,25 +175,25 @@ export default function TextReportScreen() {
   const performSubmission = async () => {
     setIsSubmitting(true);
     try {
+      console.log('[REPORT SUBMISSION] Starting submission for text report');
       const reportType: ReportType = audioUri ? 'mixed' : 'text';
       const now = new Date().toISOString();
       const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+      console.log('[REPORT SUBMISSION] Report type:', reportType, '| Report ID:', reportId);
+
       // Capture location if available
       let metadata: any = {};
-      console.log('🔍 Starting location capture...');
       try {
-        console.log('🔍 Requesting location permissions...');
+        console.log('[REPORT SUBMISSION] Requesting location permission...');
         const { status } = await Location.requestForegroundPermissionsAsync();
-        console.log('🔍 Location permission status:', status);
 
         if (status === 'granted') {
-          console.log('🔍 Permission granted, getting current position...');
+          console.log('[REPORT SUBMISSION] Location permission granted, getting GPS coordinates...');
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.High,
           });
 
-          console.log('🔍 Location received:', location);
           const mapLink = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
           const locationData = {
             latitude: location.coords.latitude,
@@ -189,22 +202,21 @@ export default function TextReportScreen() {
             timestamp: new Date().toISOString(),
           };
 
+          console.log('[REPORT SUBMISSION] Location captured:', locationData);
           metadata.location = JSON.stringify(locationData);
-
-          console.log('📍 Location captured for report:', locationData);
-          console.log('📍 Map link:', mapLink);
-          console.log('📍 Metadata:', metadata);
         } else {
-          console.log('🔍 Permission not granted, status:', status);
+          console.log('[REPORT SUBMISSION] Location permission denied');
         }
       } catch (locError) {
-        console.error('🔍 Location capture error:', locError);
+        console.log('[REPORT SUBMISSION] Location capture failed:', locError instanceof Error ? locError.message : 'Unknown error');
         // Continue without location if permission denied or GPS fails
       }
 
       // First save locally
+      console.log('[REPORT SUBMISSION] Saving report locally...');
       const savedReport = await saveReport({
         id: reportId,
+        ...(user?.userId && { userId: user.userId }),
         type: reportType,
         status: 'saved',
         textContent: report.trim(),
@@ -214,10 +226,14 @@ export default function TextReportScreen() {
         metadata,
       });
 
+      console.log('[REPORT SUBMISSION] Report saved locally, submitting to backend...');
       // Then submit to backend
       const result = await submitReportToBackend(savedReport);
 
+      console.log('[REPORT SUBMISSION] Full backend response:', JSON.stringify(result, null, 2));
+
       if (result.success) {
+        console.log('[REPORT SUBMISSION] ✅ Submission successful!', { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
         Alert.alert(
           'Success',
           'Your report has been submitted successfully.',
@@ -231,6 +247,7 @@ export default function TextReportScreen() {
           ]
         );
       } else {
+        console.log('[REPORT SUBMISSION] ❌ Submission failed:', result.error);
         Alert.alert(
           'Submission Error',
           result.error || 'Failed to submit to backend. Your report has been saved locally and can be submitted later.',
@@ -245,7 +262,7 @@ export default function TextReportScreen() {
         );
       }
     } catch (error) {
-      console.error('Error submitting report:', error);
+      console.log('[REPORT SUBMISSION] ❌ Submission exception:', error instanceof Error ? error.message : 'Unknown error');
       Alert.alert(
         'Error',
         'An unexpected error occurred. Your report has been saved locally.',

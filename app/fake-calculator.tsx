@@ -46,7 +46,6 @@ export default function FakeCalculatorScreen() {
         try {
           audioRecorder.stop().catch(() => { });
         } catch (error) {
-          console.log('Recorder cleanup skipped - already released');
         }
       }
     };
@@ -69,7 +68,6 @@ export default function FakeCalculatorScreen() {
     try {
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        console.error('Microphone permission not granted');
         return;
       }
 
@@ -77,9 +75,7 @@ export default function FakeCalculatorScreen() {
       audioRecorder.record();
       setRecordingStartTime(Date.now());
       setIsRecording(true);
-      console.log('Background recording started');
     } catch (error) {
-      console.error('Error starting background recording:', error);
     }
   };
 
@@ -89,7 +85,6 @@ export default function FakeCalculatorScreen() {
     try {
       // Verify recorder exists and hasn't been released
       if (!audioRecorder) {
-        console.warn('Audio recorder was already released');
         setIsRecording(false);
         return null;
       }
@@ -115,11 +110,9 @@ export default function FakeCalculatorScreen() {
           metadata: { notes: 'Background recording from calculator' },
         });
         setBackgroundRecordingUri(uri);
-        console.log('Background recording saved:', savedReport.id);
         return uri;
       }
     } catch (error) {
-      console.error('Error stopping background recording:', error);
     }
 
     return null;

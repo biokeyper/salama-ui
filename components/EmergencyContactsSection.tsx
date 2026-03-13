@@ -23,13 +23,18 @@ import {
   setPanicMessage,
   EmergencyContact,
 } from '@/services/emergencyContactService';
+import { getAuthToken } from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthGateModal from '@/components/AuthGateModal';
 
 export default function EmergencyContactsSection() {
+  const { user } = useAuth();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [panicMessage, setPanicMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPanicMessageModal, setShowPanicMessageModal] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
   const [newPhone, setNewPhone] = useState('');
   const [newName, setNewName] = useState('');
   const [newRelationship, setNewRelationship] = useState('');
@@ -43,6 +48,7 @@ export default function EmergencyContactsSection() {
   const [editName, setEditName] = useState('');
   const [editRelationship, setEditRelationship] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'add' | 'edit' | 'panic' | null>(null);
 
   // Refs for TextInputs in edit modal
   const editPhoneRef = useRef<TextInput>(null);
@@ -62,7 +68,6 @@ export default function EmergencyContactsSection() {
         setContacts(result.data);
       }
     } catch (error) {
-      console.error('Error loading contacts:', error);
     } finally {
       setIsLoading(false);
     }
@@ -74,12 +79,54 @@ export default function EmergencyContactsSection() {
       if (result.success && typeof result.data === 'string') {
         setPanicMsg(result.data);
       } else if (result.success && result.data) {
-        console.warn('Panic message is not a string:', typeof result.data, result.data);
         setPanicMsg('');
       }
     } catch (error) {
-      console.error('Error loading panic message:', error);
     }
+  };
+
+  const checkAuth = async (): Promise<boolean> => {
+    const token = await getAuthToken();
+    return !!(token && user);
+  };
+
+  const handleOpenAddModal = async () => {
+    const isAuth = await checkAuth();
+    if (!isAuth) {
+      setPendingAction('add');
+      setShowAuthGate(true);
+      return;
+    }
+    setShowAddModal(true);
+  };
+
+  const handleOpenEditModal = async (contact: EmergencyContact) => {
+    const isAuth = await checkAuth();
+    if (!isAuth) {
+      setPendingAction('edit');
+      setShowAuthGate(true);
+      return;
+    }
+    setEditingContact(contact);
+    setEditPhone(contact.phone);
+    setEditName(contact.name);
+    setEditRelationship(contact.relationship);
+    setShowEditModal(true);
+  };
+
+  const handleOpenPanicMessageModal = async () => {
+    const isAuth = await checkAuth();
+    if (!isAuth) {
+      setPendingAction('panic');
+      setShowAuthGate(true);
+      return;
+    }
+    setShowPanicMessageModal(true);
+  };
+
+  const handleAuthGateClosed = () => {
+    setShowAuthGate(false);
+    setPendingAction(null);
   };
 
   const loadDeviceContacts = async () => {
@@ -103,7 +150,6 @@ export default function EmergencyContactsSection() {
         setShowDeviceContacts(true);
       }
     } catch (error) {
-      console.error('Error loading device contacts:', error);
       Alert.alert('Error', 'Failed to load device contacts');
     }
   };
@@ -197,31 +243,22 @@ export default function EmergencyContactsSection() {
   };
 
   const handleEditContact = (contact: EmergencyContact) => {
-    setEditingContact(contact);
-    setEditPhone(contact.phone);
-    setEditName(contact.name);
-    setEditRelationship(contact.relationship);
-    setShowEditModal(true);
+    handleOpenEditModal(contact);
   };
 
   const handleSaveEdit = async () => {
-    console.log('🔵 handleSaveEdit called - isEditing:', isEditing, 'editingContact:', editingContact);
 
     // Prevent duplicate submissions
     if (isEditing || !editingContact) {
-      console.log('⚠️ Preventing duplicate submission - isEditing:', isEditing);
       return;
     }
 
     if (!editName.trim() || !editPhone.trim() || !editRelationship.trim()) {
-      console.log('❌ Validation failed - missing fields');
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    console.log('✅ Validation passed');
     setIsEditing(true);
-    console.log('⏳ Set isEditing to true');
 
     try {
       const updatePayload = {
@@ -229,13 +266,10 @@ export default function EmergencyContactsSection() {
         phone: editPhone.trim(),
         relationship: editRelationship.trim(),
       };
-      console.log('📝 Editing contact with payload:', JSON.stringify(updatePayload, null, 2));
 
       const result = await editEmergencyContact(editingContact.contactId, updatePayload);
-      console.log('📞 Edit response received:', result.success, result.error);
 
       if (result.success) {
-        console.log('✨ Edit successful');
         Alert.alert('Success', 'Contact updated successfully');
         setShowEditModal(false);
         setEditingContact(null);
@@ -244,14 +278,11 @@ export default function EmergencyContactsSection() {
         setEditRelationship('');
         await loadContacts();
       } else {
-        console.log('❌ Edit failed:', result.error);
         Alert.alert('Error', result.error || 'Failed to update contact');
       }
     } catch (error) {
-      console.log('💥 Exception in edit:', error);
       Alert.alert('Error', 'An error occurred while updating contact');
     } finally {
-      console.log('🔚 Finally - setting isEditing to false');
       setIsEditing(false);
     }
   };
@@ -292,7 +323,7 @@ export default function EmergencyContactsSection() {
       {/* Panic Message Card */}
       <TouchableOpacity
         style={styles.panicMessageCard}
-        onPress={() => setShowPanicMessageModal(true)}
+        onPress={handleOpenPanicMessageModal}
       >
         <View style={styles.panicMessageContent}>
           <Feather name="message-square" size={20} color="#8B5CF6" />
@@ -342,7 +373,7 @@ export default function EmergencyContactsSection() {
 
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => setShowAddModal(true)}
+          onPress={handleOpenAddModal}
         >
           <Feather name="plus" size={20} color="#8B5CF6" />
           <Text style={styles.addButtonText}>Add Emergency Contact</Text>
@@ -568,6 +599,13 @@ export default function EmergencyContactsSection() {
           </View>
         </View>
       </Modal>
+
+      {/* Auth Gate Modal for emergency contact operations */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={handleAuthGateClosed}
+        message="Sign in to manage emergency contacts"
+      />
     </View>
   );
 }

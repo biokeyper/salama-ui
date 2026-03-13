@@ -48,9 +48,12 @@ export async function grantAccess(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error granting access:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to grant access';
+    let errorMessage = 'Failed to grant access';
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as any;
+      const responseData = axiosError.response?.data;
+      errorMessage = responseData?.message || 'Failed to grant access';
+    }
     return {
       success: false,
       error: errorMessage,
@@ -84,9 +87,12 @@ export async function revokeAccess(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error revoking access:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to revoke access';
+    let errorMessage = 'Failed to revoke access';
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as any;
+      const responseData = axiosError.response?.data;
+      errorMessage = responseData?.message || 'Failed to revoke access';
+    }
     return {
       success: false,
       error: errorMessage,
@@ -112,7 +118,6 @@ export async function getMySharedReports(): Promise<{ success: boolean; reports?
         reports = Array.isArray(response.data.data) ? response.data.data : [];
       }
 
-      console.log('📤 My shared reports fetched:', reports.length);
       return {
         success: true,
         reports,
@@ -124,7 +129,6 @@ export async function getMySharedReports(): Promise<{ success: boolean; reports?
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching my shared reports:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Failed to fetch my shared reports';
     return {
@@ -149,7 +153,6 @@ export async function getSharedWithMe(): Promise<{ success: boolean; reports?: S
         reports = Array.isArray(response.data.data) ? response.data.data : [];
       }
 
-      console.log('📥 Shared with me reports fetched:', reports.length);
       return {
         success: true,
         reports,
@@ -161,7 +164,6 @@ export async function getSharedWithMe(): Promise<{ success: boolean; reports?: S
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching shared reports:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Failed to fetch shared reports';
     return {
@@ -204,7 +206,6 @@ export async function getReportViewers(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching report viewers:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Failed to fetch report viewers';
     return {
@@ -238,9 +239,12 @@ export async function getSharedReport(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error fetching shared report:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to fetch shared report';
+    let errorMessage = 'Failed to fetch shared report';
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as any;
+      const responseData = axiosError.response?.data;
+      errorMessage = responseData?.message || 'Failed to fetch shared report';
+    }
     return {
       success: false,
       error: errorMessage,
@@ -272,9 +276,12 @@ export async function unarchiveReport(
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.error('Error unarchiving report:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to unarchive report';
+    let errorMessage = 'Failed to unarchive report';
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as any;
+      const responseData = axiosError.response?.data;
+      errorMessage = responseData?.message || 'Failed to unarchive report';
+    }
     return {
       success: false,
       error: errorMessage,

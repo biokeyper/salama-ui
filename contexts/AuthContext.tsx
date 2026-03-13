@@ -51,14 +51,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const rehydrateAuth = async () => {
     try {
+      console.log('[AUTH-CONTEXT] 🔄 Rehydrating auth on app start...');
       const authenticated = await isAuthenticated();
+      console.log('[AUTH-CONTEXT] Auth check result:', authenticated);
       if (authenticated) {
         const userInfo = await getUserInfo();
+        console.log('[AUTH-CONTEXT] ✅ User authenticated:', userInfo);
         setUser(userInfo);
         setIsLoggedIn(true);
+      } else {
+        console.log('[AUTH-CONTEXT] ❌ No authenticated user');
       }
     } catch (error) {
-      console.error('Error rehydrating auth:', error);
+      console.error('[AUTH-CONTEXT] Error rehydrating auth:', error);
     } finally {
       setIsLoading(false);
     }
@@ -78,8 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     otp: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
+      console.log('[AUTH-CONTEXT] 📝 Starting signup...');
       const result = await verifySignup(phone, otp);
+      console.log('[AUTH-CONTEXT] Signup result:', result.success, result.user);
       if (result.success && result.user) {
+        console.log('[AUTH-CONTEXT] ✅ Setting user after signup:', result.user.userId);
         setUser(result.user);
         setIsLoggedIn(true);
         // Show email recovery modal on first signup only if user doesn't have email from backend
@@ -91,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Signup failed';
+      console.log('[AUTH-CONTEXT] ❌ Signup failed:', message);
       return { success: false, error: message };
     }
   };
@@ -100,10 +109,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     otp: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
+      console.log('[AUTH-CONTEXT] 🔐 Starting login for phone:', phone);
       const result = await verifyLogin(phone, otp);
+      console.log('[AUTH-CONTEXT] Login result:', result.success, result.user);
       if (result.success && result.user) {
+        console.log('[AUTH-CONTEXT] ✅ Setting user after login:', result.user.userId);
         setUser(result.user);
         setIsLoggedIn(true);
+
+        // Assign userId to local reports created while not logged in
+        try {
+          console.log('[AUTH] Assigning userId to local reports...');
+          const { getAllReports, saveReport } = await import('@/services/storage');
+          const localReports = await getAllReports(undefined); // Get all reports without userId filter
+          const reportsNeedingUserId = localReports.filter(r => !r.userId);
+
+          console.log('[AUTH] Found', reportsNeedingUserId.length, 'reports without userId');
+
+          for (const report of reportsNeedingUserId) {
+            await saveReport({
+              ...report,
+              userId: result.user.userId,
+            });
+            console.log('[AUTH] Updated report', report.id, 'with userId:', result.user.userId);
+          }
+
+          if (reportsNeedingUserId.length > 0) {
+            console.log('[AUTH] ✅ Successfully assigned userId to', reportsNeedingUserId.length, 'reports');
+          }
+        } catch (migrateError) {
+          console.log('[AUTH] Error assigning userId to reports:', migrateError instanceof Error ? migrateError.message : 'Unknown error');
+          // Don't fail login if this fails
+        }
+
+        // Sync local PIN to backend (if user set PIN while not logged in)
+        try {
+          console.log('[AUTH] Syncing PIN to backend...');
+          const { syncLocalPinToBackend } = await import('@/services/security');
+          await syncLocalPinToBackend(result.user.userId);
+        } catch (pinError) {
+          console.log('[AUTH] Error syncing PIN:', pinError instanceof Error ? pinError.message : 'Unknown error');
+          // Don't fail login if PIN sync fails
+        }
+
         // Show email recovery modal on first login only if user doesn't have email from backend
         if (!result.user.email) {
           setShowEmailRecoveryModal(true);

@@ -1,23 +1,43 @@
-import LockScreen from '@/app/lock-screen';
-import AudioReportItem from '@/components/AudioReportItem';
-import { hasPin } from '@/services/security';
-import { getAuthToken } from '@/services/authService';
-import { useAuth } from '@/contexts/AuthContext';
-import { deleteReport, getAllReports, updateReportStatus, archiveReport, saveReport } from '@/services/storage';
-import { submitReportToBackend, archiveReportOnBackend, decryptReportFromBackend, searchBackendReports, getReportStats } from '@/services/api';
-import { startStatusPolling } from '@/services/statusPoller';
-import { grantAccess, getReportViewers, revokeAccess, getSharedWithMe, getMySharedReports, getSharedReport, unarchiveReport } from '@/services/accessService';
-import { Report } from '@/types/report';
-import { getAvailableActions } from '@/utils/reportActions';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import * as FileSystem from 'expo-file-system/legacy';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import LockScreen from "@/app/lock-screen";
+import AudioReportItem from "@/components/AudioReportItem";
+import AuthGateModal from "@/components/AuthGateModal";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getMySharedReports,
+  getReportViewers,
+  getSharedReport,
+  getSharedWithMe,
+  grantAccess,
+  revokeAccess,
+  unarchiveReport,
+} from "@/services/accessService";
+import {
+  archiveReportOnBackend,
+  decryptReportFromBackend,
+  getReportStats,
+  searchBackendReports,
+  submitReportToBackend,
+} from "@/services/api";
+import { getAuthToken } from "@/services/authService";
+import {
+  archiveReport,
+  deleteReport,
+  getAllReports,
+  saveReport,
+} from "@/services/storage";
+import { Report } from "@/types/report";
+import { getAvailableActions } from "@/utils/reportActions";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Location from "expo-location";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Clipboard,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -27,9 +47,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+  View,
+} from "react-native";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LibraryScreen() {
   const router = useRouter();
@@ -38,25 +59,34 @@ export default function LibraryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingReportId, setPlayingReportId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'audio' | 'text'>('audio');
+  const [activeTab, setActiveTab] = useState<"audio" | "text">("audio");
   const [showPinRequired, setShowPinRequired] = useState(false);
   const [showPinVerify, setShowPinVerify] = useState(false);
   const [showSetPinModal, setShowSetPinModal] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [hasNoAuthToken, setHasNoAuthToken] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [showSharedTab, setShowSharedTab] = useState(false);
-  const [sharedTabMode, setSharedTabMode] = useState<'with-me' | 'my-shared'>('with-me');
+  const [sharedTabMode, setSharedTabMode] = useState<"with-me" | "my-shared">(
+    "with-me",
+  );
   const [openMenuReportId, setOpenMenuReportId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showViewersModal, setShowViewersModal] = useState(false);
   const [showSharedWithMeTab, setShowSharedWithMeTab] = useState(false);
   const [showDecryptedModal, setShowDecryptedModal] = useState(false);
-  const [showSharedWithMeDetailsModal, setShowSharedWithMeDetailsModal] = useState(false);
+  const [showSharedWithMeDetailsModal, setShowSharedWithMeDetailsModal] =
+    useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const [selectedSharedWithMeReport, setSelectedSharedWithMeReport] = useState<any>(null);
-  const [shareUserId, setShareUserId] = useState('');
+  const [selectedSharedWithMeReport, setSelectedSharedWithMeReport] =
+    useState<any>(null);
+  const [shareUserId, setShareUserId] = useState("");
+  const [expirationDate, setExpirationDate] = useState<Date>(
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  ); // Default to 7 days
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [viewers, setViewers] = useState<any[]>([]);
   const [sharedReports, setSharedReports] = useState<any[]>([]);
   const [mySharedReports, setMySharedReports] = useState<any[]>([]);
@@ -66,12 +96,19 @@ export default function LibraryScreen() {
   const [isLoadingShare, setIsLoadingShare] = useState(false);
   const [decryptedContent, setDecryptedContent] = useState<any>(null);
   const [isLoadingDecrypt, setIsLoadingDecrypt] = useState(false);
-  const [isLoadingSharedWithMeDetails, setIsLoadingSharedWithMeDetails] = useState(false);
-  const [isSubmittingReportId, setIsSubmittingReportId] = useState<string | null>(null);
+  const [isLoadingSharedWithMeDetails, setIsLoadingSharedWithMeDetails] =
+    useState(false);
+  const [isSubmittingReportId, setIsSubmittingReportId] = useState<
+    string | null
+  >(null);
+  const [isArchivingReportId, setIsArchivingReportId] = useState<string | null>(
+    null,
+  );
+  const [isRevokingUserId, setIsRevokingUserId] = useState<string | null>(null);
 
   // Search functionality state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchStatus, setSearchStatus] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchStatus, setSearchStatus] = useState<string>("all");
   const [backendReports, setBackendReports] = useState<any[]>([]);
   const [reportStats, setReportStats] = useState<any>(null);
   const [isLoadingSearch, setIsLoadingSearch] = useState(false);
@@ -85,30 +122,11 @@ export default function LibraryScreen() {
       const checkPinStatus = async () => {
         setIsCheckingAuth(true);
 
-        // Check if user is authenticated
-        const token = await getAuthToken();
-        const isAuthenticatedUser = token && user;
-
-        if (!isAuthenticatedUser) {
-          // Not authenticated - don't show PIN modals
-          setIsAuthenticated(false);
-          setIsCheckingAuth(false);
-          return;
-        }
-
-        // User is authenticated - check PIN status
-        const pinIsSet = await hasPin();
-
-        if (!pinIsSet) {
-          // Authenticated but no PIN - show set PIN modal
-          setShowSetPinModal(true);
-          setIsAuthenticated(false);
-        } else {
-          // PIN exists - require verification
-          setShowPinVerify(true);
-          setIsAuthenticated(false);
-        }
+        // Library is open to everyone - no PIN required
+        console.log('[LIBRARY] Opening library - PIN not required');
+        setIsAuthenticated(true);
         setIsCheckingAuth(false);
+        await loadReports();
       };
       checkPinStatus();
 
@@ -118,45 +136,77 @@ export default function LibraryScreen() {
         setPlayingReportId(null);
         setOpenMenuReportId(null);
       };
-    }, [user])
+    }, [user]),
   );
 
   const handlePinVerified = () => {
+    console.log('[LIBRARY] PIN verified - loading reports');
     setShowPinVerify(false);
     setIsAuthenticated(true);
+    loadReports();
   };
 
   const handlePinSet = (pin: string) => {
     // PIN has been set - mark as authenticated and load reports
+    console.log('[LIBRARY] PIN set - loading reports');
     setShowSetPinModal(false);
     setIsAuthenticated(true);
+    loadReports();
   };
 
   // Load reports from local storage and sync with backend
   const loadReports = async () => {
     try {
-      // Load local reports
-      const allReports = await getAllReports();
+      // Load local reports (filtered by current user if logged in)
+      const userId = user?.userId;
+      console.log('===============================================');
+      console.log('[LIBRARY] Full user object:', JSON.stringify(user));
+      console.log('[LIBRARY] User Status:', userId ? `✅ LOGGED IN (${userId})` : '❌ NOT LOGGED IN');
+      console.log('[LIBRARY] Reports will be:', userId ? 'filtered to this user only' : 'unfiltered (all local reports)');
+      console.log('===============================================');
+      const allReports = await getAllReports(userId);
+      console.log('[LIBRARY] Loaded reports count:', allReports.length);
+      if (allReports.length > 0) {
+        console.log('[LIBRARY] Reports by userId:', allReports.map(r => ({ id: r.id, userId: r.userId, status: r.status })));
+      }
 
       // Sync submitted reports with backend to get latest status
       if (isAuthenticated) {
         try {
+          console.log('[LIBRARY] 🔄 Fetching reports from backend...');
+          console.log('[LIBRARY] 📡 Endpoint: GET /api/search/reports?limit=100&offset=0');
           const backendResult = await searchBackendReports({
             limit: 100,
             offset: 0,
           });
 
+          console.log('[LIBRARY] ✅ Backend reports fetched:', backendResult.reports?.length || 0);
+          if (backendResult.reports?.length > 0) {
+            console.log('[LIBRARY] Backend reports:', backendResult.reports.map(r => ({ id: r.reportId, status: r.status })));
+          }
+
           if (backendResult.success && backendResult.reports) {
-            // Update local reports with backend data (status, confirmations, hashes only)
+            // Update local reports with backend data and add new backend reports
             for (const backendReport of backendResult.reports) {
-              const localReportIndex = allReports.findIndex(r => r.id === backendReport.reportId);
+              // Backend returns 'id', not 'reportId'
+              const reportId = backendReport.id || backendReport.reportId;
+              console.log('[LIBRARY] Processing backend report:', JSON.stringify(backendReport));
+
+              const localReportIndex = allReports.findIndex(
+                (r) => r.id === reportId,
+              );
+
               if (localReportIndex !== -1) {
+                // Update existing local report with backend data
                 const localReport = allReports[localReportIndex];
-                // Only update blockchain-related fields from backend
+                console.log('[LIBRARY] Updating local report:', reportId);
                 if (backendReport.status) {
                   localReport.status = backendReport.status;
                 }
-                if (backendReport.confirmations !== undefined && backendReport.confirmations !== null) {
+                if (
+                  backendReport.confirmations !== undefined &&
+                  backendReport.confirmations !== null
+                ) {
                   localReport.confirmations = backendReport.confirmations;
                 }
                 if (backendReport.txHash) {
@@ -165,28 +215,47 @@ export default function LibraryScreen() {
                 if (backendReport.ipfsHash) {
                   localReport.ipfsHash = backendReport.ipfsHash;
                 }
+              } else {
+                // Add backend report that doesn't exist locally
+                console.log('[LIBRARY] Adding new backend report:', reportId);
+                const newReport: Report = {
+                  id: reportId,
+                  userId: userId,
+                  type: backendReport.type || 'audio',
+                  status: backendReport.status,
+                  createdAt: backendReport.createdAt || new Date().toISOString(),
+                  updatedAt: backendReport.updatedAt || new Date().toISOString(),
+                  confirmations: backendReport.confirmations,
+                  txHash: backendReport.txHash,
+                  ipfsHash: backendReport.ipfsHash,
+                };
+                console.log('[LIBRARY] Created report object:', JSON.stringify(newReport));
+                allReports.push(newReport);
               }
             }
           }
         } catch (syncError) {
-          console.error('Error syncing with backend:', syncError);
+          console.log('[LIBRARY] Error syncing with backend:', syncError instanceof Error ? syncError.message : 'Unknown error');
           // Continue with local reports if sync fails
         }
       }
 
       // Filter based on archived status
       const filteredReports = showArchived
-        ? allReports.filter(r => r.isArchived)
-        : allReports.filter(r => !r.isArchived);
+        ? allReports.filter((r) => r.isArchived)
+        : allReports.filter((r) => !r.isArchived);
 
       // Sort by most recent first
-      filteredReports.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      filteredReports.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
+      console.log('[LIBRARY] Setting reports to state:', filteredReports.length, 'reports');
+      console.log('[LIBRARY] Reports details:', filteredReports.map(r => ({ id: r.id, status: r.status, archived: r.isArchived })));
       setReports(filteredReports);
     } catch (error) {
-      console.error('Error loading reports:', error);
-      Alert.alert('Error', 'Failed to load reports');
+      console.log('[LIBRARY] Error loading reports:', error instanceof Error ? error.message : error);
+      Alert.alert("Error", "Failed to load reports");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -204,7 +273,6 @@ export default function LibraryScreen() {
           return;
         }
       } catch (error) {
-        console.error('Error checking auth:', error);
         setHasNoAuthToken(true);
         // Silent - PIN screen handles guidance
       }
@@ -221,22 +289,28 @@ export default function LibraryScreen() {
   }, [isAuthenticated, showArchived]);
 
   const filteredReports = useMemo(() => {
-    let filtered = reports.filter(r => {
-      if (activeTab === 'audio') {
-        return (r.type === 'audio' || r.type === 'mixed') && r.audioUri;
+    let filtered = reports.filter((r) => {
+      if (activeTab === "audio") {
+        return (r.type === "audio" || r.type === "mixed") && r.audioUri;
       } else {
-        return r.type === 'text' || (r.type === 'mixed' && r.textContent);
+        return r.type === "text" || (r.type === "mixed" && r.textContent);
       }
     });
 
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(r => {
-        const dateStr = new Date(r.createdAt).toLocaleDateString().toLowerCase();
-        const contentStr = (r.textContent || '').toLowerCase();
-        const idStr = (r.id || '').toLowerCase();
-        return dateStr.includes(query) || contentStr.includes(query) || idStr.includes(query);
+      filtered = filtered.filter((r) => {
+        const dateStr = new Date(r.createdAt)
+          .toLocaleDateString()
+          .toLowerCase();
+        const contentStr = (r.textContent || "").toLowerCase();
+        const idStr = (r.id || "").toLowerCase();
+        return (
+          dateStr.includes(query) ||
+          contentStr.includes(query) ||
+          idStr.includes(query)
+        );
       });
     }
 
@@ -260,8 +334,7 @@ export default function LibraryScreen() {
         setPlayingReportId(report.id);
       }
     } catch (error) {
-      console.error('Playback error:', error);
-      Alert.alert('Error', 'Failed to play audio');
+      Alert.alert("Error", "Failed to play audio");
     }
   };
 
@@ -275,24 +348,25 @@ export default function LibraryScreen() {
 
     if (!actions.canDelete) {
       Alert.alert(
-        'Cannot Delete',
-        actions.message || 'This report cannot be deleted. You can archive it instead.',
-        [{ text: 'OK' }]
+        "Cannot Delete",
+        actions.message ||
+          "This report cannot be deleted. You can archive it instead.",
+        [{ text: "OK" }],
       );
       return;
     }
 
     Alert.alert(
-      'Delete Report',
-      'Are you sure you want to delete this report? This action cannot be undone.',
+      "Delete Report",
+      "Are you sure you want to delete this report? This action cannot be undone.",
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               // Stop playback if playing
@@ -304,9 +378,7 @@ export default function LibraryScreen() {
               if (report.audioUri) {
                 try {
                   await FileSystem.deleteAsync(report.audioUri);
-                } catch (error) {
-                  console.error('Error deleting audio file:', error);
-                }
+                } catch (error) {}
               }
 
               // Delete report from storage (local only)
@@ -315,105 +387,166 @@ export default function LibraryScreen() {
               // Reload reports
               await loadReports();
 
-              Alert.alert('Success', 'Report deleted successfully');
+              Alert.alert("Success", "Report deleted successfully");
             } catch (error) {
-              console.error('Error deleting report:', error);
-              Alert.alert('Error', 'Failed to delete report');
+              Alert.alert("Error", "Failed to delete report");
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const handleResubmit = async (report: Report) => {
-    Alert.alert(
-      'Submit Report',
-      'Submit this report securely?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Submit',
-          onPress: async () => {
-            console.log('🔄 Setting submitting state for report:', report.id);
-            setIsSubmittingReportId(report.id);
-            try {
-              const result = await submitReportToBackend(report);
-              console.log('📊 Submit result:', result);
+    // CHECK AUTH FIRST - before showing any dialogs
+    const token = await getAuthToken();
+    if (!token || !user) {
+      console.log("[LIBRARY] Submit button clicked but user NOT logged in - showing auth gate");
+      setShowAuthGate(true);
+      return;
+    }
 
-              if (result.success) {
-                console.log('✅ Report submitted successfully');
-                console.log('📋 Submission Details:', {
-                  reportId: result.reportId,
-                  txHash: result.txHash,
-                  ipfsHash: result.ipfsHash,
-                  status: result.status,
+    console.log("[LIBRARY] User authenticated - proceeding with submit");
+
+    // Only show submit confirmation if authenticated
+    Alert.alert("Submit Report", "Submit this report securely?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Submit",
+        onPress: async () => {
+          setIsSubmittingReportId(report.id);
+          try {
+            console.log("[REPORT SUBMISSION] Resubmitting report from library:", { id: report.id, type: report.type, status: report.status });
+            // Capture location if available
+            try {
+              console.log("[REPORT SUBMISSION] Requesting location permission for resubmission...");
+              const { status } =
+                await Location.requestForegroundPermissionsAsync();
+
+              if (status === "granted") {
+                console.log("[REPORT SUBMISSION] Location permission granted, getting GPS coordinates...");
+                const location = await Location.getCurrentPositionAsync({
+                  accuracy: Location.Accuracy.High,
                 });
 
-                Alert.alert(
-                  'Success',
-                  'Report submitted successfully!',
-                  [
-                    {
-                      text: 'OK',
-                      onPress: async () => {
-                        setIsSubmittingReportId(null);
-                        await loadReports();
-                      },
-                    },
-                  ]
-                );
-              } else if (result.requiresAuth) {
-                Alert.alert(
-                  'Login Required',
-                  'You need to be logged in to submit reports.',
-                  [
-                    {
-                      text: 'Login',
-                      onPress: () => {
-                        router.navigate('/login');
-                      },
-                    },
-                    {
-                      text: 'Sign Up',
-                      onPress: () => {
-                        router.navigate('/signup');
-                      },
-                    },
-                    {
-                      text: 'Cancel',
-                      style: 'cancel',
-                    },
-                  ]
-                );
+                const mapLink = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+                const locationData = {
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude,
+                  mapLink,
+                  timestamp: new Date().toISOString(),
+                };
+
+                console.log("[REPORT SUBMISSION] Location captured for resubmission:", locationData);
+
+                // Add location to report metadata
+                if (!report.metadata) {
+                  report.metadata = {};
+                }
+                report.metadata.location = JSON.stringify(locationData);
               } else {
-                Alert.alert(
-                  'Submission Failed',
-                  result.error || 'Failed to submit report. Please try again.',
-                  [
-                    {
-                      text: 'OK',
-                      onPress: async () => {
-                        await loadReports();
-                      },
-                    },
-                  ]
-                );
+                console.log("[REPORT SUBMISSION] Location permission denied for resubmission");
               }
-            } catch (error) {
-              console.error('Error submitting report:', error);
-              Alert.alert('Error', 'An unexpected error occurred while submitting the report');
-              await loadReports();
-            } finally {
-              setIsSubmittingReportId(null);
+            } catch (locError) {
+              console.log("[REPORT SUBMISSION] Location capture failed for resubmission:", locError instanceof Error ? locError.message : "Unknown error");
+              // Continue without location if permission denied or GPS fails
             }
-          },
+
+            console.log("[REPORT SUBMISSION] Submitting to backend...");
+            const result = await submitReportToBackend(report);
+
+            console.log('[REPORT SUBMISSION] Full backend response:', JSON.stringify(result, null, 2));
+
+            if (result.success) {
+              console.log("[REPORT SUBMISSION] ✅ Resubmission successful!", { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
+              console.log('[REPORT SUBMISSION] Report object:', { id: report.id, type: report.type, status: report.status });
+
+              // Validate required fields
+              if (!report.id || !report.type) {
+                console.log('[REPORT SUBMISSION] ❌ Missing required fields for save:', { id: report.id, type: report.type });
+                throw new Error(`Report missing required fields: id=${report.id}, type=${report.type}`);
+              }
+
+              console.log('[REPORT SUBMISSION] Saving report to database with backend status:', result.status);
+              await saveReport({
+                id: report.id,
+                ...(report.userId && { userId: report.userId }),
+                type: report.type,
+                status: result.status || 'submitted',
+                textContent: report.textContent,
+                audioUri: report.audioUri,
+                createdAt: report.createdAt,
+                updatedAt: new Date().toISOString(),
+                metadata: report.metadata,
+                txHash: result.txHash,
+                ipfsHash: result.ipfsHash,
+              });
+              console.log('[REPORT SUBMISSION] ✅ Report saved to database with status:', result.status || 'submitted');
+
+              Alert.alert("Success", "Report submitted successfully!", [
+                {
+                  text: "OK",
+                  onPress: async () => {
+                    setIsSubmittingReportId(null);
+                    await loadReports();
+                  },
+                },
+              ]);
+            } else if (result.requiresAuth) {
+              console.log("[REPORT SUBMISSION] ❌ Authentication required for resubmission");
+              Alert.alert(
+                "Login Required",
+                "You need to be logged in to submit reports.",
+                [
+                  {
+                    text: "Login",
+                    onPress: () => {
+                      router.navigate("/login");
+                    },
+                  },
+                  {
+                    text: "Sign Up",
+                    onPress: () => {
+                      router.navigate("/signup");
+                    },
+                  },
+                  {
+                    text: "Cancel",
+                    style: "cancel",
+                  },
+                ],
+              );
+            } else {
+              console.log("[REPORT SUBMISSION] ❌ Resubmission failed:", result.error);
+              Alert.alert(
+                "Submission Failed",
+                result.error || "Failed to submit report. Please try again.",
+                [
+                  {
+                    text: "OK",
+                    onPress: async () => {
+                      await loadReports();
+                    },
+                  },
+                ],
+              );
+            }
+          } catch (error) {
+            console.log("[REPORT SUBMISSION] ❌ Resubmission exception:", error instanceof Error ? error.message : "Unknown error");
+            Alert.alert(
+              "Error",
+              "An unexpected error occurred while submitting the report",
+            );
+            await loadReports();
+          } finally {
+            setIsSubmittingReportId(null);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleArchive = (report: Report) => {
@@ -421,60 +554,72 @@ export default function LibraryScreen() {
 
     if (!actions.canArchive) {
       Alert.alert(
-        'Cannot Archive',
-        actions.message || 'This report cannot be archived',
-        [{ text: 'OK' }]
+        "Cannot Archive",
+        actions.message || "This report cannot be archived",
+        [{ text: "OK" }],
       );
       return;
     }
 
     Alert.alert(
-      'Archive Report',
-      'Archiving will hide this report from your library but keep the blockchain record.',
+      "Archive Report",
+      "Archiving will hide this report from your library but keep the blockchain record.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Archive',
+          text: "Archive",
           onPress: async () => {
+            setIsArchivingReportId(report.id);
             try {
               // Archive on backend (for submitted reports with submissionId)
               if (report.submissionId) {
-                const result = await archiveReportOnBackend(report.submissionId, 'User archived');
+                const result = await archiveReportOnBackend(
+                  report.submissionId,
+                  "User archived",
+                );
                 if (!result.success) {
-                  Alert.alert('Error', result.error || 'Failed to archive on backend');
+                  Alert.alert(
+                    "Error",
+                    result.error || "Failed to archive on backend",
+                  );
                   return;
                 }
               }
 
               // Archive locally
-              await archiveReport(report.id, 'User archived');
+              await archiveReport(report.id, "User archived");
               await loadReports();
-              Alert.alert('Success', 'Report archived successfully');
+              Alert.alert("Success", "Report archived successfully");
             } catch (error) {
-              console.error('Error archiving report:', error);
-              Alert.alert('Error', 'Failed to archive report');
+              Alert.alert("Error", "Failed to archive report");
+            } finally {
+              setIsArchivingReportId(null);
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const handleUnarchive = (report: Report) => {
     Alert.alert(
-      'Unarchive Report',
-      'This report will be restored to your library.',
+      "Unarchive Report",
+      "This report will be restored to your library.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Unarchive',
+          text: "Unarchive",
           onPress: async () => {
+            setIsArchivingReportId(report.id);
             try {
               // Unarchive on backend
               if (report.submissionId) {
                 const result = await unarchiveReport(report.submissionId);
                 if (!result.success) {
-                  Alert.alert('Error', result.error || 'Failed to unarchive on backend');
+                  Alert.alert(
+                    "Error",
+                    result.error || "Failed to unarchive on backend",
+                  );
                   return;
                 }
               }
@@ -487,14 +632,15 @@ export default function LibraryScreen() {
                 archivedReason: null,
               });
               await loadReports();
-              Alert.alert('Success', 'Report restored successfully');
+              Alert.alert("Success", "Report restored successfully");
             } catch (error) {
-              console.error('Error unarchiving report:', error);
-              Alert.alert('Error', 'Failed to unarchive report');
+              Alert.alert("Error", "Failed to unarchive report");
+            } finally {
+              setIsArchivingReportId(null);
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -511,37 +657,39 @@ export default function LibraryScreen() {
 
     if (!actions.canEdit) {
       Alert.alert(
-        'Cannot Edit',
-        actions.message || 'This report cannot be edited',
-        [{ text: 'OK' }]
+        "Cannot Edit",
+        actions.message || "This report cannot be edited",
+        [{ text: "OK" }],
       );
       return;
     }
 
-    if (report.type === 'text' || report.type === 'mixed') {
+    if (report.type === "text" || report.type === "mixed") {
       router.push({
-        pathname: '/text-report',
+        pathname: "/text-report",
         params: { editReportId: report.id },
       });
     } else {
-      Alert.alert('Note', 'Audio reports cannot be edited yet');
+      Alert.alert("Note", "Audio reports cannot be edited yet");
     }
   };
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const handleViewSubmitted = async (report: Report) => {
+    setOpenMenuReportId(null);
+
     if (!report.submissionId) {
-      Alert.alert('Error', 'This report has not been submitted yet');
+      Alert.alert("Error", "This report has not been submitted yet");
       return;
     }
 
@@ -551,18 +699,14 @@ export default function LibraryScreen() {
 
     try {
       const result = await decryptReportFromBackend(report.submissionId);
-      console.log('View Details Response:', JSON.stringify(result, null, 2));
-      console.log('Metadata:', result.data?.payload?.metadata);
-      console.log('Responses:', result.data?.payload?.responses);
       if (result.success && result.data) {
         setDecryptedContent(result.data);
       } else {
-        Alert.alert('Error', result.error || 'Failed to decrypt report');
+        Alert.alert("Error", result.error || "Failed to decrypt report");
         setShowDecryptedModal(false);
       }
     } catch (error) {
-      console.error('Error viewing report details:', error);
-      Alert.alert('Error', 'An error occurred while decrypting the report');
+      Alert.alert("Error", "An error occurred while decrypting the report");
       setShowDecryptedModal(false);
     } finally {
       setIsLoadingDecrypt(false);
@@ -570,12 +714,14 @@ export default function LibraryScreen() {
   };
 
   const handleShareReport = (report: Report) => {
+    setOpenMenuReportId(null);
+
     if (!report.submissionId) {
-      Alert.alert('Error', 'Only submitted reports can be shared');
+      Alert.alert("Error", "Only submitted reports can be shared");
       return;
     }
     setSelectedReport(report);
-    setShareUserId('');
+    setShareUserId("");
     setShowShareModal(true);
   };
 
@@ -590,7 +736,7 @@ export default function LibraryScreen() {
 
       // Load reports based on selected status
       const params: any = { limit: searchLimit, offset: 0 };
-      if (searchStatus !== 'all') {
+      if (searchStatus !== "all") {
         params.status = searchStatus;
       }
       const reportsResult = await searchBackendReports(params);
@@ -599,8 +745,7 @@ export default function LibraryScreen() {
         setSearchOffset(0);
       }
     } catch (error) {
-      console.error('Error loading backend reports:', error);
-      Alert.alert('Error', 'Failed to load reports');
+      Alert.alert("Error", "Failed to load reports");
     } finally {
       setIsLoadingSearch(false);
     }
@@ -608,8 +753,11 @@ export default function LibraryScreen() {
 
   const loadMoreBackendReports = async () => {
     try {
-      const params: any = { limit: searchLimit, offset: searchOffset + searchLimit };
-      if (searchStatus !== 'all') {
+      const params: any = {
+        limit: searchLimit,
+        offset: searchOffset + searchLimit,
+      };
+      if (searchStatus !== "all") {
         params.status = searchStatus;
       }
       const result = await searchBackendReports(params);
@@ -618,44 +766,60 @@ export default function LibraryScreen() {
         setSearchOffset(searchOffset + searchLimit);
       }
     } catch (error) {
-      console.error('Error loading more reports:', error);
-      Alert.alert('Error', 'Failed to load more reports');
+      Alert.alert("Error", "Failed to load more reports");
     }
   };
 
   const handleGrantAccess = async () => {
     if (!selectedReport || !shareUserId.trim()) {
-      Alert.alert('Error', 'Please enter a user ID');
+      Alert.alert("Error", "Please enter a user ID");
       return;
     }
 
     try {
       setIsLoadingShare(true);
-      console.log('🔐 Granting access to user:', shareUserId.trim());
-      const result = await grantAccess(selectedReport.submissionId!, shareUserId.trim());
-      console.log('🔐 Grant access response:', result);
+      // Calculate expiresIn in seconds from now until the selected date
+      const now = new Date();
+      const expiresInSeconds = Math.floor(
+        (expirationDate.getTime() - now.getTime()) / 1000,
+      );
+
+      if (expiresInSeconds <= 0) {
+        Alert.alert("Error", "Expiration date must be in the future");
+        setIsLoadingShare(false);
+        return;
+      }
+
+      const result = await grantAccess(
+        selectedReport.submissionId!,
+        shareUserId.trim(),
+        expiresInSeconds,
+      );
 
       if (result.success) {
-        console.log('✅ Access granted successfully');
-        Alert.alert('Success', 'Access granted to the user');
+        Alert.alert(
+          "Success",
+          `Access granted until ${expirationDate.toLocaleDateString()}`,
+        );
         setShowShareModal(false);
-        setShareUserId('');
+        setShareUserId("");
+        setExpirationDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // Reset to 7 days
         setSelectedReport(null);
       } else {
-        console.log('❌ Grant access failed:', result.error);
-        Alert.alert('Error', result.error || 'Failed to grant access');
+        Alert.alert("Error", result.error || "Failed to grant access");
       }
     } catch (error) {
-      console.error('❌ Grant access error:', error);
-      Alert.alert('Error', 'An error occurred');
+      Alert.alert("Error", "An unexpected error occurred");
     } finally {
       setIsLoadingShare(false);
     }
   };
 
   const handleViewViewers = async (report: Report) => {
+    setOpenMenuReportId(null);
+
     if (!report.submissionId) {
-      Alert.alert('Error', 'This report has not been submitted yet');
+      Alert.alert("Error", "This report has not been submitted yet");
       return;
     }
 
@@ -664,16 +828,14 @@ export default function LibraryScreen() {
 
     try {
       const result = await getReportViewers(report.submissionId);
-      console.log('👁️ Viewers response:', result);
       if (result.success) {
-        console.log('👁️ Viewers list:', result.viewers);
         setViewers(result.viewers || []);
         setShowViewersModal(true);
       } else {
-        Alert.alert('Error', result.error || 'Failed to fetch viewers');
+        Alert.alert("Error", result.error || "Failed to fetch viewers");
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred while fetching viewers');
+      Alert.alert("Error", "An error occurred while fetching viewers");
     } finally {
       setIsLoadingViewers(false);
     }
@@ -681,46 +843,46 @@ export default function LibraryScreen() {
 
   const handleRevokeAccess = async (userId: string) => {
     if (!selectedReport) {
-      Alert.alert('Error', 'Report not selected');
+      Alert.alert("Error", "Report not selected");
       return;
     }
 
     Alert.alert(
-      'Revoke Access',
+      "Revoke Access",
       `Are you sure you want to revoke access for this user?`,
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Revoke',
-          style: 'destructive',
+          text: "Revoke",
+          style: "destructive",
           onPress: async () => {
+            setIsRevokingUserId(userId);
             try {
-              const reportId = selectedReport.submissionId || selectedReport.reportId;
-              console.log('🔐 Revoking access for user:', userId);
+              const reportId =
+                selectedReport.submissionId || selectedReport.reportId;
               const result = await revokeAccess(reportId!, userId);
-              console.log('🔐 Revoke access response:', result);
 
               if (result.success) {
-                console.log('✅ Access revoked successfully');
-                Alert.alert('Success', 'Access revoked successfully');
+                Alert.alert("Success", "Access revoked successfully");
                 // Refresh viewers list
                 const viewersResult = await getReportViewers(reportId!);
                 if (viewersResult.success) {
                   setViewers(viewersResult.viewers || []);
                 }
               } else {
-                console.log('❌ Revoke access failed:', result.error);
-                Alert.alert('Error', result.error || 'Failed to revoke access');
+                Alert.alert("Error", result.error || "Failed to revoke access");
               }
             } catch (error) {
-              Alert.alert('Error', 'An error occurred');
+              Alert.alert("Error", "An error occurred");
+            } finally {
+              setIsRevokingUserId(null);
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -728,18 +890,13 @@ export default function LibraryScreen() {
     setIsLoadingShared(true);
     try {
       const result = await getSharedWithMe();
-      console.log('📥 === SHARED WITH ME (getSharedWithMe) ===');
-      console.log('📥 Full Response:', JSON.stringify(result, null, 2));
-      console.log('📥 Reports Count:', result.reports?.length || 0);
-      console.log('📥 First Report Example:', result.reports?.[0]);
-      console.log('📥 All Reports:', result.reports);
       if (result.success) {
         setSharedReports(result.reports || []);
       } else {
-        Alert.alert('Error', result.error || 'Failed to load shared reports');
+        Alert.alert("Error", result.error || "Failed to load shared reports");
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred');
+      Alert.alert("Error", "An error occurred");
     } finally {
       setIsLoadingShared(false);
     }
@@ -749,18 +906,16 @@ export default function LibraryScreen() {
     setIsLoadingMyShared(true);
     try {
       const result = await getMySharedReports();
-      console.log('📤 === MY SHARED (getMySharedReports) ===');
-      console.log('📤 Full Response:', JSON.stringify(result, null, 2));
-      console.log('📤 Reports Count:', result.reports?.length || 0);
-      console.log('📤 First Report Example:', result.reports?.[0]);
-      console.log('📤 All Reports:', result.reports);
       if (result.success) {
         setMySharedReports(result.reports || []);
       } else {
-        Alert.alert('Error', result.error || 'Failed to load your shared reports');
+        Alert.alert(
+          "Error",
+          result.error || "Failed to load your shared reports",
+        );
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred');
+      Alert.alert("Error", "An error occurred");
     } finally {
       setIsLoadingMyShared(false);
     }
@@ -771,16 +926,14 @@ export default function LibraryScreen() {
     setIsLoadingSharedWithMeDetails(true);
     try {
       const result = await getSharedReport(report.reportId);
-      console.log('📄 Full response from getSharedReport (Shared With Me):', JSON.stringify(result, null, 2));
-      console.log('📄 Payload (data):', result.data);
       if (result.success) {
         setDecryptedContent(result.data);
         setShowSharedWithMeDetailsModal(true);
       } else {
-        Alert.alert('Error', result.error || 'Failed to load report details');
+        Alert.alert("Error", result.error || "Failed to load report details");
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred while loading report details');
+      Alert.alert("Error", "An error occurred while loading report details");
     } finally {
       setIsLoadingSharedWithMeDetails(false);
     }
@@ -807,96 +960,43 @@ export default function LibraryScreen() {
     );
   }
 
-  // Show PIN screens if not authenticated
-  if (!isAuthenticated) {
-    if (showPinRequired) {
-      return (
-        <Modal
-          visible={showPinRequired}
-          animationType="slide"
-          transparent={false}
-        >
-          <LockScreen
-            mode="setup"
-            onSetPin={() => {
-              setShowPinRequired(false);
-              setIsAuthenticated(true);
-            }}
-            onUnlock={() => { }}
-          />
-        </Modal>
-      );
-    }
-
-    if (showSetPinModal) {
-      return (
-        <Modal
-          visible={showSetPinModal}
-          animationType="slide"
-          transparent={false}
-        >
-          <LockScreen
-            mode="set"
-            onSetPin={(pin) => {
-              handlePinSet(pin);
-            }}
-            onClose={() => {
-              setShowSetPinModal(false);
-              router.back();
-            }}
-          />
-        </Modal>
-      );
-    }
-
-    if (showPinVerify) {
-      return (
-        <Modal
-          visible={showPinVerify}
-          animationType="slide"
-          transparent={false}
-        >
-          <LockScreen
-            mode="verify"
-            onUnlock={() => {
-              setShowPinVerify(false);
-              setIsAuthenticated(true);
-            }}
-            onSetPin={() => { }}
-            onClose={() => setShowPinVerify(false)}
-          />
-        </Modal>
-      );
-    }
-  }
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
             <MaterialIcons name="arrow-back" size={24} color="#8A4FFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{showArchived ? 'Archived' : 'Library'}</Text>
+          <Text style={styles.headerTitle}>
+            {showArchived ? "Archived" : "Library"}
+          </Text>
           <TouchableOpacity
             onPress={() => setShowArchived(!showArchived)}
             style={styles.archiveToggleButton}
           >
             <MaterialIcons
-              name={showArchived ? 'inbox' : 'archive'}
+              name={showArchived ? "inbox" : "archive"}
               size={20}
               color="#8A4FFF"
             />
             <Text style={styles.archiveToggleText}>
-              {showArchived ? 'Back to Library' : 'View Archived'}
+              {showArchived ? "Back to Library" : "View Archived"}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Search Bar */}
         <View style={styles.searchBarContainer}>
-          <MaterialIcons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <MaterialIcons
+            name="search"
+            size={20}
+            color="#999"
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search reports..."
@@ -905,7 +1005,7 @@ export default function LibraryScreen() {
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
               <MaterialIcons name="close" size={20} color="#999" />
             </TouchableOpacity>
           )}
@@ -914,22 +1014,46 @@ export default function LibraryScreen() {
         {/* Tabs */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
-            style={[styles.tab, !showSharedWithMeTab && activeTab === 'audio' && styles.activeTab]}
+            style={[
+              styles.tab,
+              !showSharedWithMeTab && activeTab === "audio" && styles.activeTab,
+            ]}
             onPress={() => {
-              setActiveTab('audio');
+              setActiveTab("audio");
               setShowSharedWithMeTab(false);
             }}
           >
-            <Text style={[styles.tabText, !showSharedWithMeTab && activeTab === 'audio' && styles.activeTabText]}>Audio</Text>
+            <Text
+              style={[
+                styles.tabText,
+                !showSharedWithMeTab &&
+                  activeTab === "audio" &&
+                  styles.activeTabText,
+              ]}
+            >
+              Audio
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, !showSharedWithMeTab && activeTab === 'text' && styles.activeTab]}
+            style={[
+              styles.tab,
+              !showSharedWithMeTab && activeTab === "text" && styles.activeTab,
+            ]}
             onPress={() => {
-              setActiveTab('text');
+              setActiveTab("text");
               setShowSharedWithMeTab(false);
             }}
           >
-            <Text style={[styles.tabText, !showSharedWithMeTab && activeTab === 'text' && styles.activeTabText]}>Text Reports</Text>
+            <Text
+              style={[
+                styles.tabText,
+                !showSharedWithMeTab &&
+                  activeTab === "text" &&
+                  styles.activeTabText,
+              ]}
+            >
+              Text Reports
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, showSharedWithMeTab && styles.activeTab]}
@@ -945,53 +1069,98 @@ export default function LibraryScreen() {
               }
             }}
           >
-            <Text style={[styles.tabText, showSharedWithMeTab && styles.activeTabText]}>Shared</Text>
+            <Text
+              style={[
+                styles.tabText,
+                showSharedWithMeTab && styles.activeTabText,
+              ]}
+            >
+              Shared
+            </Text>
           </TouchableOpacity>
         </View>
 
         {/* Reports List */}
         <ScrollView
           style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl
-              refreshing={showSharedWithMeTab ? (sharedTabMode === 'with-me' ? isLoadingShared : isLoadingMyShared) : refreshing}
-              onRefresh={showSharedWithMeTab ? (sharedTabMode === 'with-me' ? loadSharedReports : loadMySharedReports) : loadReports}
+              refreshing={
+                showSharedWithMeTab
+                  ? sharedTabMode === "with-me"
+                    ? isLoadingShared
+                    : isLoadingMyShared
+                  : refreshing
+              }
+              onRefresh={
+                showSharedWithMeTab
+                  ? sharedTabMode === "with-me"
+                    ? loadSharedReports
+                    : loadMySharedReports
+                  : loadReports
+              }
             />
           }
         >
+          {openMenuReportId && (
+            <Pressable
+              style={styles.globalMenuBackdrop}
+              onPress={() => setOpenMenuReportId(null)}
+            />
+          )}
+
           {showSharedWithMeTab ? (
             <>
               {/* Shared Tab Sub-tabs */}
               <View style={styles.sharedSubTabContainer}>
                 <TouchableOpacity
-                  style={[styles.sharedSubTab, sharedTabMode === 'with-me' && styles.activeSharedSubTab]}
-                  onPress={() => setSharedTabMode('with-me')}
+                  style={[
+                    styles.sharedSubTab,
+                    sharedTabMode === "with-me" && styles.activeSharedSubTab,
+                  ]}
+                  onPress={() => setSharedTabMode("with-me")}
                 >
-                  <Text style={[styles.sharedSubTabText, sharedTabMode === 'with-me' && styles.activeSharedSubTabText]}>
+                  <Text
+                    style={[
+                      styles.sharedSubTabText,
+                      sharedTabMode === "with-me" &&
+                        styles.activeSharedSubTabText,
+                    ]}
+                  >
                     Shared With Me
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.sharedSubTab, sharedTabMode === 'my-shared' && styles.activeSharedSubTab]}
-                  onPress={() => setSharedTabMode('my-shared')}
+                  style={[
+                    styles.sharedSubTab,
+                    sharedTabMode === "my-shared" && styles.activeSharedSubTab,
+                  ]}
+                  onPress={() => setSharedTabMode("my-shared")}
                 >
-                  <Text style={[styles.sharedSubTabText, sharedTabMode === 'my-shared' && styles.activeSharedSubTabText]}>
+                  <Text
+                    style={[
+                      styles.sharedSubTabText,
+                      sharedTabMode === "my-shared" &&
+                        styles.activeSharedSubTabText,
+                    ]}
+                  >
                     My Shared
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Shared With Me Mode */}
-              {sharedTabMode === 'with-me' ? (
-                isLoadingShared ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#8A4FFF" />
-                  </View>
-                ) : !sharedReports || sharedReports.length === 0 ? (
+              {sharedTabMode === "with-me" ? (
+                !sharedReports || sharedReports.length === 0 ? (
                   <View style={styles.emptyContainer}>
                     <Feather name="share-2" size={64} color="#CCC" />
-                    <Text style={styles.emptyText}>No reports shared with you</Text>
-                    <Text style={styles.emptySubtext}>Reports others share will appear here</Text>
+                    <Text style={styles.emptyText}>
+                      No reports shared with you
+                    </Text>
+                    <Text style={styles.emptySubtext}>
+                      Reports others share will appear here
+                    </Text>
                   </View>
                 ) : (
                   <View style={styles.reportsList}>
@@ -1004,22 +1173,28 @@ export default function LibraryScreen() {
                         <View style={styles.sharedReportHeader}>
                           <View>
                             <Text style={styles.sharedReportTitle}>
-                              Report from {report.reporterPhone || report.reporterEmail || 'Unknown'}
+                              Report from{" "}
+                              {report.reporterPhone ||
+                                report.reporterEmail ||
+                                "Unknown"}
                             </Text>
                             <Text style={styles.sharedReportSubtitle}>
-                              {new Date(report.grantedAt).toLocaleDateString()} • ID: {report.reporterId?.substring(0, 8)}
+                              {new Date(report.grantedAt).toLocaleDateString()}{" "}
+                              • ID: {report.reporterId?.substring(0, 8)}
                             </Text>
                           </View>
                           <View
                             style={[
                               styles.statusBadge,
                               {
-                                backgroundColor: report.isActive ? '#10B981' : '#EF4444',
+                                backgroundColor: report.isActive
+                                  ? "#10B981"
+                                  : "#EF4444",
                               },
                             ]}
                           >
                             <Text style={styles.statusBadgeText}>
-                              {report.isActive ? 'Active' : 'Inactive'}
+                              {report.isActive ? "Active" : "Inactive"}
                             </Text>
                           </View>
                         </View>
@@ -1031,7 +1206,13 @@ export default function LibraryScreen() {
                 <View style={styles.emptyContainer}>
                   <Feather name="share-2" size={64} color="#CCC" />
                   <Text style={styles.emptyText}>No reports shared yet</Text>
-                  <Text style={styles.emptySubtext}>Reports you share will appear here</Text>
+                  <Text style={styles.emptySubtext}>
+                    Reports you share will appear here
+                  </Text>
+                </View>
+              ) : isLoadingMyShared ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>Loading...</Text>
                 </View>
               ) : (
                 <View style={styles.reportsList}>
@@ -1044,17 +1225,20 @@ export default function LibraryScreen() {
                         setIsLoadingViewers(true);
                         try {
                           // Fetch latest viewers from backend
-                          const result = await getReportViewers(report.reportId);
-                          console.log('👁️ Viewers response for My Shared report:', result);
+                          const result = await getReportViewers(
+                            report.reportId,
+                          );
                           if (result.success) {
                             setViewers(result.viewers || []);
                             setShowViewersModal(true);
                           } else {
-                            Alert.alert('Error', result.error || 'Failed to load viewers');
+                            Alert.alert(
+                              "Error",
+                              result.error || "Failed to load viewers",
+                            );
                           }
                         } catch (error) {
-                          console.error('Error fetching viewers:', error);
-                          Alert.alert('Error', 'Failed to load viewers');
+                          Alert.alert("Error", "Failed to load viewers");
                         } finally {
                           setIsLoadingViewers(false);
                         }
@@ -1066,7 +1250,9 @@ export default function LibraryScreen() {
                             {report.reportId}
                           </Text>
                           <Text style={styles.sharedReportSubtitle}>
-                            {new Date(report.createdAt).toLocaleDateString()} • {report.viewerCount} viewer{report.viewerCount !== 1 ? 's' : ''}
+                            {new Date(report.createdAt).toLocaleDateString()} •{" "}
+                            {report.viewerCount} viewer
+                            {report.viewerCount !== 1 ? "s" : ""}
                           </Text>
                         </View>
                         <View
@@ -1074,16 +1260,17 @@ export default function LibraryScreen() {
                             styles.statusBadge,
                             {
                               backgroundColor:
-                                report.status === 'confirmed'
-                                  ? '#10B981'
-                                  : report.status === 'pending'
-                                    ? '#F59E0B'
-                                    : '#EF4444',
+                                report.status === "confirmed"
+                                  ? "#10B981"
+                                  : report.status === "pending"
+                                    ? "#F59E0B"
+                                    : "#EF4444",
                             },
                           ]}
                         >
                           <Text style={styles.statusBadgeText}>
-                            {report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
+                            {report.status?.charAt(0).toUpperCase() +
+                              report.status?.slice(1)}
                           </Text>
                         </View>
                       </View>
@@ -1094,183 +1281,338 @@ export default function LibraryScreen() {
             </>
           ) : filteredReports.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Feather name={activeTab === 'audio' ? "mic-off" : "file-text"} size={64} color="#CCC" />
+              <Feather
+                name={activeTab === "audio" ? "mic-off" : "file-text"}
+                size={64}
+                color="#CCC"
+              />
               <Text style={styles.emptyText}>No {activeTab} reports found</Text>
               <Text style={styles.emptySubtext}>
-                {activeTab === 'audio' ? "Record an incident to see it here" : "Create a text report to see it here"}
+                {activeTab === "audio"
+                  ? "Record an incident to see it here"
+                  : "Create a text report to see it here"}
               </Text>
             </View>
           ) : (
             <>
-              {activeTab === 'audio' ? (
-                filteredReports.map((report) => (
-                  <View key={report.id}>
-                    <AudioReportItem
-                      report={report}
-                      isPlaying={playingReportId === report.id}
-                      isSubmitting={isSubmittingReportId === report.id}
-                      onPlayPause={handlePlayPause}
-                      onStop={handleStop}
-                      onDelete={handleDelete}
-                      onResubmit={handleResubmit}
-                      onPlayingChange={setPlayingReportId}
-                      onArchive={handleArchiveToggle}
-                      onEdit={handleEditReport}
-                      openMenuReportId={openMenuReportId}
-                      onMenuToggle={(id) => setOpenMenuReportId(openMenuReportId === id ? null : id)}
-                      onShare={handleShareReport}
-                      onViewViewers={handleViewViewers}
-                      onViewDetails={handleViewSubmitted}
-                    />
-                  </View>
-                ))
-              ) : (
-                filteredReports.map((report) => {
-                  const actions = getAvailableActions(report);
-                  return (
-                    <View key={report.id} style={styles.textReportItem}>
-                      <View style={styles.textReportHeaderWrapper}>
-                        <View style={styles.textReportHeader}>
-                          <View style={styles.textReportHeaderLeft}>
-                            <Text style={styles.textReportDate}>{formatDate(report.createdAt)}</Text>
-                            <View style={[
-                              styles.statusBadge,
-                              report.status === 'saved' && styles.draftBadge,
-                              report.status === 'submitted' && styles.submittedBadge,
-                              report.status === 'confirmed' && styles.confirmedBadge,
-                              report.status === 'failed' && styles.failedBadge,
-                            ]}>
-                              <Text style={styles.statusBadgeText}>
-                                {report.status === 'saved' ? 'Draft' : report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}
+              {activeTab === "audio"
+                ? filteredReports.map((report) => (
+                    <View
+                      key={report.id}
+                      style={
+                        openMenuReportId === report.id
+                          ? styles.openCardLayer
+                          : undefined
+                      }
+                    >
+                      <AudioReportItem
+                        report={report}
+                        isPlaying={playingReportId === report.id}
+                        isSubmitting={isSubmittingReportId === report.id}
+                        onPlayPause={handlePlayPause}
+                        onStop={handleStop}
+                        onDelete={handleDelete}
+                        onResubmit={handleResubmit}
+                        onPlayingChange={setPlayingReportId}
+                        onArchive={handleArchiveToggle}
+                        onEdit={handleEditReport}
+                        openMenuReportId={openMenuReportId}
+                        onMenuToggle={(id) =>
+                          setOpenMenuReportId(
+                            openMenuReportId === id ? null : id,
+                          )
+                        }
+                        onShare={handleShareReport}
+                        onViewViewers={handleViewViewers}
+                        onViewDetails={handleViewSubmitted}
+                      />
+                    </View>
+                  ))
+                : filteredReports.map((report) => {
+                    const actions = getAvailableActions(report);
+                    const isTextMenuOpen = openMenuReportId === report.id;
+                    return (
+                      <View
+                        key={report.id}
+                        style={[
+                          styles.textReportItem,
+                          isTextMenuOpen && styles.openCardLayer,
+                        ]}
+                      >
+                        <View style={styles.textReportHeaderWrapper}>
+                          <View style={styles.textReportHeader}>
+                            <View style={styles.textReportHeaderLeft}>
+                              <Text style={styles.textReportDate}>
+                                {formatDate(report.createdAt)}
                               </Text>
+                              <View
+                                style={[
+                                  styles.statusBadge,
+                                  report.status === "saved" &&
+                                    styles.draftBadge,
+                                  report.status === "submitted" &&
+                                    styles.submittedBadge,
+                                  report.status === "confirmed" &&
+                                    styles.confirmedBadge,
+                                  report.status === "failed" &&
+                                    styles.failedBadge,
+                                ]}
+                              >
+                                <Text style={styles.statusBadgeText}>
+                                  {report.status === "saved"
+                                    ? "Draft"
+                                    : report.status?.charAt(0).toUpperCase() +
+                                      report.status?.slice(1)}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.actionIconsContainer}>
+                              {actions.canEdit && (
+                                <TouchableOpacity
+                                  style={styles.actionIcon}
+                                  onPress={() => handleEditReport(report)}
+                                >
+                                  <Feather
+                                    name="edit-2"
+                                    size={20}
+                                    color="#8A4FFF"
+                                  />
+                                </TouchableOpacity>
+                              )}
+                              {actions.canDelete && (
+                                <TouchableOpacity
+                                  style={styles.actionIcon}
+                                  onPress={() => handleDelete(report)}
+                                >
+                                  <MaterialIcons
+                                    name="delete-outline"
+                                    size={20}
+                                    color="#FF3B30"
+                                  />
+                                </TouchableOpacity>
+                              )}
+                              {(report.status === "submitted" ||
+                                report.status === "pending" ||
+                                report.status === "confirmed" ||
+                                report.isArchived) && (
+                                <TouchableOpacity
+                                  style={styles.actionIcon}
+                                  onPress={() =>
+                                    setOpenMenuReportId(
+                                      openMenuReportId === report.id
+                                        ? null
+                                        : report.id,
+                                    )
+                                  }
+                                >
+                                  <MaterialIcons
+                                    name="more-vert"
+                                    size={24}
+                                    color="#6B7280"
+                                  />
+                                </TouchableOpacity>
+                              )}
                             </View>
                           </View>
-                          <View style={styles.actionIconsContainer}>
-                            {actions.canEdit && (
-                              <TouchableOpacity style={styles.actionIcon} onPress={() => handleEditReport(report)}>
-                                <Feather name="edit-2" size={20} color="#8A4FFF" />
-                              </TouchableOpacity>
+                          {(report.status === "submitted" ||
+                            report.status === "pending" ||
+                            report.status === "confirmed" ||
+                            report.isArchived) &&
+                            openMenuReportId === report.id && (
+                              <>
+                                <Pressable
+                                  style={styles.menuOverlay}
+                                  onPress={() => setOpenMenuReportId(null)}
+                                />
+                                <View style={styles.dropdownMenu}>
+                                  <TouchableOpacity
+                                    style={styles.menuOption}
+                                    onPress={() => {
+                                      handleViewSubmitted(report);
+                                      setOpenMenuReportId(null);
+                                    }}
+                                  >
+                                    <Feather
+                                      name="eye"
+                                      size={18}
+                                      color="#8B5CF6"
+                                    />
+                                    <Text style={styles.menuOptionText}>
+                                      View Details
+                                    </Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={styles.menuOption}
+                                    onPress={() => {
+                                      handleShareReport(report);
+                                      setOpenMenuReportId(null);
+                                    }}
+                                  >
+                                    <Feather
+                                      name="share-2"
+                                      size={18}
+                                      color="#8B5CF6"
+                                    />
+                                    <Text style={styles.menuOptionText}>
+                                      Share
+                                    </Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.menuOption,
+                                      isLoadingViewers &&
+                                        styles.menuOptionDisabled,
+                                    ]}
+                                    onPress={() => {
+                                      handleViewViewers(report);
+                                      setOpenMenuReportId(null);
+                                    }}
+                                    disabled={isLoadingViewers}
+                                  >
+                                    {isLoadingViewers ? (
+                                      <ActivityIndicator
+                                        size="small"
+                                        color="#8B5CF6"
+                                      />
+                                    ) : (
+                                      <Feather
+                                        name="users"
+                                        size={18}
+                                        color="#8B5CF6"
+                                      />
+                                    )}
+                                    <Text style={styles.menuOptionText}>
+                                      {isLoadingViewers
+                                        ? "Loading..."
+                                        : "Viewers"}
+                                    </Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.menuOption,
+                                      styles.menuOptionDanger,
+                                      isArchivingReportId === report.id &&
+                                        styles.menuOptionDisabled,
+                                    ]}
+                                    onPress={() => {
+                                      handleArchiveToggle(report);
+                                      setOpenMenuReportId(null);
+                                    }}
+                                    disabled={isArchivingReportId === report.id}
+                                  >
+                                    {isArchivingReportId === report.id ? (
+                                      <ActivityIndicator
+                                        size="small"
+                                        color="#FF3B30"
+                                      />
+                                    ) : (
+                                      <Feather
+                                        name={
+                                          report.isArchived
+                                            ? "inbox"
+                                            : "archive"
+                                        }
+                                        size={18}
+                                        color="#FF3B30"
+                                      />
+                                    )}
+                                    <Text
+                                      style={[
+                                        styles.menuOptionText,
+                                        styles.menuOptionDangerText,
+                                      ]}
+                                    >
+                                      {isArchivingReportId === report.id
+                                        ? "Processing..."
+                                        : report.isArchived
+                                          ? "Unarchive"
+                                          : "Archive"}
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </>
                             )}
-                            {actions.canDelete && (
-                              <TouchableOpacity style={styles.actionIcon} onPress={() => handleDelete(report)}>
-                                <MaterialIcons name="delete-outline" size={20} color="#FF3B30" />
-                              </TouchableOpacity>
-                            )}
-                            {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && (
-                              <TouchableOpacity
-                                style={styles.actionIcon}
-                                onPress={() => setOpenMenuReportId(openMenuReportId === report.id ? null : report.id)}
-                              >
-                                <MaterialIcons name="more-vert" size={24} color="#6B7280" />
-                              </TouchableOpacity>
-                            )}
-                          </View>
                         </View>
-                        {((report.status === 'submitted' || report.status === 'pending' || report.status === 'confirmed') || report.isArchived) && openMenuReportId === report.id && (
-                          <>
-                            <Pressable
-                              style={styles.menuOverlay}
-                              onPress={() => setOpenMenuReportId(null)}
-                            />
-                            <View style={styles.dropdownMenu}>
-                            <TouchableOpacity
-                              style={styles.menuOption}
-                              onPress={() => {
-                                handleViewSubmitted(report);
-                                setOpenMenuReportId(null);
-                              }}
-                            >
-                              <Feather name="eye" size={18} color="#8B5CF6" />
-                              <Text style={styles.menuOptionText}>View Details</Text>
-                            </TouchableOpacity>
+                        <Text
+                          style={styles.textReportContent}
+                          numberOfLines={3}
+                        >
+                          {report.textContent || "No content"}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.viewButton}
+                          onPress={() => {
+                            // Navigate to detail view (to be implemented)
+                            Alert.alert(
+                              "Report Details",
+                              report.textContent || "No content",
+                            );
+                          }}
+                        >
+                          <Text style={styles.viewButtonText}>
+                            View Full Report
+                          </Text>
+                        </TouchableOpacity>
 
+                        {/* Submit Button Section */}
+                        {actions.canSubmit && (
+                          <View style={styles.submitButtonSection}>
                             <TouchableOpacity
-                              style={styles.menuOption}
-                              onPress={() => {
-                                handleShareReport(report);
-                                setOpenMenuReportId(null);
-                              }}
+                              style={[
+                                styles.primarySubmitButton,
+                                isSubmittingReportId === report.id &&
+                                  styles.buttonDisabled,
+                              ]}
+                              onPress={() => handleResubmit(report)}
+                              disabled={isSubmittingReportId === report.id}
                             >
-                              <Feather name="share-2" size={18} color="#8B5CF6" />
-                              <Text style={styles.menuOptionText}>Share</Text>
+                              {isSubmittingReportId === report.id ? (
+                                <ActivityIndicator
+                                  size="small"
+                                  color="#8A4FFF"
+                                />
+                              ) : (
+                                <>
+                                  <MaterialIcons
+                                    name={
+                                      report.status === "saved"
+                                        ? "cloud-upload"
+                                        : "refresh"
+                                    }
+                                    size={18}
+                                    color="#8A4FFF"
+                                  />
+                                  <Text style={styles.primarySubmitButtonText}>
+                                    {report.status === "saved"
+                                      ? "Submit"
+                                      : "Resubmit"}
+                                  </Text>
+                                </>
+                              )}
                             </TouchableOpacity>
+                          </View>
+                        )}
 
+                        {/* Unarchive Button for Archived Reports */}
+                        {report.isArchived && (
+                          <View style={styles.menuContainer}>
                             <TouchableOpacity
-                              style={styles.menuOption}
-                              onPress={() => {
-                                handleViewViewers(report);
-                                setOpenMenuReportId(null);
-                              }}
+                              style={styles.unarchiveFullButton}
+                              onPress={() => handleUnarchive(report)}
                             >
-                              <Feather name="users" size={18} color="#8B5CF6" />
-                              <Text style={styles.menuOptionText}>Viewers</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.menuOption, styles.menuOptionDanger]}
-                              onPress={() => {
-                                handleArchiveToggle(report);
-                                setOpenMenuReportId(null);
-                              }}
-                            >
-                              <Feather name={report.isArchived ? "inbox" : "archive"} size={18} color="#FF3B30" />
-                              <Text style={[styles.menuOptionText, styles.menuOptionDangerText]}>
-                                {report.isArchived ? 'Unarchive' : 'Archive'}
+                              <Feather name="inbox" size={18} color="#8A4FFF" />
+                              <Text style={styles.unarchiveButtonText}>
+                                Unarchive
                               </Text>
                             </TouchableOpacity>
                           </View>
-                          </>
                         )}
                       </View>
-                      <Text style={styles.textReportContent} numberOfLines={3}>
-                        {report.textContent || 'No content'}
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.viewButton}
-                        onPress={() => {
-                          // Navigate to detail view (to be implemented)
-                          Alert.alert('Report Details', report.textContent || 'No content');
-                        }}
-                      >
-                        <Text style={styles.viewButtonText}>View Full Report</Text>
-                      </TouchableOpacity>
-
-                      {/* Submit Button Section */}
-                      {actions.canSubmit && (
-                        <View style={styles.submitButtonSection}>
-                          <TouchableOpacity
-                            style={[styles.primarySubmitButton, isSubmittingReportId === report.id && styles.buttonDisabled]}
-                            onPress={() => handleResubmit(report)}
-                            disabled={isSubmittingReportId === report.id}
-                          >
-                            {isSubmittingReportId === report.id ? (
-                              <ActivityIndicator size="small" color="#8A4FFF" />
-                            ) : (
-                              <>
-                                <MaterialIcons name={report.status === 'saved' ? 'cloud-upload' : 'refresh'} size={18} color="#8A4FFF" />
-                                <Text style={styles.primarySubmitButtonText}>{report.status === 'saved' ? 'Submit' : 'Resubmit'}</Text>
-                              </>
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      )}
-
-                      {/* Unarchive Button for Archived Reports */}
-                      {report.isArchived && (
-                        <View style={styles.menuContainer}>
-                          <TouchableOpacity
-                            style={styles.unarchiveFullButton}
-                            onPress={() => handleUnarchive(report)}
-                          >
-                            <Feather name="inbox" size={18} color="#8A4FFF" />
-                            <Text style={styles.unarchiveButtonText}>Unarchive</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })
-              )}
+                    );
+                  })}
             </>
           )}
         </ScrollView>
@@ -1312,7 +1654,9 @@ export default function LibraryScreen() {
               {decryptedContent.payload?.text && (
                 <View style={styles.contentSection}>
                   <Text style={styles.contentLabel}>Report Text:</Text>
-                  <Text style={styles.contentText}>{decryptedContent.payload.text}</Text>
+                  <Text style={styles.contentText}>
+                    {decryptedContent.payload.text}
+                  </Text>
                 </View>
               )}
 
@@ -1325,10 +1669,12 @@ export default function LibraryScreen() {
                     <Text style={styles.audioText}>
                       {decryptedContent.metadata?.duration
                         ? `${decryptedContent.metadata.duration}s`
-                        : 'Audio file available'}
+                        : "Audio file available"}
                     </Text>
                     {decryptedContent.payload?.audioFormat && (
-                      <Text style={styles.audioFormat}>{decryptedContent.payload.audioFormat}</Text>
+                      <Text style={styles.audioFormat}>
+                        {decryptedContent.payload.audioFormat}
+                      </Text>
                     )}
                   </View>
                 </View>
@@ -1337,15 +1683,24 @@ export default function LibraryScreen() {
               {/* Status */}
               <View style={styles.contentSection}>
                 <Text style={styles.contentLabel}>Status:</Text>
-                <View style={{ alignSelf: 'flex-start' }}>
-                  <View style={[
-                    styles.statusBadge,
-                    decryptedContent.status === 'confirmed' && { backgroundColor: '#4CAF50' },
-                    decryptedContent.status === 'pending' && { backgroundColor: '#FFEB3B' },
-                    decryptedContent.status === 'failed' && { backgroundColor: '#FF3B30' },
-                  ]}>
+                <View style={{ alignSelf: "flex-start" }}>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      decryptedContent.status === "confirmed" && {
+                        backgroundColor: "#4CAF50",
+                      },
+                      decryptedContent.status === "pending" && {
+                        backgroundColor: "#FFEB3B",
+                      },
+                      decryptedContent.status === "failed" && {
+                        backgroundColor: "#FF3B30",
+                      },
+                    ]}
+                  >
                     <Text style={styles.statusBadgeText}>
-                      {decryptedContent.status?.charAt(0).toUpperCase() + decryptedContent.status?.slice(1)}
+                      {decryptedContent.status?.charAt(0).toUpperCase() +
+                        decryptedContent.status?.slice(1)}
                     </Text>
                   </View>
                 </View>
@@ -1357,33 +1712,145 @@ export default function LibraryScreen() {
                   <Text style={styles.contentLabel}>Metadata:</Text>
                   {decryptedContent.payload.metadata.location && (
                     <View style={styles.metadataItem}>
-                      <MaterialIcons name="location-on" size={16} color="#8A4FFF" />
-                      <Text style={styles.metadataText}>{decryptedContent.payload.metadata.location}</Text>
+                      <MaterialIcons
+                        name="location-on"
+                        size={16}
+                        color="#8A4FFF"
+                      />
+                      <View style={styles.locationContent}>
+                        {(() => {
+                          try {
+                            const location = JSON.parse(
+                              decryptedContent.payload.metadata.location,
+                            );
+                            return (
+                              <>
+                                <Text style={styles.metadataText}>
+                                  {location.latitude.toFixed(4)},{" "}
+                                  {location.longitude.toFixed(4)}
+                                </Text>
+                                {location.mapLink && (
+                                  <TouchableOpacity
+                                    onPress={async () => {
+                                      try {
+                                        await Linking.openURL(location.mapLink);
+                                      } catch (error) {
+                                        Alert.alert(
+                                          "Error",
+                                          "Could not open map",
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <Text style={styles.mapLinkText}>
+                                      View on Map →
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+                              </>
+                            );
+                          } catch (e) {
+                            return (
+                              <Text style={styles.metadataText}>
+                                {decryptedContent.payload.metadata.location}
+                              </Text>
+                            );
+                          }
+                        })()}
+                      </View>
                     </View>
                   )}
                   {decryptedContent.payload.metadata.timestamp && (
                     <View style={styles.metadataItem}>
-                      <MaterialIcons name="access-time" size={16} color="#8A4FFF" />
-                      <Text style={styles.metadataText}>{formatDate(decryptedContent.payload.metadata.timestamp)}</Text>
+                      <MaterialIcons
+                        name="access-time"
+                        size={16}
+                        color="#8A4FFF"
+                      />
+                      <Text style={styles.metadataText}>
+                        {formatDate(
+                          decryptedContent.payload.metadata.timestamp,
+                        )}
+                      </Text>
                     </View>
                   )}
                 </View>
               )}
 
               {/* Responses */}
-              {decryptedContent.payload?.responses && decryptedContent.payload.responses.length > 0 && (
-                <View style={styles.contentSection}>
-                  <Text style={styles.contentLabel}>Survey Responses:</Text>
-                  {decryptedContent.payload.responses.map((response: string, index: number) => (
-                    response && (
-                      <View key={index} style={styles.responseItem}>
-                        <Text style={styles.responseIndex}>{index + 1}.</Text>
-                        <Text style={styles.responseText}>{response}</Text>
-                      </View>
-                    )
-                  ))}
-                </View>
-              )}
+              {decryptedContent.payload?.responses &&
+                decryptedContent.payload.responses.length > 0 && (
+                  <View style={styles.contentSection}>
+                    <Text style={styles.contentLabel}>Survey Responses:</Text>
+                    {decryptedContent.payload.responses.map(
+                      (response: string, index: number) =>
+                        response && (
+                          <View key={index} style={styles.responseItem}>
+                            <Text style={styles.responseIndex}>
+                              {index + 1}.
+                            </Text>
+                            <View style={styles.responseContent}>
+                              {response.includes("Location:") &&
+                              response.includes("latitude") ? (
+                                (() => {
+                                  try {
+                                    // Extract JSON from "Location: {...}" format
+                                    const jsonMatch =
+                                      response.match(/\{[\s\S]*\}/);
+                                    if (jsonMatch) {
+                                      const location = JSON.parse(jsonMatch[0]);
+                                      return (
+                                        <View>
+                                          <Text style={styles.responseText}>
+                                            📍 Location
+                                          </Text>
+                                          <Text style={styles.responseSubtext}>
+                                            {location.latitude.toFixed(4)},{" "}
+                                            {location.longitude.toFixed(4)}
+                                          </Text>
+                                          {location.mapLink && (
+                                            <TouchableOpacity
+                                              onPress={async () => {
+                                                try {
+                                                  await Linking.openURL(
+                                                    location.mapLink,
+                                                  );
+                                                } catch (error) {
+                                                  Alert.alert(
+                                                    "Error",
+                                                    "Could not open map",
+                                                  );
+                                                }
+                                              }}
+                                            >
+                                              <Text style={styles.mapLinkText}>
+                                                View on Map →
+                                              </Text>
+                                            </TouchableOpacity>
+                                          )}
+                                        </View>
+                                      );
+                                    }
+                                  } catch (e) {
+                                    // Fall back to showing raw response
+                                  }
+                                  return (
+                                    <Text style={styles.responseText}>
+                                      {response}
+                                    </Text>
+                                  );
+                                })()
+                              ) : (
+                                <Text style={styles.responseText}>
+                                  {response}
+                                </Text>
+                              )}
+                            </View>
+                          </View>
+                        ),
+                    )}
+                  </View>
+                )}
 
               {/* Timeline */}
               <View style={styles.contentSection}>
@@ -1393,25 +1860,39 @@ export default function LibraryScreen() {
                     <MaterialIcons name="schedule" size={18} color="#8A4FFF" />
                     <View style={styles.timelineText}>
                       <Text style={styles.timelineLabel}>Created</Text>
-                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.createdAt)}</Text>
+                      <Text style={styles.timelineDate}>
+                        {formatDate(decryptedContent.timestamps.createdAt)}
+                      </Text>
                     </View>
                   </View>
                 )}
                 {decryptedContent.timestamps?.submittedAt && (
                   <View style={styles.timelineItem}>
-                    <MaterialIcons name="cloud-upload" size={18} color="#2196F3" />
+                    <MaterialIcons
+                      name="cloud-upload"
+                      size={18}
+                      color="#2196F3"
+                    />
                     <View style={styles.timelineText}>
                       <Text style={styles.timelineLabel}>Submitted</Text>
-                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.submittedAt)}</Text>
+                      <Text style={styles.timelineDate}>
+                        {formatDate(decryptedContent.timestamps.submittedAt)}
+                      </Text>
                     </View>
                   </View>
                 )}
                 {decryptedContent.timestamps?.confirmedAt && (
                   <View style={styles.timelineItem}>
-                    <MaterialIcons name="check-circle" size={18} color="#4CAF50" />
+                    <MaterialIcons
+                      name="check-circle"
+                      size={18}
+                      color="#4CAF50"
+                    />
                     <View style={styles.timelineText}>
                       <Text style={styles.timelineLabel}>Confirmed</Text>
-                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.confirmedAt)}</Text>
+                      <Text style={styles.timelineDate}>
+                        {formatDate(decryptedContent.timestamps.confirmedAt)}
+                      </Text>
                     </View>
                   </View>
                 )}
@@ -1420,7 +1901,9 @@ export default function LibraryScreen() {
                     <MaterialIcons name="edit" size={18} color="#FF9800" />
                     <View style={styles.timelineText}>
                       <Text style={styles.timelineLabel}>Updated</Text>
-                      <Text style={styles.timelineDate}>{formatDate(decryptedContent.timestamps.updatedAt)}</Text>
+                      <Text style={styles.timelineDate}>
+                        {formatDate(decryptedContent.timestamps.updatedAt)}
+                      </Text>
                     </View>
                   </View>
                 )}
@@ -1443,7 +1926,7 @@ export default function LibraryScreen() {
         transparent={true}
         onRequestClose={() => {
           setShowShareModal(false);
-          setShareUserId('');
+          setShareUserId("");
           setSelectedReport(null);
         }}
       >
@@ -1452,7 +1935,7 @@ export default function LibraryScreen() {
             <TouchableOpacity
               onPress={() => {
                 setShowShareModal(false);
-                setShareUserId('');
+                setShareUserId("");
                 setSelectedReport(null);
               }}
             >
@@ -1462,8 +1945,13 @@ export default function LibraryScreen() {
             <View style={{ width: 24 }} />
           </View>
 
-          <View style={styles.shareContainer}>
-            <Text style={styles.shareLabel}>Enter user ID to grant access:</Text>
+          <ScrollView
+            style={styles.shareContainerScroll}
+            contentContainerStyle={styles.shareContainer}
+          >
+            <Text style={styles.shareLabel}>
+              Enter user ID to grant access:
+            </Text>
             <TextInput
               style={styles.shareInput}
               placeholder="User ID"
@@ -1471,8 +1959,41 @@ export default function LibraryScreen() {
               onChangeText={setShareUserId}
               placeholderTextColor="#aaa"
             />
+
+            <Text style={styles.shareLabel}>Access expires:</Text>
             <TouchableOpacity
-              style={[styles.shareButton, isLoadingShare && styles.shareButtonDisabled]}
+              style={styles.datePickerButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Feather name="calendar" size={18} color="#8A4FFF" />
+              <Text style={styles.datePickerButtonText}>
+                {expirationDate.toLocaleDateString()}{" "}
+                {expirationDate.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+            </TouchableOpacity>
+
+            <DateTimePickerModal
+              isVisible={showDatePicker}
+              mode="datetime"
+              date={expirationDate}
+              onConfirm={(date) => {
+                setExpirationDate(date);
+                setShowDatePicker(false);
+              }}
+              onCancel={() => setShowDatePicker(false)}
+              minuteInterval={5}
+              textColor="#8B5CF6"
+              isDarkModeEnabled={false}
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.shareButton,
+                isLoadingShare && styles.shareButtonDisabled,
+              ]}
               onPress={handleGrantAccess}
               disabled={isLoadingShare}
             >
@@ -1482,7 +2003,7 @@ export default function LibraryScreen() {
                 <Text style={styles.shareButtonText}>Grant Access</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
 
@@ -1531,18 +2052,34 @@ export default function LibraryScreen() {
                       style={styles.viewerIdContainer}
                       onPress={() => {
                         Clipboard.setString(viewer.viewerId);
-                        Alert.alert('Copied', 'Viewer ID copied to clipboard');
+                        Alert.alert("Copied", "Viewer ID copied to clipboard");
                       }}
                     >
                       <Text style={styles.viewerIdLabel}>ID</Text>
-                      <Text style={styles.viewerIdValue}>{viewer.viewerId}</Text>
-                      <Feather name="copy" size={14} color="#8A4FFF" style={styles.copyIcon} />
+                      <Text style={styles.viewerIdValue}>
+                        {viewer.viewerId}
+                      </Text>
+                      <Feather
+                        name="copy"
+                        size={14}
+                        color="#8A4FFF"
+                        style={styles.copyIcon}
+                      />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.revokeButtonContainer}
+                      style={[
+                        styles.revokeButtonContainer,
+                        isRevokingUserId === viewer.viewerId &&
+                          styles.revokeButtonDisabled,
+                      ]}
                       onPress={() => handleRevokeAccess(viewer.viewerId)}
+                      disabled={isRevokingUserId === viewer.viewerId}
                     >
-                      <Text style={styles.revokeButtonText}>Revoke</Text>
+                      {isRevokingUserId === viewer.viewerId ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.revokeButtonText}>Revoke</Text>
+                      )}
                     </TouchableOpacity>
                   </View>
 
@@ -1551,19 +2088,30 @@ export default function LibraryScreen() {
                     {viewer.phone && (
                       <View style={styles.viewerDetailItem}>
                         <Text style={styles.viewerDetailLabel}>Phone</Text>
-                        <Text style={styles.viewerDetailValue}>{viewer.phone}</Text>
+                        <Text style={styles.viewerDetailValue}>
+                          {viewer.phone}
+                        </Text>
                       </View>
                     )}
                     {viewer.email && (
                       <View style={styles.viewerDetailItem}>
                         <Text style={styles.viewerDetailLabel}>Email</Text>
-                        <Text style={styles.viewerDetailValue}>{viewer.email}</Text>
+                        <Text style={styles.viewerDetailValue}>
+                          {viewer.email}
+                        </Text>
                       </View>
                     )}
                     <View style={styles.viewerDetailItem}>
                       <Text style={styles.viewerDetailLabel}>Status</Text>
-                      <Text style={[styles.viewerDetailValue, viewer.isActive ? styles.statusActive : styles.statusInactive]}>
-                        {viewer.isActive ? 'Active' : 'Inactive'}
+                      <Text
+                        style={[
+                          styles.viewerDetailValue,
+                          viewer.isActive
+                            ? styles.statusActive
+                            : styles.statusInactive,
+                        ]}
+                      >
+                        {viewer.isActive ? "Active" : "Inactive"}
                       </Text>
                     </View>
                     <View style={styles.viewerDetailItem}>
@@ -1575,7 +2123,9 @@ export default function LibraryScreen() {
                     {viewer.expiresAt && (
                       <View style={styles.viewerDetailItem}>
                         <Text style={styles.viewerDetailLabel}>Expires</Text>
-                        <Text style={[styles.viewerDetailValue, styles.expiryColor]}>
+                        <Text
+                          style={[styles.viewerDetailValue, styles.expiryColor]}
+                        >
                           {new Date(viewer.expiresAt).toLocaleDateString()}
                         </Text>
                       </View>
@@ -1590,11 +2140,7 @@ export default function LibraryScreen() {
 
       {/* Blur overlay when PIN modal is shown */}
       {(showPinRequired || showPinVerify) && (
-        <BlurView
-          intensity={90}
-          style={StyleSheet.absoluteFill}
-          tint="dark"
-        />
+        <BlurView intensity={90} style={StyleSheet.absoluteFill} tint="dark" />
       )}
 
       {/* PIN Required Modal */}
@@ -1605,16 +2151,22 @@ export default function LibraryScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Feather name="lock" size={60} color="#8B5CF6" style={styles.modalIcon} />
+            <Feather
+              name="lock"
+              size={60}
+              color="#8B5CF6"
+              style={styles.modalIcon}
+            />
             <Text style={styles.modalTitle}>PIN Required</Text>
             <Text style={styles.modalMessage}>
-              To protect your privacy and sensitive data, you must set a PIN before accessing the library.
+              To protect your privacy and sensitive data, you must set a PIN
+              before accessing the library.
             </Text>
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => {
                 setShowPinRequired(false);
-                router.push('/settings');
+                router.push("/settings");
               }}
             >
               <Text style={styles.modalButtonText}>Set PIN Now</Text>
@@ -1633,15 +2185,11 @@ export default function LibraryScreen() {
       </Modal>
 
       {/* PIN Verification Modal */}
-      <Modal
-        visible={showPinVerify}
-        animationType="slide"
-        transparent={false}
-      >
+      <Modal visible={showPinVerify} animationType="slide" transparent={false}>
         <LockScreen
           mode="verify"
           onUnlock={handlePinVerified}
-          onSetPin={() => { }}
+          onSetPin={() => {}}
           onClose={() => setShowPinVerify(false)}
         />
         <TouchableOpacity
@@ -1691,57 +2239,73 @@ export default function LibraryScreen() {
                 <View style={styles.detailsSection}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Report ID</Text>
-                    <Text style={styles.detailValue}>{selectedSharedWithMeReport.reportId}</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedSharedWithMeReport.reportId}
+                    </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>From</Text>
                     <Text style={styles.detailValue}>
-                      {selectedSharedWithMeReport.reporterPhone || selectedSharedWithMeReport.reporterEmail || 'Unknown'}
+                      {selectedSharedWithMeReport.reporterPhone ||
+                        selectedSharedWithMeReport.reporterEmail ||
+                        "Unknown"}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Reporter ID</Text>
-                    <Text style={styles.detailValue}>{selectedSharedWithMeReport.reporterId}</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedSharedWithMeReport.reporterId}
+                    </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Granted Date</Text>
                     <Text style={styles.detailValue}>
-                      {new Date(selectedSharedWithMeReport.grantedAt).toLocaleString()}
+                      {new Date(
+                        selectedSharedWithMeReport.grantedAt,
+                      ).toLocaleString()}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Expires</Text>
                     <Text style={styles.detailValue}>
-                      {new Date(selectedSharedWithMeReport.expiresAt).toLocaleString()}
+                      {new Date(
+                        selectedSharedWithMeReport.expiresAt,
+                      ).toLocaleString()}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status</Text>
-                    <Text style={[styles.detailValue, selectedSharedWithMeReport.isActive ? styles.statusActiveText : styles.statusInactiveText]}>
-                      {selectedSharedWithMeReport.isActive ? 'Active' : 'Inactive'}
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        selectedSharedWithMeReport.isActive
+                          ? styles.statusActiveText
+                          : styles.statusInactiveText,
+                      ]}
+                    >
+                      {selectedSharedWithMeReport.isActive
+                        ? "Active"
+                        : "Inactive"}
                     </Text>
                   </View>
 
-                  {decryptedContent && (
-                    <>
-                      <View style={styles.divider} />
-                      <Text style={styles.contentTitle}>Report Content</Text>
-                      <Text style={styles.contentText}>
-                        {decryptedContent.payload || decryptedContent.textContent || JSON.stringify(decryptedContent)}
-                      </Text>
-                    </>
-                  )}
                 </View>
               )}
             </ScrollView>
           )}
         </SafeAreaView>
       </Modal>
+
+      {/* Auth Gate Modal for submit button */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => setShowAuthGate(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -1749,237 +2313,251 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   container: {
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 10 : 20,
+    paddingTop: Platform.OS === "ios" ? 10 : 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   archiveToggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     padding: 8,
   },
   archiveToggleText: {
     fontSize: 14,
-    color: '#8A4FFF',
-    fontWeight: '600',
+    color: "#8A4FFF",
+    fontWeight: "600",
   },
   placeholder: {
     width: 40,
   },
   tabContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
     gap: 12,
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: 20,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   activeTab: {
-    backgroundColor: '#8A4FFF',
+    backgroundColor: "#8A4FFF",
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
   },
   activeTabText: {
-    color: '#fff',
+    color: "#fff",
   },
   sharedSubTabContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
   },
   sharedSubTab: {
     flex: 1,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: 16,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   activeSharedSubTab: {
-    backgroundColor: '#8A4FFF',
+    backgroundColor: "#8A4FFF",
   },
   sharedSubTabText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
   },
   activeSharedSubTabText: {
-    color: '#fff',
+    color: "#fff",
   },
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+    position: "relative",
+  },
+  globalMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 900,
+    elevation: 40,
+  },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: "#999",
     marginTop: 8,
   },
   textReportItem: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginHorizontal: 16,
     marginVertical: 8,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    shadowColor: '#000',
+    borderColor: "#E0E0E0",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    overflow: 'visible',
+    overflow: "visible",
     zIndex: 1,
   },
+  openCardLayer: {
+    position: "relative",
+    zIndex: 999,
+    elevation: 50,
+  },
   textReportHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   textReportHeaderWrapper: {
-    position: 'relative',
+    position: "relative",
   },
   textReportHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     flex: 1,
   },
   actionIconsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionIcon: {
     padding: 4,
   },
   textReportDate: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   draftBadge: {
-    backgroundColor: '#FFA500',
+    backgroundColor: "#FFA500",
   },
   submittedBadge: {
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
   },
   confirmedBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
   },
   failedBadge: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: "#FF3B30",
   },
   statusBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
   textReportContent: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     lineHeight: 20,
     marginBottom: 12,
   },
   viewButton: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   viewButtonText: {
-    color: '#8A4FFF',
-    fontWeight: '600',
+    color: "#8A4FFF",
+    fontWeight: "600",
     fontSize: 14,
   },
   submitButtonSection: {
     marginTop: 12,
     paddingTop: 12,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   primarySubmitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#8A4FFF',
+    borderColor: "#8A4FFF",
     gap: 6,
   },
   primarySubmitButtonText: {
-    color: '#8A4FFF',
-    fontWeight: '600',
+    color: "#8A4FFF",
+    fontWeight: "600",
     fontSize: 14,
   },
   unarchiveFullButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#8A4FFF',
+    borderColor: "#8A4FFF",
     gap: 6,
   },
   unarchiveButtonText: {
-    color: '#8A4FFF',
-    fontWeight: '600',
+    color: "#8A4FFF",
+    fontWeight: "600",
     fontSize: 14,
   },
   buttonDisabled: {
@@ -1987,19 +2565,19 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#fff',
-    width: '90%',
-    maxHeight: '90%',
+    backgroundColor: "#fff",
+    width: "90%",
+    maxHeight: "90%",
     borderRadius: 20,
     padding: 40,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
@@ -2010,56 +2588,56 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 12,
   },
   modalMessage: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     lineHeight: 24,
     marginBottom: 24,
   },
   modalButton: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: "#8B5CF6",
     paddingVertical: 14,
     paddingHorizontal: 40,
     borderRadius: 30,
     marginBottom: 12,
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
   },
   modalButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   modalCancelButton: {
     paddingVertical: 10,
   },
   modalCancelText: {
-    color: '#999',
+    color: "#999",
     fontSize: 14,
   },
   modalCloseButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 40,
     right: 20,
     zIndex: 10,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
   },
   decryptedContent: {
     flex: 1,
@@ -2069,12 +2647,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
   },
   contentLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 8,
   },
   detailsSection: {
@@ -2083,67 +2661,67 @@ const styles = StyleSheet.create({
   detailRow: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: "#F0F0F0",
   },
   detailLabel: {
     fontSize: 12,
-    color: '#9CA3AF',
-    fontWeight: '600',
+    color: "#9CA3AF",
+    fontWeight: "600",
     marginBottom: 4,
   },
   detailValue: {
     fontSize: 14,
-    color: '#1F2937',
-    fontWeight: '500',
+    color: "#1F2937",
+    fontWeight: "500",
   },
   statusActiveText: {
-    color: '#10B981',
+    color: "#10B981",
   },
   statusInactiveText: {
-    color: '#EF4444',
+    color: "#EF4444",
   },
   divider: {
     height: 1,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: "#E0E0E0",
     marginVertical: 20,
   },
   contentTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 12,
   },
   contentText: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
     lineHeight: 24,
   },
   audioInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: "#F5F3FF",
     borderRadius: 8,
   },
   audioText: {
     fontSize: 14,
-    color: '#8A4FFF',
-    fontWeight: '600',
+    color: "#8A4FFF",
+    fontWeight: "600",
     flex: 1,
   },
   audioFormat: {
     fontSize: 12,
-    color: '#999',
-    backgroundColor: '#E8E8E8',
+    color: "#999",
+    backgroundColor: "#E8E8E8",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
   timelineItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
     marginBottom: 12,
     paddingVertical: 8,
@@ -2153,97 +2731,232 @@ const styles = StyleSheet.create({
   },
   timelineLabel: {
     fontSize: 12,
-    color: '#999',
-    textTransform: 'uppercase',
-    fontWeight: '600',
+    color: "#999",
+    textTransform: "uppercase",
+    fontWeight: "600",
     marginBottom: 4,
   },
   timelineDate: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
   },
   reportId: {
     fontSize: 12,
-    color: '#999',
-    fontFamily: 'monospace',
-    backgroundColor: '#F5F5F5',
+    color: "#999",
+    fontFamily: "monospace",
+    backgroundColor: "#F5F5F5",
     padding: 8,
     borderRadius: 4,
   },
   metadataItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     marginBottom: 8,
     paddingVertical: 8,
     paddingHorizontal: 10,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: "#F5F3FF",
     borderRadius: 6,
   },
   metadataText: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
     flex: 1,
   },
+  locationContent: {
+    flex: 1,
+  },
+  responseContent: {
+    flex: 1,
+  },
+  responseSubtext: {
+    fontSize: 13,
+    color: "#666",
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  mapLinkText: {
+    fontSize: 12,
+    color: "#8A4FFF",
+    fontWeight: "600",
+    marginTop: 6,
+    textDecorationLine: "underline",
+  },
   responseItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     marginBottom: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: "#F9F9F9",
     borderRadius: 6,
     borderLeftWidth: 3,
-    borderLeftColor: '#8A4FFF',
+    borderLeftColor: "#8A4FFF",
   },
   responseIndex: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#8A4FFF',
+    fontWeight: "600",
+    color: "#8A4FFF",
     marginTop: 2,
   },
   responseText: {
     fontSize: 14,
-    color: '#333',
+    color: "#333",
     flex: 1,
     lineHeight: 20,
   },
-  shareContainer: {
+  shareContainerScroll: {
     flex: 1,
+  },
+  shareContainer: {
     padding: 20,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   shareLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 16,
   },
   shareInput: {
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 16,
   },
   shareButton: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: "#8B5CF6",
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   shareButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   shareButtonDisabled: {
     opacity: 0.6,
   },
+  datePickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  datePickerButtonText: {
+    fontSize: 16,
+    color: "#333",
+    flex: 1,
+  },
+  datePickerContainer: {
+    backgroundColor: "#F9F9F9",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  datePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  datePickerTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  dateTimeGrid: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  pickerSection: {
+    flex: 1,
+    alignItems: "center",
+  },
+  pickerLabel: {
+    fontSize: 12,
+    color: "#999",
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  pickerInput: {
+    flexDirection: "column",
+    alignItems: "center",
+    backgroundColor: "#F9F9F9",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    paddingVertical: 8,
+  },
+  pickerButton: {
+    fontSize: 24,
+    color: "#8A4FFF",
+    fontWeight: "bold",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  pickerValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#333",
+    paddingVertical: 8,
+    minWidth: 50,
+    textAlign: "center",
+  },
+  dateInputRow: {
+    marginBottom: 12,
+    gap: 8,
+  },
+  quickSelectButton: {
+    flex: 1,
+    backgroundColor: "#E8DCFF",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  quickSelectText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#8B5CF6",
+  },
+  dateInputLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 4,
+    fontWeight: "600",
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 14,
+  },
+  dateConfirmButton: {
+    backgroundColor: "#8B5CF6",
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  dateConfirmButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   reportActionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginTop: 8,
   },
@@ -2252,42 +2965,42 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 6,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
   },
   reportActionButtonText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
   editButton: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
-    flexDirection: 'row',
+    backgroundColor: "#8B5CF6",
+    borderColor: "#8B5CF6",
+    flexDirection: "row",
     gap: 6,
   },
   submitButton: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    backgroundColor: "#10B981",
+    borderColor: "#10B981",
   },
   unarchiveButton: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
-    flexDirection: 'row',
+    backgroundColor: "#3B82F6",
+    borderColor: "#3B82F6",
+    flexDirection: "row",
     gap: 6,
   },
   // Search bar styles
   searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
     borderRadius: 8,
     marginHorizontal: 12,
     marginVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
   },
   searchIcon: {
     marginRight: 8,
@@ -2296,7 +3009,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#333',
+    color: "#333",
   },
   // Sharing styles
   reportsList: {
@@ -2305,46 +3018,46 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   sharedReportCard: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: "#F0F9FF",
     borderLeftWidth: 4,
-    borderLeftColor: '#14B8A6',
+    borderLeftColor: "#14B8A6",
     padding: 12,
     borderRadius: 8,
     marginVertical: 4,
   },
   sharedReportHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   sharedReportTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
   },
   sharedReportSubtitle: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 4,
   },
   viewerItem: {
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: "#E5E7EB",
   },
   viewerItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 12,
     gap: 12,
   },
   viewerIdContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
@@ -2352,21 +3065,21 @@ const styles = StyleSheet.create({
   },
   viewerIdLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#9CA3AF',
+    fontWeight: "600",
+    color: "#9CA3AF",
   },
   viewerIdValue: {
     fontSize: 11,
-    color: '#1F2937',
-    fontFamily: 'monospace',
+    color: "#1F2937",
+    fontFamily: "monospace",
     flex: 1,
   },
   copyIcon: {
     marginLeft: 4,
   },
   viewerDetailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   viewerDetailItem: {
@@ -2375,50 +3088,50 @@ const styles = StyleSheet.create({
   },
   viewerDetailLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
-    fontWeight: '600',
+    color: "#9CA3AF",
+    fontWeight: "600",
     marginBottom: 4,
   },
   viewerDetailValue: {
     fontSize: 13,
-    color: '#1F2937',
-    fontWeight: '500',
+    color: "#1F2937",
+    fontWeight: "500",
   },
   statusActive: {
-    color: '#10B981',
+    color: "#10B981",
   },
   statusInactive: {
-    color: '#EF4444',
+    color: "#EF4444",
   },
   expiryColor: {
-    color: '#F59E0B',
+    color: "#F59E0B",
   },
   revokeButtonContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#EF4444',
+    backgroundColor: "#EF4444",
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   revokeButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   menuContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginTop: 12,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
   menuButton: {
     padding: 8,
     marginRight: -8,
   },
   menuOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -2426,14 +3139,14 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   dropdownMenu: {
-    position: 'absolute',
+    position: "absolute",
     top: 40,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -2442,23 +3155,29 @@ const styles = StyleSheet.create({
     zIndex: 99999,
   },
   menuOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
   menuOptionDanger: {
     borderBottomWidth: 0,
   },
   menuOptionText: {
     fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
+    color: "#374151",
+    fontWeight: "500",
   },
   menuOptionDangerText: {
-    color: '#FF3B30',
+    color: "#FF3B30",
+  },
+  menuOptionDisabled: {
+    opacity: 0.6,
+  },
+  revokeButtonDisabled: {
+    opacity: 0.6,
   },
 });

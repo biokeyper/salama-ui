@@ -24,7 +24,6 @@ export default function BootScreen() {
           }
         }, 2000);
       } catch (error) {
-        console.error('Error checking boot status:', error);
         // Still go to home on error - auth checks will catch it
         router.replace('/(tabs)');
       }
