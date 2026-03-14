@@ -43,7 +43,7 @@ export default function AuthGateModal({
           <View style={styles.headerRow}>
             <View style={styles.iconPlaceholder} />
             <Feather name="lock" size={32} color="#8B5CF6" />
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
               <Feather name="x" size={24} color="#1F2937" />
             </TouchableOpacity>
           </View>

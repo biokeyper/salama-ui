@@ -71,15 +71,14 @@ export default function LoginScreen() {
     try {
       const result = await login(phone.trim(), otp.trim());
       if (result.success) {
-        Alert.alert('Success', 'You are now logged in', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to home screen (main tabs)
-              router.replace('/');
-            },
-          },
-        ]);
+        // Navigate immediately, then show success message
+        // This ensures navigation happens first before any modal shows
+        setTimeout(() => {
+          router.replace('/');
+        }, 100);
+
+        // Show brief success alert
+        Alert.alert('Success', 'You are now logged in');
       } else {
         Alert.alert('Error', result.error || 'Failed to verify OTP');
       }

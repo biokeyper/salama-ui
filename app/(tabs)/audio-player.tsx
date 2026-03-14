@@ -19,6 +19,7 @@ import {
   submitReportToBackend,
 } from "@/services/api";
 import { getAuthToken } from "@/services/authService";
+import { hasPin } from "@/services/security";
 import {
   archiveReport,
   deleteReport,
@@ -122,11 +123,30 @@ export default function LibraryScreen() {
       const checkPinStatus = async () => {
         setIsCheckingAuth(true);
 
-        // Library is open to everyone - no PIN required
-        console.log('[LIBRARY] Opening library - PIN not required');
-        setIsAuthenticated(true);
+        // If user is logged in, require PIN to access library
+        if (user) {
+          console.log('[LIBRARY] User logged in - checking PIN status');
+          // Check if user has a PIN set
+          const hasPinSet = await hasPin(user?.userId);
+          console.log('[LIBRARY] User has PIN set:', hasPinSet);
+
+          if (hasPinSet) {
+            // PIN exists - show verify PIN flow
+            console.log('[LIBRARY] PIN exists - showing verify PIN modal');
+            setShowPinVerify(true);
+          } else {
+            // No PIN - show set PIN flow
+            console.log('[LIBRARY] No PIN exists - showing set PIN modal');
+            setShowSetPinModal(true);
+          }
+          setIsAuthenticated(false);
+        } else {
+          // Not logged in - open library freely
+          console.log('[LIBRARY] User not logged in - opening library freely');
+          setIsAuthenticated(true);
+          await loadReports();
+        }
         setIsCheckingAuth(false);
-        await loadReports();
       };
       checkPinStatus();
 
@@ -138,21 +158,6 @@ export default function LibraryScreen() {
       };
     }, [user]),
   );
-
-  const handlePinVerified = () => {
-    console.log('[LIBRARY] PIN verified - loading reports');
-    setShowPinVerify(false);
-    setIsAuthenticated(true);
-    loadReports();
-  };
-
-  const handlePinSet = (pin: string) => {
-    // PIN has been set - mark as authenticated and load reports
-    console.log('[LIBRARY] PIN set - loading reports');
-    setShowSetPinModal(false);
-    setIsAuthenticated(true);
-    loadReports();
-  };
 
   // Load reports from local storage and sync with backend
   const loadReports = async () => {
@@ -290,10 +295,16 @@ export default function LibraryScreen() {
 
   const filteredReports = useMemo(() => {
     let filtered = reports.filter((r) => {
+      // Filter by archived status
+      if (showArchived && !r.isArchived) return false;
+      if (!showArchived && r.isArchived) return false;
+
       if (activeTab === "audio") {
-        return (r.type === "audio" || r.type === "mixed") && r.audioUri;
+        // Show audio reports if they have audioUri OR if they're type audio with txHash (backend)
+        return (r.type === "audio" || r.type === "mixed") && (r.audioUri || r.txHash);
       } else {
-        return r.type === "text" || (r.type === "mixed" && r.textContent);
+        // Show text reports if they have textContent OR if they're type text with txHash (backend)
+        return (r.type === "text" && (r.textContent || r.txHash)) || (r.type === "mixed" && r.textContent);
       }
     });
 
@@ -315,7 +326,7 @@ export default function LibraryScreen() {
     }
 
     return filtered;
-  }, [reports, activeTab, searchQuery]);
+  }, [reports, activeTab, searchQuery, showArchived]);
 
   const handlePlayPause = (report: Report) => {
     // If clicking on a different report, stop the currently playing one
@@ -563,7 +574,7 @@ export default function LibraryScreen() {
 
     Alert.alert(
       "Archive Report",
-      "Archiving will hide this report from your library but keep the blockchain record.",
+      "Archiving will hide this report from your library but keep the record.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -582,13 +593,21 @@ export default function LibraryScreen() {
                     "Error",
                     result.error || "Failed to archive on backend",
                   );
+                  setIsArchivingReportId(null);
                   return;
                 }
               }
 
               // Archive locally
               await archiveReport(report.id, "User archived");
-              await loadReports();
+
+              // Optimistically update: mark as archived immediately
+              setReports((prev) =>
+                prev.map((r) =>
+                  r.id === report.id ? { ...r, isArchived: true } : r
+                )
+              );
+
               Alert.alert("Success", "Report archived successfully");
             } catch (error) {
               Alert.alert("Error", "Failed to archive report");
@@ -620,6 +639,7 @@ export default function LibraryScreen() {
                     "Error",
                     result.error || "Failed to unarchive on backend",
                   );
+                  setIsArchivingReportId(null);
                   return;
                 }
               }
@@ -631,7 +651,14 @@ export default function LibraryScreen() {
                 archivedAt: null,
                 archivedReason: null,
               });
-              await loadReports();
+
+              // Optimistically update: mark as unarchived immediately
+              setReports((prev) =>
+                prev.map((r) =>
+                  r.id === report.id ? { ...r, isArchived: false } : r
+                )
+              );
+
               Alert.alert("Success", "Report restored successfully");
             } catch (error) {
               Alert.alert("Error", "Failed to unarchive report");
@@ -825,17 +852,19 @@ export default function LibraryScreen() {
 
     setSelectedReport(report);
     setIsLoadingViewers(true);
+    setShowViewersModal(true);
 
     try {
       const result = await getReportViewers(report.submissionId);
       if (result.success) {
         setViewers(result.viewers || []);
-        setShowViewersModal(true);
       } else {
         Alert.alert("Error", result.error || "Failed to fetch viewers");
+        setShowViewersModal(false);
       }
     } catch (error) {
       Alert.alert("Error", "An error occurred while fetching viewers");
+      setShowViewersModal(false);
     } finally {
       setIsLoadingViewers(false);
     }
@@ -957,6 +986,46 @@ export default function LibraryScreen() {
           <Text style={styles.loadingText}>Loading reports...</Text>
         </View>
       </SafeAreaView>
+    );
+  }
+
+  // Show PIN modals for logged-in users
+  if ((showPinVerify || showSetPinModal) && user) {
+    return (
+      <Modal
+        visible={showPinVerify || showSetPinModal}
+        animationType="slide"
+        transparent={false}
+      >
+        <LockScreen
+          mode={showSetPinModal ? 'set' : 'verify'}
+          onUnlock={
+            showPinVerify
+              ? () => {
+                  console.log('[LIBRARY] PIN verified - loading library');
+                  setShowPinVerify(false);
+                  setIsAuthenticated(true);
+                  loadReports();
+                }
+              : undefined
+          }
+          onSetPin={
+            showSetPinModal
+              ? (pin: string) => {
+                  console.log('[LIBRARY] PIN set - loading library');
+                  setShowSetPinModal(false);
+                  setIsAuthenticated(true);
+                  loadReports();
+                }
+              : undefined
+          }
+          onClose={() => {
+            setShowPinVerify(false);
+            setShowSetPinModal(false);
+            router.replace('/(tabs)');
+          }}
+        />
+      </Modal>
     );
   }
 
@@ -1460,33 +1529,19 @@ export default function LibraryScreen() {
                                   </TouchableOpacity>
 
                                   <TouchableOpacity
-                                    style={[
-                                      styles.menuOption,
-                                      isLoadingViewers &&
-                                        styles.menuOptionDisabled,
-                                    ]}
+                                    style={styles.menuOption}
                                     onPress={() => {
                                       handleViewViewers(report);
                                       setOpenMenuReportId(null);
                                     }}
-                                    disabled={isLoadingViewers}
                                   >
-                                    {isLoadingViewers ? (
-                                      <ActivityIndicator
-                                        size="small"
-                                        color="#8B5CF6"
-                                      />
-                                    ) : (
-                                      <Feather
-                                        name="users"
-                                        size={18}
-                                        color="#8B5CF6"
-                                      />
-                                    )}
+                                    <Feather
+                                      name="users"
+                                      size={18}
+                                      color="#8B5CF6"
+                                    />
                                     <Text style={styles.menuOptionText}>
-                                      {isLoadingViewers
-                                        ? "Loading..."
-                                        : "Viewers"}
+                                      Viewers
                                     </Text>
                                   </TouchableOpacity>
 
@@ -1494,42 +1549,30 @@ export default function LibraryScreen() {
                                     style={[
                                       styles.menuOption,
                                       styles.menuOptionDanger,
-                                      isArchivingReportId === report.id &&
-                                        styles.menuOptionDisabled,
                                     ]}
                                     onPress={() => {
                                       handleArchiveToggle(report);
                                       setOpenMenuReportId(null);
                                     }}
-                                    disabled={isArchivingReportId === report.id}
                                   >
-                                    {isArchivingReportId === report.id ? (
-                                      <ActivityIndicator
-                                        size="small"
-                                        color="#FF3B30"
-                                      />
-                                    ) : (
-                                      <Feather
-                                        name={
-                                          report.isArchived
-                                            ? "inbox"
-                                            : "archive"
-                                        }
-                                        size={18}
-                                        color="#FF3B30"
-                                      />
-                                    )}
+                                    <Feather
+                                      name={
+                                        report.isArchived
+                                          ? "inbox"
+                                          : "archive"
+                                      }
+                                      size={18}
+                                      color="#FF3B30"
+                                    />
                                     <Text
                                       style={[
                                         styles.menuOptionText,
                                         styles.menuOptionDangerText,
                                       ]}
                                     >
-                                      {isArchivingReportId === report.id
-                                        ? "Processing..."
-                                        : report.isArchived
-                                          ? "Unarchive"
-                                          : "Archive"}
+                                      {report.isArchived
+                                        ? "Unarchive"
+                                        : "Archive"}
                                     </Text>
                                   </TouchableOpacity>
                                 </View>
@@ -1596,20 +1639,6 @@ export default function LibraryScreen() {
                           </View>
                         )}
 
-                        {/* Unarchive Button for Archived Reports */}
-                        {report.isArchived && (
-                          <View style={styles.menuContainer}>
-                            <TouchableOpacity
-                              style={styles.unarchiveFullButton}
-                              onPress={() => handleUnarchive(report)}
-                            >
-                              <Feather name="inbox" size={18} color="#8A4FFF" />
-                              <Text style={styles.unarchiveButtonText}>
-                                Unarchive
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
                       </View>
                     );
                   })}
@@ -2184,24 +2213,6 @@ export default function LibraryScreen() {
         </View>
       </Modal>
 
-      {/* PIN Verification Modal */}
-      <Modal visible={showPinVerify} animationType="slide" transparent={false}>
-        <LockScreen
-          mode="verify"
-          onUnlock={handlePinVerified}
-          onSetPin={() => {}}
-          onClose={() => setShowPinVerify(false)}
-        />
-        <TouchableOpacity
-          style={styles.modalCloseButton}
-          onPress={() => {
-            setShowPinVerify(false);
-            router.back();
-          }}
-        >
-          <Feather name="x" size={24} color="#666" />
-        </TouchableOpacity>
-      </Modal>
 
       {/* Shared With Me Report Details Modal */}
       <Modal
@@ -2306,6 +2317,25 @@ export default function LibraryScreen() {
         visible={showAuthGate}
         onClose={() => setShowAuthGate(false)}
       />
+
+      {/* Archiving Loading Modal */}
+      <Modal
+        visible={isArchivingReportId !== null}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#8A4FFF" />
+            <Text style={styles.loadingText}>
+              {isArchivingReportId && (() => {
+                const report = reports.find(r => r.id === isArchivingReportId);
+                return report?.isArchived ? "Unarchiving..." : "Archiving...";
+              })()}
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2327,6 +2357,19 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: "#666",
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingBox: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 24,
+    alignItems: "center",
+    minWidth: 150,
   },
   header: {
     flexDirection: "row",

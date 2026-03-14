@@ -97,6 +97,7 @@ export async function submitReportToBackend(
 ): Promise<SubmissionResult> {
   try {
     console.log('[API] submitReportToBackend called for report:', report.id);
+    console.log('[API] 📋 Full report object:', JSON.stringify(report, null, 2));
     // Check authentication
     const authenticated = await isAuthenticated();
     if (!authenticated) {
@@ -119,10 +120,6 @@ export async function submitReportToBackend(
       };
     }
 
-    // Update status to submitted (optimistic)
-    console.log('[API] Updating report status to submitted');
-    await updateReportStatus(report.id, 'submitted');
-
     // Map to backend format (flexible responses)
     console.log('[API] Mapping report to backend format');
     const responses = mapReportToResponses(report);
@@ -135,10 +132,14 @@ export async function submitReportToBackend(
     const submitPayload = {
       payload: {
         responses,
-        metadata,
+        metadata: {
+          ...metadata,
+          type: report.type,  // Include report type (audio, text, or mixed)
+        },
       },
     };
 
+    console.log('[API] 🚀 FINAL PAYLOAD being sent to backend:', JSON.stringify(submitPayload, null, 2));
     console.log('[API] Sending report to backend endpoint:', apiConfig.endpoints.submitReport);
     // Submit to backend (backend handles encryption)
     const response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
@@ -149,11 +150,13 @@ export async function submitReportToBackend(
       console.log('[API] ✅ Backend response received:', JSON.stringify(data, null, 2));
       console.log('[API] Extracted status from backend:', data.status);
 
-      // Update report with submission details
+      // Update report with status from backend (not hardcoded)
       const submissionId = data.reportId || data.submissionId;
+      const backendStatus = data.status || 'pending';
+      console.log('[API] Updating report status to:', backendStatus);
       await updateReportStatus(
         report.id,
-        'submitted',
+        backendStatus,
         submissionId
       );
 
@@ -163,7 +166,7 @@ export async function submitReportToBackend(
         submissionId,
         txHash: data.txHash,
         ipfsHash: data.ipfsHash,
-        status: data.status || 'pending',
+        status: backendStatus,
       };
     }
 

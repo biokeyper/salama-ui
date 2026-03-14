@@ -62,15 +62,14 @@ export default function SignupScreen() {
     try {
       const result = await signup(phone.trim(), otp.trim());
       if (result.success) {
-        Alert.alert('Success', 'Account created successfully', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to home screen (main tabs)
-              router.replace('/');
-            },
-          },
-        ]);
+        // Navigate immediately, then show success message
+        // This ensures navigation happens first before any modal shows
+        setTimeout(() => {
+          router.replace('/');
+        }, 100);
+
+        // Show brief success alert
+        Alert.alert('Success', 'Account created successfully');
       } else {
         Alert.alert('Error', result.error || 'Failed to verify OTP');
       }
