@@ -1,20 +1,42 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthGateModal from './AuthGateModal';
 
 interface FloatingEmergencyButtonProps {
   onPress: () => void;
 }
 
 export default function FloatingEmergencyButton({ onPress }: FloatingEmergencyButtonProps) {
+  const { user } = useAuth();
+  const [showAuthGate, setShowAuthGate] = useState(false);
+
+  const handlePress = () => {
+    // Check if user is logged in before allowing panic alert
+    if (!user) {
+      setShowAuthGate(true);
+      return;
+    }
+    onPress();
+  };
+
   return (
-    <TouchableOpacity
-      style={styles.floatingButton}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <MaterialIcons name="favorite" size={28} color="#EF4444" />
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <MaterialIcons name="favorite" size={28} color="#EF4444" />
+      </TouchableOpacity>
+
+      {/* Auth gate for unauthenticated users */}
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => setShowAuthGate(false)}
+      />
+    </>
   );
 }
 

@@ -280,6 +280,21 @@ export default function TextReportScreen() {
     }
   };
 
+  if (!user) {
+    return (
+      <View style={{ flex: 1 }}>
+        {/* Show auth gate - user must log in to continue */}
+        <AuthGateModal
+          visible={showAuthGate}
+          onClose={() => {
+            // Close modal and redirect back
+            router.back();
+          }}
+        />
+      </View>
+    );
+  }
+
   return (
     <>
       <KeyboardAvoidingView
@@ -365,14 +380,6 @@ export default function TextReportScreen() {
           </View>
         </ThemedView>
       </KeyboardAvoidingView>
-
-      {/* Auth gate for unauthenticated users */}
-      <AuthGateModal
-        visible={showAuthGate}
-        onClose={() => {
-          setShowAuthGate(false);
-        }}
-      />
     </>
   );
 }

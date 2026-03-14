@@ -1,13 +1,40 @@
 import { ThemedText } from '@/components/ThemedText';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthGateModal from '@/components/AuthGateModal';
 
 export default function DetailedReportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { user } = useAuth();
+  const [showAuthGate, setShowAuthGate] = useState(false);
+
+  // Check if user is logged in - if not, show auth gate
+  useEffect(() => {
+    if (!user) {
+      console.log('[DETAILED-REPORT] User not logged in - showing auth gate');
+      setShowAuthGate(true);
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        {/* Show auth gate - user must log in to continue */}
+        <AuthGateModal
+          visible={showAuthGate}
+          onClose={() => {
+            // Close modal and redirect back
+            router.back();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

@@ -102,15 +102,32 @@ export default function SettingsScreen() {
                         try {
                             const result = await deleteUserAccount();
                             if (result.success) {
+                                // Clear all local data from device
+                                try {
+                                    // Delete all reports and health logs from SQLite
+                                    await deleteAllReports();
+                                    await deleteAllHealthLogs();
+                                    console.log('[SETTINGS] ✅ Local database cleared');
+
+                                    // Clear all async storage
+                                    await AsyncStorage.clear();
+                                    console.log('[SETTINGS] ✅ AsyncStorage cleared');
+
+                                    // Clear auth context (handles SecureStore cleanup)
+                                    await logout();
+                                    console.log('[SETTINGS] ✅ Auth context and SecureStore cleared');
+                                } catch (cleanupError) {
+                                    console.log('[SETTINGS] Error during cleanup:', cleanupError instanceof Error ? cleanupError.message : 'Unknown error');
+                                }
+
                                 Alert.alert(
                                     'Account Deleted',
-                                    'Your account has been permanently deleted.',
+                                    'Your account and all local data have been permanently deleted.',
                                     [
                                         {
                                             text: 'OK',
                                             onPress: () => {
-                                                // Clear local storage and redirect to login
-                                                AsyncStorage.clear();
+                                                // Redirect to home as guest
                                                 router.replace('/');
                                             },
                                         },

@@ -7,15 +7,27 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { saveReport } from '../services/storage';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthGateModal from '@/components/AuthGateModal';
 
 export default function RecordPastScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false); // Prevent multiple stop calls
+  const [showAuthGate, setShowAuthGate] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
+
+  // Check if user is logged in - if not, show auth gate
+  useEffect(() => {
+    if (!user) {
+      console.log('[RECORD-PAST] User not logged in - showing auth gate');
+      setShowAuthGate(true);
+    }
+  }, [user]);
 
   // Animation value for pulsing effect
   const pulseScale = useSharedValue(1);
@@ -107,6 +119,13 @@ export default function RecordPastScreen() {
   };
 
   const handleEmergencyExit = async () => {
+    // Check if user is logged in before allowing emergency exit
+    if (!user) {
+      console.log('[RECORD-PAST] Cannot use emergency exit - user not logged in');
+      setShowAuthGate(true);
+      return;
+    }
+
     // 1. Stop recording if active (use stopRecording to avoid duplicate stop calls)
     if (isRecording && !isStopping) {
       try {
@@ -170,6 +189,21 @@ export default function RecordPastScreen() {
       }
     });
   };
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {/* Show auth gate - user must log in to continue */}
+        <AuthGateModal
+          visible={showAuthGate}
+          onClose={() => {
+            // Close modal and redirect back
+            router.back();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

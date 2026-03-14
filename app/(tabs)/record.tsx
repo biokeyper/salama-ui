@@ -180,6 +180,13 @@ export default function RecordScreen() {
   };
 
   const handleEmergencyExit = async () => {
+    // Check if user is logged in before allowing emergency exit
+    if (!user) {
+      console.log('[RECORD] Cannot use emergency exit - user not logged in');
+      setShowAuthGate(true);
+      return;
+    }
+
     if (isExiting) return;
     setIsExiting(true);
 
@@ -492,6 +499,21 @@ export default function RecordScreen() {
     });
   };
 
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {/* Show auth gate - user must log in to continue */}
+        <AuthGateModal
+          visible={showAuthGate}
+          onClose={() => {
+            // Close modal and redirect back
+            router.back();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -613,15 +635,6 @@ export default function RecordScreen() {
       >
         <Text style={styles.emergencyText}>EXIT NOW</Text>
       </TouchableOpacity>
-
-      {/* Auth gate for unauthenticated users */}
-      <AuthGateModal
-        visible={showAuthGate}
-        onClose={() => {
-          // User chose "Continue as Guest" - allow browsing but block recording
-          setShowAuthGate(false);
-        }}
-      />
     </SafeAreaView>
   );
 }
