@@ -11,7 +11,7 @@ import { extractErrorMessage } from '@/utils/errorExtractor';
 import { updateReportStatus } from './storage';
 import { getAuthToken, isAuthenticated, logout } from './authService';
 import * as SecureStore from 'expo-secure-store';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -97,12 +97,9 @@ export async function submitReportToBackend(
   report: Report
 ): Promise<SubmissionResult> {
   try {
-    console.log('[API] submitReportToBackend called for report:', report.id);
-    console.log('[API] 📋 Full report object:', JSON.stringify(report, null, 2));
     // Check authentication
     const authenticated = await isAuthenticated();
     if (!authenticated) {
-      console.log('[API] Authentication check failed');
       return {
         success: false,
         error: 'Authentication required',
@@ -110,11 +107,9 @@ export async function submitReportToBackend(
       };
     }
 
-    console.log('[API] Authentication verified');
 
     // Validate report
     if (!report.id) {
-      console.log('[API] Report missing ID');
       return {
         success: false,
         error: 'Report missing ID',
@@ -122,11 +117,9 @@ export async function submitReportToBackend(
     }
 
     // Map to backend format (flexible responses)
-    console.log('[API] Mapping report to backend format');
     const responses = mapReportToResponses(report);
 
     // Prepare metadata
-    console.log('[API] Preparing report metadata');
     const metadata = prepareReportMetadata(report);
 
     // Build final payload - wrapped in "payload" field as backend expects
@@ -142,12 +135,10 @@ export async function submitReportToBackend(
 
     // If report has an audio file, send as multipart/form-data
     if (report.audioUri) {
-      console.log('[API] 🎙️ Audio file detected, sending as multipart/form-data');
 
       // Verify the audio file exists before trying to upload
       const fileInfo = await FileSystem.getInfoAsync(report.audioUri);
       if (!fileInfo.exists) {
-        console.log('[API] ⚠️ Audio file not found at:', report.audioUri, '- sending without audio');
       }
 
       const formData = new FormData();
@@ -171,7 +162,6 @@ export async function submitReportToBackend(
         });
       }
 
-      console.log('[API] 🚀 Sending multipart form data to:', apiConfig.endpoints.submitReport);
       response = await apiClient.post(apiConfig.endpoints.submitReport, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -181,21 +171,16 @@ export async function submitReportToBackend(
     } else {
       // Text-only report: send as JSON
       const submitPayload = { payload: payloadData };
-      console.log('[API] 🚀 FINAL PAYLOAD being sent to backend:', JSON.stringify(submitPayload, null, 2));
-      console.log('[API] Sending report to backend endpoint:', apiConfig.endpoints.submitReport);
       response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
     }
 
     if (response.status === 200 || response.status === 201) {
       const data = response.data;
 
-      console.log('[API] ✅ Backend response received:', JSON.stringify(data, null, 2));
-      console.log('[API] Extracted status from backend:', data.status);
 
       // Update report with status from backend (not hardcoded)
       const submissionId = data.reportId || data.submissionId;
       const backendStatus = data.status || 'pending';
-      console.log('[API] Updating report status to:', backendStatus);
       await updateReportStatus(
         report.id,
         backendStatus,
@@ -212,13 +197,11 @@ export async function submitReportToBackend(
       };
     }
 
-    console.log('[API] ❌ Unexpected response status:', response.status);
     return {
       success: false,
       error: 'Unexpected response from backend',
     };
   } catch (error) {
-    console.log('[API] ❌ Submission error:', error instanceof Error ? error.message : 'Unknown error');
     const errorMessage = extractErrorMessage(error, 'Failed to submit report');
 
     // Check if it's an authentication error (401)
@@ -226,7 +209,6 @@ export async function submitReportToBackend(
       (error instanceof Error && error.message.includes('401'));
 
     if (isAuthError) {
-      console.log('[API] Authentication error detected');
       return {
         success: false,
         error: 'Authentication required',

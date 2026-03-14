@@ -13,7 +13,6 @@ export default function SafetyCheckScreen() {
   // Check if user is logged in - if not, show auth gate
   useEffect(() => {
     if (!user) {
-      console.log('[SAFETY-CHECK] User not logged in - showing auth gate');
       setShowAuthGate(true);
     }
   }, [user]);

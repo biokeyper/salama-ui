@@ -137,11 +137,9 @@ export async function setPin(pin: string, userId?: string): Promise<boolean> {
     const token = await getAuthToken();
     if (!token) {
       await storePinForUser(pin, userId);
-      console.log('[PIN] ℹ️ PIN saved locally (not authenticated)');
       return true;
     }
 
-    console.log('[PIN] Setting PIN on backend for user:', userId);
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.setPin}`,
       { pin },
@@ -153,7 +151,6 @@ export async function setPin(pin: string, userId?: string): Promise<boolean> {
     );
 
     if (response.status === 200 || response.status === 201) {
-      console.log('[PIN] ✅ PIN set on backend for user:', userId);
       await storePinForUser(pin, userId);
       return true;
     }
@@ -173,11 +170,9 @@ export async function verifyPin(enteredPin: string, userPin: string | null): Pro
   try {
     const pinToVerify = isValidPin(userPin) ? userPin : await getStoredPin();
     if (!pinToVerify) {
-      console.log('[PIN] No PIN set for user');
       return false;
     }
 
-    console.log('[PIN] Verifying entered PIN');
     return enteredPin === pinToVerify;
   } catch (error) {
     extractErrorMessage(error, 'Failed to verify PIN');
@@ -203,7 +198,6 @@ export async function hasPin(userPinOrUserId?: string | null): Promise<boolean> 
       hasPinSet = isValidPin(storedPin);
     }
 
-    console.log('[PIN] User has PIN:', hasPinSet);
     return hasPinSet;
   } catch (error) {
     extractErrorMessage(error, 'Failed to check PIN');

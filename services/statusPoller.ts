@@ -32,18 +32,12 @@ export function startStatusPolling(reportId: string): void {
   };
 
   // Start polling
-  console.log('[STATUS-POLLER] 🚀 Starting status polling for report:', reportId);
-  console.log('[STATUS-POLLER] 📡 Polling endpoint: GET /api/reportStatus?reportId=' + reportId);
-  console.log('[STATUS-POLLER] ⏱️ Interval: every', apiConfig.statusPolling.interval + 'ms');
-  console.log('[STATUS-POLLER] ⏳ Max duration:', apiConfig.statusPolling.maxDuration + 'ms (5 minutes)');
-  console.log('[STATUS-POLLER] ✅ Confirmation threshold:', apiConfig.statusPolling.confirmationThreshold + ' confirmations');
 
   const pollInterval = setInterval(async () => {
     try {
       // Check if max duration exceeded
       const elapsed = Date.now() - session.startTime;
       if (elapsed > apiConfig.statusPolling.maxDuration) {
-        console.log('[STATUS-POLLER] ⏰ Max polling duration reached for report:', reportId);
         stopStatusPolling(reportId);
         return;
       }
@@ -51,11 +45,9 @@ export function startStatusPolling(reportId: string): void {
       // Get current status
       const statusResult = await checkReportStatus(reportId);
       const confirmations = statusResult.confirmations || 0;
-      console.log('[STATUS-POLLER] 📊 Report', reportId, '- Status:', statusResult.status, '- Confirmations:', confirmations + '/' + apiConfig.statusPolling.confirmationThreshold);
 
       // Check if submitted (12+ confirmations)
       if (confirmations >= apiConfig.statusPolling.confirmationThreshold) {
-        console.log('[STATUS-POLLER] ✅ Report', reportId, 'reached', confirmations, 'confirmations - SUBMITTED');
 
         const { saveReport, getReportById } = await import('./storage');
         const existingReport = await getReportById(reportId);
@@ -76,7 +68,6 @@ export function startStatusPolling(reportId: string): void {
 
       // Check if failed
       if (statusResult.status === 'failed') {
-        console.log('[STATUS-POLLER] ❌ Report', reportId, 'submission FAILED');
         const { saveReport, getReportById } = await import('./storage');
         const existingReport = await getReportById(reportId);
         if (existingReport) {
@@ -102,7 +93,6 @@ export function startStatusPolling(reportId: string): void {
         });
       }
     } catch (error) {
-      console.log('[STATUS-POLLER] ⚠️ Error polling status for report:', reportId, '-', error instanceof Error ? error.message : 'Unknown error');
     }
   }, apiConfig.statusPolling.interval);
 
@@ -119,7 +109,6 @@ export function stopStatusPolling(reportId: string): void {
   if (session && session.intervalId) {
     clearInterval(session.intervalId);
     activeSessions.delete(reportId);
-    console.log('[STATUS-POLLER] ⏹️ Stopped polling for report:', reportId);
   }
 }
 

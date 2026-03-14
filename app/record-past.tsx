@@ -24,7 +24,6 @@ export default function RecordPastScreen() {
   // Check if user is logged in - if not, show auth gate
   useEffect(() => {
     if (!user) {
-      console.log('[RECORD-PAST] User not logged in - showing auth gate');
       setShowAuthGate(true);
     }
   }, [user]);
@@ -121,7 +120,6 @@ export default function RecordPastScreen() {
   const handleEmergencyExit = async () => {
     // Check if user is logged in before allowing emergency exit
     if (!user) {
-      console.log('[RECORD-PAST] Cannot use emergency exit - user not logged in');
       setShowAuthGate(true);
       return;
     }

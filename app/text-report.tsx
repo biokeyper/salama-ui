@@ -28,7 +28,6 @@ export default function TextReportScreen() {
   // Check if user is logged in - if not, show auth gate
   useEffect(() => {
     if (!user) {
-      console.log('[TEXT-REPORT] User not logged in - showing auth gate');
       setShowAuthGate(true);
     }
   }, [user]);
@@ -93,7 +92,6 @@ export default function TextReportScreen() {
   const handleSaveDraft = async () => {
     // Check if user is logged in
     if (!user) {
-      console.log('[TEXT-REPORT] Cannot save draft - user not logged in');
       setShowAuthGate(true);
       return;
     }
@@ -175,21 +173,17 @@ export default function TextReportScreen() {
   const performSubmission = async () => {
     setIsSubmitting(true);
     try {
-      console.log('[REPORT SUBMISSION] Starting submission for text report');
       const reportType: ReportType = audioUri ? 'mixed' : 'text';
       const now = new Date().toISOString();
       const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      console.log('[REPORT SUBMISSION] Report type:', reportType, '| Report ID:', reportId);
 
       // Capture location if available
       let metadata: any = {};
       try {
-        console.log('[REPORT SUBMISSION] Requesting location permission...');
         const { status } = await Location.requestForegroundPermissionsAsync();
 
         if (status === 'granted') {
-          console.log('[REPORT SUBMISSION] Location permission granted, getting GPS coordinates...');
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.High,
           });
@@ -202,18 +196,14 @@ export default function TextReportScreen() {
             timestamp: new Date().toISOString(),
           };
 
-          console.log('[REPORT SUBMISSION] Location captured:', locationData);
           metadata.location = JSON.stringify(locationData);
         } else {
-          console.log('[REPORT SUBMISSION] Location permission denied');
         }
       } catch (locError) {
-        console.log('[REPORT SUBMISSION] Location capture failed:', locError instanceof Error ? locError.message : 'Unknown error');
         // Continue without location if permission denied or GPS fails
       }
 
       // First save locally
-      console.log('[REPORT SUBMISSION] Saving report locally...');
       const savedReport = await saveReport({
         id: reportId,
         ...(user?.userId && { userId: user.userId }),
@@ -226,14 +216,11 @@ export default function TextReportScreen() {
         metadata,
       });
 
-      console.log('[REPORT SUBMISSION] Report saved locally, submitting to backend...');
       // Then submit to backend
       const result = await submitReportToBackend(savedReport);
 
-      console.log('[REPORT SUBMISSION] Full backend response:', JSON.stringify(result, null, 2));
 
       if (result.success) {
-        console.log('[REPORT SUBMISSION] ✅ Submission successful!', { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
         Alert.alert(
           'Success',
           'Your report has been submitted successfully.',
@@ -247,7 +234,6 @@ export default function TextReportScreen() {
           ]
         );
       } else {
-        console.log('[REPORT SUBMISSION] ❌ Submission failed:', result.error);
         Alert.alert(
           'Submission Error',
           result.error || 'Failed to submit to backend. Your report has been saved locally and can be submitted later.',
@@ -262,7 +248,6 @@ export default function TextReportScreen() {
         );
       }
     } catch (error) {
-      console.log('[REPORT SUBMISSION] ❌ Submission exception:', error instanceof Error ? error.message : 'Unknown error');
       Alert.alert(
         'Error',
         'An unexpected error occurred. Your report has been saved locally.',

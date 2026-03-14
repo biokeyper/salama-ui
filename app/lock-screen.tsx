@@ -71,7 +71,6 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                         const success = await savePinToBackend(pin, user?.userId);
                         if (success) {
                             const logStatus = user?.userId ? `✅ PIN set for user: ${user.userId}` : '✅ PIN set locally (not logged in)';
-                            console.log('[LOCK-SCREEN] ' + logStatus);
                             onSetPin?.(pin);
                         } else {
                             Alert.alert('Error', 'Failed to set PIN. Please try again.');
@@ -107,15 +106,12 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
               // Verify PIN against user.pin from backend
               const isValid = await verifyPin(pin, user?.pin);
               if (isValid) {
-                console.log('[LOCK-SCREEN] ✅ PIN verified for user:', user?.userId || 'NOT LOGGED IN');
                 onUnlock();
               } else {
-                console.log('[LOCK-SCREEN] ❌ Invalid PIN');
                 Alert.alert('Incorrect PIN', 'Please try again');
                 setPin('');
               }
             } catch (error) {
-              console.log('[LOCK-SCREEN] Error verifying PIN:', error instanceof Error ? error.message : 'Unknown error');
               Alert.alert('Error', 'An error occurred. Please try again.');
               setPin('');
             }

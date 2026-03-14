@@ -38,6 +38,8 @@ export interface Report {
   confirmations?: number; // 0-12+
   txHash?: string; // Blockchain transaction hash
   ipfsHash?: string; // IPFS location
+  audioIpfsHash?: string; // IPFS hash for audio file
+  audioGatewayUrl?: string; // IPFS gateway URL for audio playback
 
   // Archive flag (soft delete for blockchain records)
   isArchived?: boolean;

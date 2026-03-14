@@ -29,6 +29,7 @@ import {
 import { Report } from "@/types/report";
 import { getAvailableActions } from "@/utils/reportActions";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { BlurView } from "expo-blur";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
@@ -117,6 +118,12 @@ export default function LibraryScreen() {
   const [isSearchingBackend, setIsSearchingBackend] = useState(false);
   const searchLimit = 10;
 
+  // Audio player for details modal
+  const [detailAudioUri, setDetailAudioUri] = useState<string | null>(null);
+  const [isLoadingDetailAudio, setIsLoadingDetailAudio] = useState(false);
+  const detailPlayer = useAudioPlayer(detailAudioUri, { updateInterval: 100 });
+  const detailPlayerStatus = useAudioPlayerStatus(detailPlayer);
+
   // Check PIN status every time the screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -127,19 +134,15 @@ export default function LibraryScreen() {
 
         // If user is logged in, require PIN to access library
         if (user) {
-          console.log('[LIBRARY] User logged in - checking PIN status');
           // Check if user has a PIN set (from backend or secure local cache).
           const hasPinSet = await hasPin(user?.pin);
-          console.log('[LIBRARY] User has PIN set:', hasPinSet);
 
           if (hasPinSet) {
             // PIN exists - show verify PIN flow
-            console.log('[LIBRARY] PIN exists - showing verify PIN modal');
             setShowPinVerify(true);
             setShowSetPinModal(false);
           } else {
             // No PIN - show set PIN flow
-            console.log('[LIBRARY] No PIN exists - showing set PIN modal');
             setShowSetPinModal(true);
             setShowPinVerify(false);
           }
@@ -147,7 +150,6 @@ export default function LibraryScreen() {
           setIsAuthenticated(false);
         } else {
           // Not logged in - open library freely
-          console.log('[LIBRARY] User not logged in - opening library freely');
           setIsAuthenticated(false);
           await loadReports();
         }
@@ -169,14 +171,11 @@ export default function LibraryScreen() {
     try {
       // Load local reports (filtered by current user if logged in)
       const userId = user?.userId;
-      console.log('[LIBRARY] User Status:', userId ? `✅ LOGGED IN (${userId})` : '❌ NOT LOGGED IN');
       const allReports = await getAllReports(userId);
-      console.log('[LIBRARY] Loaded reports count:', allReports.length);
 
       // Sync submitted reports with backend to get latest status
       if (isAuthenticated) {
         try {
-          console.log('[LIBRARY] 🔄 Fetching reports from backend...');
           const backendResult = await searchBackendReports({
             limit: 100,
             offset: 0,
@@ -192,28 +191,35 @@ export default function LibraryScreen() {
                 // Update existing local report with backend data
                 const idx = allReports.findIndex((r) => r.id === reportId);
                 if (idx !== -1) {
+                  allReports[idx].submissionId = reportId;
                   allReports[idx].status = backendReport.status ?? allReports[idx].status;
                   allReports[idx].confirmations = backendReport.confirmations ?? allReports[idx].confirmations;
                   allReports[idx].txHash = backendReport.txHash ?? allReports[idx].txHash;
                   allReports[idx].ipfsHash = backendReport.ipfsHash ?? allReports[idx].ipfsHash;
+                  allReports[idx].audioIpfsHash = backendReport.metadata?.audioIpfsHash ?? allReports[idx].audioIpfsHash;
+                  allReports[idx].audioGatewayUrl = backendReport.metadata?.audioGatewayUrl ?? allReports[idx].audioGatewayUrl;
+                  allReports[idx].audioDuration = backendReport.metadata?.audioDuration ?? allReports[idx].audioDuration;
                 }
               } else {
                 allReports.push({
                   id: reportId,
+                  submissionId: reportId,
                   userId: userId,
-                  type: backendReport.type || 'audio',
+                  type: backendReport.type || backendReport.metadata?.type || 'audio',
                   status: backendReport.status,
                   createdAt: backendReport.createdAt || new Date().toISOString(),
                   updatedAt: backendReport.updatedAt || new Date().toISOString(),
                   confirmations: backendReport.confirmations,
                   txHash: backendReport.txHash,
                   ipfsHash: backendReport.ipfsHash,
+                  audioIpfsHash: backendReport.metadata?.audioIpfsHash,
+                  audioGatewayUrl: backendReport.metadata?.audioGatewayUrl,
+                  audioDuration: backendReport.metadata?.audioDuration,
                 });
               }
             }
           }
         } catch (syncError) {
-          console.log('[LIBRARY] Error syncing with backend:', syncError instanceof Error ? syncError.message : 'Unknown error');
           // Continue with local reports if sync fails
         }
       }
@@ -228,17 +234,13 @@ export default function LibraryScreen() {
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
-      console.log('[LIBRARY] Total reports loaded:', filteredReports.length);
       setReports(filteredReports);
 
       // Log polling completion
       const pendingCount = filteredReports.filter(r => r.status === 'pending').length;
       const submittedCount = filteredReports.filter(r => r.status === 'submitted').length;
       const failedCount = filteredReports.filter(r => r.status === 'failed').length;
-      console.log('[POLLING] ✅ Polling complete - Pending:', pendingCount, 'Submitted:', submittedCount, 'Failed:', failedCount);
     } catch (error) {
-      console.log('[LIBRARY] Error loading reports:', error instanceof Error ? error.message : error);
-      console.log('[POLLING] ❌ Polling error:', error instanceof Error ? error.message : 'Unknown error');
       Alert.alert("Error", "Failed to load reports");
     } finally {
       setLoading(false);
@@ -288,10 +290,8 @@ export default function LibraryScreen() {
       return;
     }
 
-    console.log('[POLLING] 🔄 Starting auto-polling for pending reports (every 30s)');
 
     const pollTick = async () => {
-      console.log('[POLLING] ⏱️ Auto-polling tick:', new Date().toLocaleTimeString());
       await loadReportsRef.current();
     };
 
@@ -300,7 +300,6 @@ export default function LibraryScreen() {
     const intervalId = setInterval(pollTick, 30000);
 
     return () => {
-      console.log('[POLLING] 🛑 Stopping auto-polling');
       clearInterval(intervalId);
     };
   }, [isAuthenticated, isCheckingAuth, user, hasPendingReports]);
@@ -311,11 +310,8 @@ export default function LibraryScreen() {
       if (showArchived && !r.isArchived) return false;
       if (!showArchived && r.isArchived) return false;
 
-      // Backend-only reports (no local audioUri/textContent) show in audio tab by default
-      const isBackendOnly = !r.audioUri && !r.textContent && r.txHash;
-
       if (activeTab === "audio") {
-        return (r.type === "audio" || r.type === "mixed" || isBackendOnly) && (r.audioUri || r.txHash);
+        return (r.type === "audio" || r.type === "mixed") && (r.audioUri || r.txHash || r.audioGatewayUrl);
       } else {
         return (r.type === "text" && (r.textContent || r.txHash)) || (r.type === "mixed" && r.textContent);
       }
@@ -361,66 +357,51 @@ export default function LibraryScreen() {
       return;
     }
 
-    // Backend-only report — fetch audio from backend
-    if (report.txHash || report.submissionId) {
+    // Backend-only report — download audio from IPFS gateway
+    if (report.audioGatewayUrl) {
       if (isFetchingAudio) return; // Already fetching
       setIsFetchingAudio(report.id);
       try {
-        console.log('[LIBRARY] 🎙️ Fetching audio from backend for report:', report.id);
-        const result = await decryptReportFromBackend(report.id);
-        if (result.success && result.data?.audioUrl) {
-          // Download audio to local cache
-          const fileExtension = result.data.audioUrl.split('.').pop()?.split('?')[0] || 'm4a';
-          const localUri = `${FileSystem.cacheDirectory}audio_${report.id}.${fileExtension}`;
 
-          await FileSystem.downloadAsync(result.data.audioUrl, localUri);
+        const localUri = `${FileSystem.cacheDirectory}audio_${report.id}.m4a`;
 
-          // Update the report in state with the local audio URI
+        // Check if already cached
+        const fileInfo = await FileSystem.getInfoAsync(localUri);
+        if (fileInfo.exists) {
           setReports((prev) =>
             prev.map((r) =>
               r.id === report.id ? { ...r, audioUri: localUri } : r,
             ),
           );
-
-          // Also persist to local storage so it doesn't need to re-download
-          const updatedReport = { ...report, audioUri: localUri };
-          await saveReport(updatedReport);
-
-          // Start playing
           setPlayingReportId(report.id);
-        } else if (result.success && result.data?.audio) {
-          // Backend returns base64-encoded audio data
-          const localUri = `${FileSystem.cacheDirectory}audio_${report.id}.m4a`;
-          await FileSystem.writeAsStringAsync(localUri, result.data.audio, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          setReports((prev) =>
-            prev.map((r) =>
-              r.id === report.id ? { ...r, audioUri: localUri } : r,
-            ),
-          );
-
-          const updatedReport = { ...report, audioUri: localUri };
-          await saveReport(updatedReport);
-
-          setPlayingReportId(report.id);
-        } else {
-          Alert.alert(
-            "Audio Unavailable",
-            "The audio for this report could not be retrieved from the server.",
-          );
+          setIsFetchingAudio(null);
+          return;
         }
+
+        // Download from IPFS gateway
+        const download = await FileSystem.downloadAsync(report.audioGatewayUrl, localUri);
+
+        // Update report in state with local audio URI
+        setReports((prev) =>
+          prev.map((r) =>
+            r.id === report.id ? { ...r, audioUri: localUri } : r,
+          ),
+        );
+
+        // Persist so it doesn't re-download next time
+        await saveReport({ ...report, audioUri: localUri });
+
+        // Start playing
+        setPlayingReportId(report.id);
       } catch (error) {
-        console.log('[LIBRARY] ❌ Failed to fetch audio:', error instanceof Error ? error.message : error);
-        Alert.alert("Error", "Failed to download audio from server.");
+        Alert.alert("Error", "Failed to download audio from IPFS.");
       } finally {
         setIsFetchingAudio(null);
       }
       return;
     }
 
-    // No audio and no backend source
+    // No audio and no IPFS source
     Alert.alert("Audio Unavailable", "No audio file available for this report.");
   };
 
@@ -487,12 +468,10 @@ export default function LibraryScreen() {
     // CHECK AUTH FIRST - before showing any dialogs
     const token = await getAuthToken();
     if (!token || !user) {
-      console.log("[LIBRARY] Submit button clicked but user NOT logged in - showing auth gate");
       setShowAuthGate(true);
       return;
     }
 
-    console.log("[LIBRARY] User authenticated - proceeding with submit");
 
     // Only show submit confirmation if authenticated
     Alert.alert("Submit Report", "Submit this report securely?", [
@@ -505,15 +484,12 @@ export default function LibraryScreen() {
         onPress: async () => {
           setIsSubmittingReportId(report.id);
           try {
-            console.log("[REPORT SUBMISSION] Resubmitting report from library:", { id: report.id, type: report.type, status: report.status });
             // Capture location if available
             try {
-              console.log("[REPORT SUBMISSION] Requesting location permission for resubmission...");
               const { status } =
                 await Location.requestForegroundPermissionsAsync();
 
               if (status === "granted") {
-                console.log("[REPORT SUBMISSION] Location permission granted, getting GPS coordinates...");
                 const location = await Location.getCurrentPositionAsync({
                   accuracy: Location.Accuracy.High,
                 });
@@ -526,7 +502,6 @@ export default function LibraryScreen() {
                   timestamp: new Date().toISOString(),
                 };
 
-                console.log("[REPORT SUBMISSION] Location captured for resubmission:", locationData);
 
                 // Add location to report metadata
                 if (!report.metadata) {
@@ -534,25 +509,18 @@ export default function LibraryScreen() {
                 }
                 report.metadata.location = JSON.stringify(locationData);
               } else {
-                console.log("[REPORT SUBMISSION] Location permission denied for resubmission");
               }
             } catch (locError) {
-              console.log("[REPORT SUBMISSION] Location capture failed for resubmission:", locError instanceof Error ? locError.message : "Unknown error");
               // Continue without location if permission denied or GPS fails
             }
 
-            console.log("[REPORT SUBMISSION] Submitting to backend...");
             const result = await submitReportToBackend(report);
 
-            console.log('[REPORT SUBMISSION] Full backend response:', JSON.stringify(result, null, 2));
 
             if (result.success) {
-              console.log("[REPORT SUBMISSION] ✅ Submission successful!", { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
 
               // Delete draft from local DB - submitted reports now come from backend only
-              console.log('[REPORT SUBMISSION] 🗑️ Deleting draft from local database:', report.id);
               await deleteReport(report.id);
-              console.log('[REPORT SUBMISSION] ✅ Draft deleted - report now managed by backend');
 
               Alert.alert("Success", "Report submitted successfully!", [
                 {
@@ -564,7 +532,6 @@ export default function LibraryScreen() {
                 },
               ]);
             } else if (result.requiresAuth) {
-              console.log("[REPORT SUBMISSION] ❌ Authentication required for resubmission");
               Alert.alert(
                 "Login Required",
                 "You need to be logged in to submit reports.",
@@ -588,7 +555,6 @@ export default function LibraryScreen() {
                 ],
               );
             } else {
-              console.log("[REPORT SUBMISSION] ❌ Resubmission failed:", result.error);
               Alert.alert(
                 "Submission Failed",
                 result.error || "Failed to submit report. Please try again.",
@@ -603,7 +569,6 @@ export default function LibraryScreen() {
               );
             }
           } catch (error) {
-            console.log("[REPORT SUBMISSION] ❌ Resubmission exception:", error instanceof Error ? error.message : "Unknown error");
             Alert.alert(
               "Error",
               "An unexpected error occurred while submitting the report",
@@ -1059,7 +1024,6 @@ export default function LibraryScreen() {
           onUnlock={
             showPinVerify
               ? () => {
-                  console.log('[LIBRARY] PIN verified - loading library');
                   setShowPinVerify(false);
                   setShowSetPinModal(false);
                   setIsAuthenticated(true);
@@ -1070,7 +1034,6 @@ export default function LibraryScreen() {
           onSetPin={
             showSetPinModal
               ? (_pin: string) => {
-                  console.log('[LIBRARY] PIN set - loading library');
                   setShowPinVerify(false);
                   setShowSetPinModal(false);
                   setIsAuthenticated(true);
@@ -1500,10 +1463,16 @@ export default function LibraryScreen() {
                                 ]}
                               >
                                 <Text style={styles.statusBadgeText}>
-                                  {report.status === "saved"
+                                  {report.status === "saved" || report.status === "draft"
                                     ? "Draft"
-                                    : report.status?.charAt(0).toUpperCase() +
-                                      report.status?.slice(1)}
+                                    : report.status === "pending"
+                                      ? `Pending ${report.confirmations || 0}/12`
+                                      : report.status === "submitted"
+                                        ? "Submitted ✓"
+                                        : report.status === "failed"
+                                          ? "Failed"
+                                          : report.status?.charAt(0).toUpperCase() +
+                                            report.status?.slice(1)}
                                 </Text>
                               </View>
                             </View>
@@ -1647,24 +1616,24 @@ export default function LibraryScreen() {
                         </View>
                         <Text
                           style={styles.textReportContent}
-                          numberOfLines={3}
+                          numberOfLines={1}
                         >
-                          {report.textContent || "No content"}
+                          {report.textContent
+                            ? report.textContent.length > 40
+                              ? report.textContent.slice(0, 40) + "…"
+                              : report.textContent
+                            : "No content"}
                         </Text>
-                        <TouchableOpacity
-                          style={styles.viewButton}
-                          onPress={() => {
-                            // Navigate to detail view (to be implemented)
-                            Alert.alert(
-                              "Report Details",
-                              report.textContent || "No content",
-                            );
-                          }}
-                        >
-                          <Text style={styles.viewButtonText}>
-                            View Full Report
-                          </Text>
-                        </TouchableOpacity>
+                        {(report.status === "draft" || report.status === "saved") && (
+                          <TouchableOpacity
+                            style={styles.viewButton}
+                            onPress={() => handleEditReport(report)}
+                          >
+                            <Text style={styles.viewButtonText}>
+                              View Full Report
+                            </Text>
+                          </TouchableOpacity>
+                        )}
 
                         {/* Submit Button Section */}
                         {actions.canSubmit && (
@@ -1722,6 +1691,10 @@ export default function LibraryScreen() {
           setShowDecryptedModal(false);
           setDecryptedContent(null);
           setSelectedReport(null);
+          setDetailAudioUri(null);
+          if (detailPlayer?.playing) {
+            try { detailPlayer.pause(); } catch (_) {}
+          }
         }}
       >
         <SafeAreaView style={styles.modalContainer}>
@@ -1731,6 +1704,10 @@ export default function LibraryScreen() {
                 setShowDecryptedModal(false);
                 setDecryptedContent(null);
                 setSelectedReport(null);
+                setDetailAudioUri(null);
+                if (detailPlayer?.playing) {
+                  try { detailPlayer.pause(); } catch (_) {}
+                }
               }}
             >
               <MaterialIcons name="close" size={24} color="#8A4FFF" />
@@ -1745,139 +1722,12 @@ export default function LibraryScreen() {
             </View>
           ) : decryptedContent ? (
             <ScrollView style={styles.decryptedContent}>
-              {/* Text Content */}
-              {decryptedContent.payload?.text && (
-                <View style={styles.contentSection}>
-                  <Text style={styles.contentLabel}>Report Text:</Text>
-                  <Text style={styles.contentText}>
-                    {decryptedContent.payload.text}
-                  </Text>
-                </View>
-              )}
-
-              {/* Audio Content */}
-              {decryptedContent.payload?.audio && (
-                <View style={styles.contentSection}>
-                  <Text style={styles.contentLabel}>Audio Recording:</Text>
-                  <View style={styles.audioInfo}>
-                    <MaterialIcons name="mic" size={20} color="#8A4FFF" />
-                    <Text style={styles.audioText}>
-                      {decryptedContent.metadata?.duration
-                        ? `${decryptedContent.metadata.duration}s`
-                        : "Audio file available"}
-                    </Text>
-                    {decryptedContent.payload?.audioFormat && (
-                      <Text style={styles.audioFormat}>
-                        {decryptedContent.payload.audioFormat}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Status */}
-              <View style={styles.contentSection}>
-                <Text style={styles.contentLabel}>Status:</Text>
-                <View style={{ alignSelf: "flex-start" }}>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      decryptedContent.status === "submitted" && {
-                        backgroundColor: "#4CAF50",
-                      },
-                      decryptedContent.status === "pending" && {
-                        backgroundColor: "#FFEB3B",
-                      },
-                      decryptedContent.status === "failed" && {
-                        backgroundColor: "#FF3B30",
-                      },
-                    ]}
-                  >
-                    <Text style={styles.statusBadgeText}>
-                      {decryptedContent.status?.charAt(0).toUpperCase() +
-                        decryptedContent.status?.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Metadata */}
-              {decryptedContent.payload?.metadata && (
-                <View style={styles.contentSection}>
-                  <Text style={styles.contentLabel}>Metadata:</Text>
-                  {decryptedContent.payload.metadata.location && (
-                    <View style={styles.metadataItem}>
-                      <MaterialIcons
-                        name="location-on"
-                        size={16}
-                        color="#8A4FFF"
-                      />
-                      <View style={styles.locationContent}>
-                        {(() => {
-                          try {
-                            const location = JSON.parse(
-                              decryptedContent.payload.metadata.location,
-                            );
-                            return (
-                              <>
-                                <Text style={styles.metadataText}>
-                                  {location.latitude.toFixed(4)},{" "}
-                                  {location.longitude.toFixed(4)}
-                                </Text>
-                                {location.mapLink && (
-                                  <TouchableOpacity
-                                    onPress={async () => {
-                                      try {
-                                        await Linking.openURL(location.mapLink);
-                                      } catch (error) {
-                                        Alert.alert(
-                                          "Error",
-                                          "Could not open map",
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    <Text style={styles.mapLinkText}>
-                                      View on Map →
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
-                              </>
-                            );
-                          } catch (e) {
-                            return (
-                              <Text style={styles.metadataText}>
-                                {decryptedContent.payload.metadata.location}
-                              </Text>
-                            );
-                          }
-                        })()}
-                      </View>
-                    </View>
-                  )}
-                  {decryptedContent.payload.metadata.timestamp && (
-                    <View style={styles.metadataItem}>
-                      <MaterialIcons
-                        name="access-time"
-                        size={16}
-                        color="#8A4FFF"
-                      />
-                      <Text style={styles.metadataText}>
-                        {formatDate(
-                          decryptedContent.payload.metadata.timestamp,
-                        )}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Responses */}
-              {decryptedContent.payload?.responses &&
-                decryptedContent.payload.responses.length > 0 && (
+              {/* Responses (report text content) */}
+              {decryptedContent.responses &&
+                decryptedContent.responses.length > 0 && (
                   <View style={styles.contentSection}>
-                    <Text style={styles.contentLabel}>Survey Responses:</Text>
-                    {decryptedContent.payload.responses.map(
+                    <Text style={styles.contentLabel}>Report Content:</Text>
+                    {decryptedContent.responses.map(
                       (response: string, index: number) =>
                         response && (
                           <View key={index} style={styles.responseItem}>
@@ -1889,7 +1739,6 @@ export default function LibraryScreen() {
                               response.includes("latitude") ? (
                                 (() => {
                                   try {
-                                    // Extract JSON from "Location: {...}" format
                                     const jsonMatch =
                                       response.match(/\{[\s\S]*\}/);
                                     if (jsonMatch) {
@@ -1910,7 +1759,7 @@ export default function LibraryScreen() {
                                                   await Linking.openURL(
                                                     location.mapLink,
                                                   );
-                                                } catch (error) {
+                                                } catch (_) {
                                                   Alert.alert(
                                                     "Error",
                                                     "Could not open map",
@@ -1926,8 +1775,8 @@ export default function LibraryScreen() {
                                         </View>
                                       );
                                     }
-                                  } catch (e) {
-                                    // Fall back to showing raw response
+                                  } catch (_) {
+                                    // Fall back to raw text
                                   }
                                   return (
                                     <Text style={styles.responseText}>
@@ -1947,6 +1796,202 @@ export default function LibraryScreen() {
                   </View>
                 )}
 
+              {/* Status */}
+              <View style={styles.contentSection}>
+                <Text style={styles.contentLabel}>Status:</Text>
+                <View style={{ alignSelf: "flex-start" }}>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      decryptedContent.status === "submitted" && {
+                        backgroundColor: "#4CAF50",
+                      },
+                      decryptedContent.status === "pending" && {
+                        backgroundColor: "#FFEB3B",
+                      },
+                      decryptedContent.status === "failed" && {
+                        backgroundColor: "#FF3B30",
+                      },
+                    ]}
+                  >
+                    <Text style={styles.statusBadgeText}>
+                      {decryptedContent.status === "submitted"
+                        ? "Submitted ✓"
+                        : decryptedContent.status?.charAt(0).toUpperCase() +
+                          decryptedContent.status?.slice(1)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Type */}
+              {decryptedContent.metadata?.type && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Type:</Text>
+                  <Text style={styles.contentText}>
+                    {decryptedContent.metadata.type.charAt(0).toUpperCase() +
+                      decryptedContent.metadata.type.slice(1)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Audio Duration */}
+              {decryptedContent.metadata?.hasAudio && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Audio Recording:</Text>
+                  <View style={styles.audioInfo}>
+                    {isLoadingDetailAudio ? (
+                      <ActivityIndicator size="small" color="#8A4FFF" />
+                    ) : detailAudioUri ? (
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (detailPlayer) {
+                            if (detailPlayerStatus?.playing) {
+                              detailPlayer.pause();
+                            } else {
+                              detailPlayer.play();
+                            }
+                          }
+                        }}
+                        style={styles.detailPlayButton}
+                      >
+                        <MaterialIcons
+                          name={detailPlayerStatus?.playing ? "pause-circle-filled" : "play-circle-filled"}
+                          size={40}
+                          color="#8A4FFF"
+                        />
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={async () => {
+                          const audioUrl = selectedReport?.audioGatewayUrl || selectedReport?.audioUri;
+                          if (!audioUrl) {
+                            Alert.alert("Error", "No audio available for this report");
+                            return;
+                          }
+                          setIsLoadingDetailAudio(true);
+                          try {
+                            // If it's a remote URL, download to cache first
+                            if (audioUrl.startsWith('http')) {
+                              const localUri = `${FileSystem.cacheDirectory}detail_audio_${selectedReport?.id}.m4a`;
+                              const fileInfo = await FileSystem.getInfoAsync(localUri);
+                              if (fileInfo.exists) {
+                                setDetailAudioUri(localUri);
+                              } else {
+                                const download = await FileSystem.downloadAsync(audioUrl, localUri);
+                                setDetailAudioUri(download.uri);
+                              }
+                            } else {
+                              setDetailAudioUri(audioUrl);
+                            }
+                          } catch (_) {
+                            Alert.alert("Error", "Failed to load audio");
+                          } finally {
+                            setIsLoadingDetailAudio(false);
+                          }
+                        }}
+                        style={styles.detailPlayButton}
+                      >
+                        <MaterialIcons name="play-circle-filled" size={40} color="#8A4FFF" />
+                      </TouchableOpacity>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.audioText}>
+                        {detailAudioUri && detailPlayerStatus?.duration
+                          ? `${Math.floor((detailPlayerStatus.currentTime || 0))}s / ${Math.floor(detailPlayerStatus.duration)}s`
+                          : decryptedContent.metadata.audioDuration
+                            ? `${Math.round(decryptedContent.metadata.audioDuration / 1000)} seconds`
+                            : "Audio file available"}
+                      </Text>
+                      {detailAudioUri && detailPlayerStatus?.duration ? (
+                        <View style={styles.detailProgressBar}>
+                          <View
+                            style={[
+                              styles.detailProgressFill,
+                              {
+                                width: `${((detailPlayerStatus.currentTime || 0) / detailPlayerStatus.duration) * 100}%`,
+                              },
+                            ]}
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Location from metadata */}
+              {decryptedContent.metadata?.location && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Location:</Text>
+                  <View style={styles.metadataItem}>
+                    <MaterialIcons
+                      name="location-on"
+                      size={16}
+                      color="#8A4FFF"
+                    />
+                    <View style={styles.locationContent}>
+                      {(() => {
+                        try {
+                          const location = JSON.parse(
+                            decryptedContent.metadata.location,
+                          );
+                          return (
+                            <>
+                              <Text style={styles.metadataText}>
+                                {location.latitude.toFixed(4)},{" "}
+                                {location.longitude.toFixed(4)}
+                              </Text>
+                              {location.mapLink && (
+                                <TouchableOpacity
+                                  onPress={async () => {
+                                    try {
+                                      await Linking.openURL(location.mapLink);
+                                    } catch (_) {
+                                      Alert.alert(
+                                        "Error",
+                                        "Could not open map",
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <Text style={styles.mapLinkText}>
+                                    View on Map →
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                            </>
+                          );
+                        } catch (_) {
+                          return (
+                            <Text style={styles.metadataText}>
+                              {decryptedContent.metadata.location}
+                            </Text>
+                          );
+                        }
+                      })()}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Recorded at timestamp from metadata */}
+              {decryptedContent.metadata?.timestamp && (
+                <View style={styles.contentSection}>
+                  <Text style={styles.contentLabel}>Recorded At:</Text>
+                  <View style={styles.metadataItem}>
+                    <MaterialIcons
+                      name="access-time"
+                      size={16}
+                      color="#8A4FFF"
+                    />
+                    <Text style={styles.metadataText}>
+                      {formatDate(decryptedContent.metadata.timestamp)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               {/* Timeline */}
               <View style={styles.contentSection}>
                 <Text style={styles.contentLabel}>Timeline:</Text>
@@ -1957,21 +2002,6 @@ export default function LibraryScreen() {
                       <Text style={styles.timelineLabel}>Created</Text>
                       <Text style={styles.timelineDate}>
                         {formatDate(decryptedContent.timestamps.createdAt)}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-                {decryptedContent.timestamps?.submittedAt && (
-                  <View style={styles.timelineItem}>
-                    <MaterialIcons
-                      name="cloud-upload"
-                      size={18}
-                      color="#2196F3"
-                    />
-                    <View style={styles.timelineText}>
-                      <Text style={styles.timelineLabel}>Submitted</Text>
-                      <Text style={styles.timelineDate}>
-                        {formatDate(decryptedContent.timestamps.submittedAt)}
                       </Text>
                     </View>
                   </View>
@@ -2827,6 +2857,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+  },
+  detailPlayButton: {
+    padding: 4,
+  },
+  detailProgressBar: {
+    height: 4,
+    backgroundColor: "#E0D4F5",
+    borderRadius: 2,
+    marginTop: 6,
+    overflow: "hidden" as const,
+  },
+  detailProgressFill: {
+    height: "100%" as const,
+    backgroundColor: "#8A4FFF",
+    borderRadius: 2,
   },
   timelineItem: {
     flexDirection: "row",

@@ -178,17 +178,13 @@ export async function dbGetAllReports(userId?: string): Promise<Report[]> {
 
         if (userId) {
             // If userId provided, filter by that user
-            console.log('[DB] Loading reports for userId:', userId);
             result = await database.getAllAsync<any>('SELECT * FROM reports WHERE user_id = ? ORDER BY created_at DESC', [userId]);
         } else {
             // If no userId (not logged in), load all reports
-            console.log('[DB] Loading all reports (no user filter)');
             result = await database.getAllAsync<any>('SELECT * FROM reports WHERE user_id IS NULL ORDER BY created_at DESC');
         }
-        console.log('[DB] Query returned', result?.length || 0, 'reports');
         return result ? result.map(rowToReport) : [];
     } catch (error) {
-        console.log('[DB] Error loading reports:', error);
         throw error;
     }
 }

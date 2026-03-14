@@ -65,11 +65,9 @@ export default function NotificationsScreen() {
         }
       } else {
         // For logged-in users, just show empty state instead of error
-        console.log('[NOTIFICATIONS] Failed to load notifications:', result.error);
         setNotifications([]);
       }
     } catch (err) {
-      console.log('[NOTIFICATIONS] Error loading notifications:', err instanceof Error ? err.message : 'Unknown error');
       setNotifications([]);
     } finally {
       setIsLoading(false);

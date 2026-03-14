@@ -404,7 +404,6 @@ export async function logout(): Promise<void> {
       const userPinKey = `pin_${userInfo.userId}`;
       try {
         await SecureStore.deleteItemAsync(userPinKey);
-        console.log('[AUTH] 🔐 Cleared PIN for user:', userInfo.userId);
       } catch (error) {
         // PIN might not exist, that's okay
       }
@@ -417,9 +416,7 @@ export async function logout(): Promise<void> {
       // Temp PIN might not exist, that's okay
     }
 
-    console.log('[AUTH] ✅ User logged out and PIN cleared');
   } catch (error) {
-    console.log('[AUTH] Error during logout:', error instanceof Error ? error.message : 'Unknown error');
   }
 }
 

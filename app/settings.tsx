@@ -107,17 +107,13 @@ export default function SettingsScreen() {
                                     // Delete all reports and health logs from SQLite
                                     await deleteAllReports();
                                     await deleteAllHealthLogs();
-                                    console.log('[SETTINGS] ✅ Local database cleared');
 
                                     // Clear all async storage
                                     await AsyncStorage.clear();
-                                    console.log('[SETTINGS] ✅ AsyncStorage cleared');
 
                                     // Clear auth context (handles SecureStore cleanup)
                                     await logout();
-                                    console.log('[SETTINGS] ✅ Auth context and SecureStore cleared');
                                 } catch (cleanupError) {
-                                    console.log('[SETTINGS] Error during cleanup:', cleanupError instanceof Error ? cleanupError.message : 'Unknown error');
                                 }
 
                                 Alert.alert(
@@ -156,7 +152,6 @@ export default function SettingsScreen() {
             // Refresh global PIN state
             await checkPinStatus();
             const logStatus = user?.userId ? `✅ PIN set for user: ${user.userId}` : '✅ PIN set locally';
-            console.log('[SETTINGS] ' + logStatus);
             Alert.alert('Success', 'PIN has been set successfully');
         } else {
             Alert.alert('Error', 'Failed to set PIN. Please try again.');

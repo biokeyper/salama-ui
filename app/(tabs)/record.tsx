@@ -47,7 +47,6 @@ export default function RecordScreen() {
   // Check if user is logged in - if not, show auth gate
   useEffect(() => {
     if (!user) {
-      console.log('[RECORD] User not logged in - showing auth gate');
       setShowAuthGate(true);
     }
   }, [user]);
@@ -182,7 +181,6 @@ export default function RecordScreen() {
   const handleEmergencyExit = async () => {
     // Check if user is logged in before allowing emergency exit
     if (!user) {
-      console.log('[RECORD] Cannot use emergency exit - user not logged in');
       setShowAuthGate(true);
       return;
     }
@@ -228,7 +226,6 @@ export default function RecordScreen() {
   const handleSaveDraft = async () => {
     // Check if user is logged in
     if (!user) {
-      console.log('[RECORD] Cannot save draft - user not logged in');
       setShowAuthGate(true);
       return;
     }
@@ -325,7 +322,6 @@ export default function RecordScreen() {
   const performSubmission = async () => {
     setIsSubmitting(true);
     try {
-      console.log('[REPORT SUBMISSION] Starting submission for audio report');
       // Get the saved report for submission
       const { getReportById } = require('@/services/storage');
       const report = await getReportById(reportId);
@@ -335,15 +331,12 @@ export default function RecordScreen() {
         return;
       }
 
-      console.log('[REPORT SUBMISSION] Report loaded:', { id: report.id, type: report.type, status: report.status });
 
       // Capture location if available
       try {
-        console.log('[REPORT SUBMISSION] Requesting location permission...');
         const { status } = await Location.requestForegroundPermissionsAsync();
 
         if (status === 'granted') {
-          console.log('[REPORT SUBMISSION] Location permission granted, getting GPS coordinates...');
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.High,
           });
@@ -356,7 +349,6 @@ export default function RecordScreen() {
             timestamp: new Date().toISOString(),
           };
 
-          console.log('[REPORT SUBMISSION] Location captured:', locationData);
 
           // Add location to report metadata
           if (!report.metadata) {
@@ -364,20 +356,15 @@ export default function RecordScreen() {
           }
           report.metadata.location = JSON.stringify(locationData);
         } else {
-          console.log('[REPORT SUBMISSION] Location permission denied');
         }
       } catch (locError) {
-        console.log('[REPORT SUBMISSION] Location capture failed:', locError instanceof Error ? locError.message : 'Unknown error');
         // Continue without location if permission denied or GPS fails
       }
 
-      console.log('[REPORT SUBMISSION] Submitting to backend...');
       const result = await submitReportToBackend(report);
 
-      console.log('[REPORT SUBMISSION] Full backend response:', JSON.stringify(result, null, 2));
 
       if (result.success) {
-        console.log('[REPORT SUBMISSION] ✅ Submission successful!', { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
         Alert.alert(
           'Success',
           'Your recording has been submitted to the backend securely.',
@@ -390,15 +377,12 @@ export default function RecordScreen() {
                   try {
                     const { deleteReport } = require('@/services/storage');
                     await deleteReport(reportId);
-                    console.log('[REPORT SUBMISSION] ✅ Deleted local draft:', reportId);
                   } catch (deleteError) {
-                    console.log('[REPORT SUBMISSION] Warning: Could not delete draft:', deleteError instanceof Error ? deleteError.message : 'Unknown error');
                     // Continue anyway - backend report is what matters
                   }
                 }
 
                 if (result.submissionId) {
-                  console.log('[REPORT SUBMISSION] Starting status polling for submission:', result.submissionId);
                   startStatusPolling(result.submissionId);
                 }
                 router.replace('/(tabs)');
@@ -407,7 +391,6 @@ export default function RecordScreen() {
           ]
         );
       } else if (result.requiresAuth) {
-        console.log('[REPORT SUBMISSION] ❌ Authentication required');
         // Authentication required - redirect to login
         Alert.alert(
           'Login Required',
@@ -434,7 +417,6 @@ export default function RecordScreen() {
           ]
         );
       } else {
-        console.log('[REPORT SUBMISSION] ❌ Submission failed:', result.error);
         Alert.alert(
           'Submission Error',
           result.error || 'Failed to submit. Your recording has been saved locally.',
@@ -449,7 +431,6 @@ export default function RecordScreen() {
         );
       }
     } catch (error) {
-      console.log('[REPORT SUBMISSION] ❌ Submission exception:', error instanceof Error ? error.message : 'Unknown error');
       Alert.alert(
         'Error',
         'An error occurred. Your recording has been saved locally.',
