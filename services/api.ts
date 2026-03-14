@@ -11,6 +11,7 @@ import { extractErrorMessage } from '@/utils/errorExtractor';
 import { updateReportStatus } from './storage';
 import { getAuthToken, isAuthenticated, logout } from './authService';
 import * as SecureStore from 'expo-secure-store';
+import * as FileSystem from 'expo-file-system';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -129,20 +130,61 @@ export async function submitReportToBackend(
     const metadata = prepareReportMetadata(report);
 
     // Build final payload - wrapped in "payload" field as backend expects
-    const submitPayload = {
-      payload: {
-        responses,
-        metadata: {
-          ...metadata,
-          type: report.type,  // Include report type (audio, text, or mixed)
-        },
+    const payloadData = {
+      responses,
+      metadata: {
+        ...metadata,
+        type: report.type,  // Include report type (audio, text, or mixed)
       },
     };
 
-    console.log('[API] 🚀 FINAL PAYLOAD being sent to backend:', JSON.stringify(submitPayload, null, 2));
-    console.log('[API] Sending report to backend endpoint:', apiConfig.endpoints.submitReport);
-    // Submit to backend (backend handles encryption)
-    const response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
+    let response;
+
+    // If report has an audio file, send as multipart/form-data
+    if (report.audioUri) {
+      console.log('[API] 🎙️ Audio file detected, sending as multipart/form-data');
+
+      // Verify the audio file exists before trying to upload
+      const fileInfo = await FileSystem.getInfoAsync(report.audioUri);
+      if (!fileInfo.exists) {
+        console.log('[API] ⚠️ Audio file not found at:', report.audioUri, '- sending without audio');
+      }
+
+      const formData = new FormData();
+      formData.append('payload', JSON.stringify(payloadData));
+
+      if (fileInfo.exists) {
+        // Determine file extension and MIME type
+        const fileExtension = report.audioUri.split('.').pop()?.toLowerCase() || 'm4a';
+        const mimeType = fileExtension === 'wav' ? 'audio/wav' : 'audio/m4a';
+
+        formData.append('audio', {
+          uri: report.audioUri,
+          name: `recording_${report.id}.${fileExtension}`,
+          type: mimeType,
+        } as any);
+
+        console.log('[API] 📎 Audio file attached:', {
+          uri: report.audioUri,
+          type: mimeType,
+          size: fileInfo.size,
+        });
+      }
+
+      console.log('[API] 🚀 Sending multipart form data to:', apiConfig.endpoints.submitReport);
+      response = await apiClient.post(apiConfig.endpoints.submitReport, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 120000, // 2 min timeout for file uploads
+      });
+    } else {
+      // Text-only report: send as JSON
+      const submitPayload = { payload: payloadData };
+      console.log('[API] 🚀 FINAL PAYLOAD being sent to backend:', JSON.stringify(submitPayload, null, 2));
+      console.log('[API] Sending report to backend endpoint:', apiConfig.endpoints.submitReport);
+      response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
+    }
 
     if (response.status === 200 || response.status === 201) {
       const data = response.data;
@@ -235,7 +277,7 @@ export async function checkReportStatus(
 
 /**
  * Archive a report on backend
- * Works for submitted/confirmed reports
+ * Works for submitted reports
  * Soft delete - keeps blockchain record but marks as archived
  */
 export async function archiveReportOnBackend(
@@ -265,7 +307,7 @@ export async function archiveReportOnBackend(
 
 /**
  * Decrypt report from backend
- * Retrieves decrypted report content for submitted/confirmed reports
+ * Retrieves decrypted report content for submitted reports
  */
 export async function decryptReportFromBackend(
   reportId: string

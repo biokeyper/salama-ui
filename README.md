@@ -1,455 +1,68 @@
-# SafeGirls App UI
+# SafeGirls
 
-This is a React Native mobile app built with [Expo SDK 54](https://expo.dev) and [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).  
-It provides a trauma-informed, privacy-focused user interface for survivors to document and report sexual and gender-based violence (SGBV) incidents.
-
----
-
-## Project Overview
-
-This repository contains the **user interface (UI)** for SafeGirls.  
-It is **not** the blockchain ("chain end") or smart contract code, but rather the mobile app that interacts with users and can connect to decentralized backends.
-
-**Key Features:**
-- **File-based routing** using [expo-router](https://docs.expo.dev/router/introduction)
-- **Tab navigation** for easy access to Home, Record, and Explore screens
-- **Audio recording and playback:** Record incidents in real-time or document past events with built-in audio player
-- **Text reporting:** Alternative text-based reporting flow for users who prefer typing
-- **Safety-first design:** Emergency exit, safety checks, and trauma-informed language
-- **Custom theming** with Light/Dark/Auto modes and persistent user preferences
-- **Expo SDK 54** with latest React Native 0.81.5
-
----
-
-## How to Use SafeGirls App
-> **Note for Users:** This app is designed to look like a normal utility app to keep you safe.
-
-### 1. Home Screen (Safe Space)
-- **Mood Check-in:** Tap the mood icons (😊 😐 😔) to log how you feel. This silently opens the Menstrual Tracker.
-- **Quick Actions:**
-  - 🎤 **Record:** Go to the recording screen.
-  - 📚 **Library:** Access your saved reports (PIN protected).
-  - 🌍 **Explore:** Find support resources and decoy apps.
-- **Privacy:** The app stores all data on your phone. Nothing is sent to the cloud without your permission.
-
-### 2. Recording Incidents
-- **Real-time:** Tap the microphone icon on the "Record" tab to start recording.
-- **Pulse Animation:** Shows that recording is active.
-- **Exit Now:** Tap the big red "EXIT NOW" button to instantly save the recording and switch to a fake calculator screen. This is for emergencies.
-
-### 3. Decoy Apps (Hidden Features)
-The app includes "fake" apps to hide its true purpose:
-- **Calculator:** Works like a real calculator.
-- **Calendar:** Shows dates and holidays.
-- **Menstrual Tracker:** Tracks your cycle and health.
-
-**Secret Gestures:**
-- **Long Press (3 seconds)** on the title of any decoy app (e.g., "Calculator", "My Cycle") to **EXIT** back to the main app.
-- **Fake Calculator:** Long press the **'C' (Clear)** button to exit.
-- **Fake Calendar:** Tap a date **3 times** to exit.
-
-### 4. Background Recording
-- You can enable background recording in **Settings** (gear icon in Explore tab).
-- When enabled, opening a decoy app (Calculator, Calendar, Tracker) will **automatically start recording audio** in the background.
-- This allows you to document situations discreetly while appearing to use a normal app.
-
-### 5. Library & PIN Protection
-- **Access:** The Library tab holds your saved audio and text reports.
-- **Security:** You must set a **PIN** to access the library.
-- **Verification:** Every time you open the library, you must enter your PIN.
-- **Hidden Content:** The library content is blurred until you unlock it.
-
-### 6. Emergency Features
-- **Abuse Detection:** The Menstrual Tracker analyzes your logs for signs of abuse (e.g., specific pain types + negative mood) and can silently create reports.
-- **Panic Button:** The "EXIT NOW" button on the record screen is your panic button. Use it if you are interrupted or unsafe.
-
----
-
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
----
+A privacy-first React Native app that empowers survivors to safely document and report sexual and gender-based violence (SGBV). Built with [Expo SDK 54](https://expo.dev).
 
 ## Features
 
-### Audio Recording & Playback
-- **Real-time recording:** Record incidents as they happen with high-quality audio capture
-- **Past event recording:** Document historical incidents with voice narration
+### Recording & Reporting
+- **Audio recording** — tap to record incidents in real-time with a pulse animation showing active capture. Recordings are saved locally and can be replayed from the library.
+- **Text reporting** — type out incident details as an alternative to audio. Supports both real-time and past-event documentation.
+- **Report library** — browse, filter, and play back all saved reports. Protected behind a user-set PIN so content stays hidden even if someone opens the app.
 
----
+### Decoy Apps & Stealth
+- **Fake Calculator** — a fully working calculator. Enable background recording in Settings and it silently captures audio while in use. Long-press the **C** button (3 seconds) to exit back to the main app.
+- **Fake Calendar** — displays dates and holidays. Supports background recording. Triple-tap any date to exit.
+- **Menstrual Tracker** — tracks cycles, symptoms, and notes. Includes health tips and a secret notes field. Long-press the header title (3 seconds) to exit.
+- **Background recording** — when enabled per decoy app in Settings, opening that app automatically starts silent audio capture in the background.
 
-## Recent Updates (December 2025)
+### Safety & Privacy
+- **Emergency exit** — the "EXIT NOW" panic button on the record screen instantly saves any in-progress recording and switches to the fake calculator screen.
+- **Abuse detection** — the cycle tracker analyzes entries for concerning patterns (severe pain + negative mood, keywords like "hit", "forced", "scared") and silently creates evidence reports.
+- **Offline-first storage** — all reports, recordings, and settings are stored locally on the device. Nothing leaves the phone without explicit user action.
+- **PIN protection** — the report library and sensitive settings are locked behind a PIN that's verified on every access.
+- **Email recovery** — optional account recovery via email, configurable in Settings.
 
-### Bug Fixes
-- **Emergency Exit Navigation:** Fixed race condition crash when pressing "EXIT NOW" button by preventing double execution.
-- **Cycle Tracker Exit:** Resolved crash when long-pressing title to exit by fixing audio recorder cleanup race condition.
-- **Library Security:** Fixed security flaw where PIN check could be bypassed on navigation. Now checks PIN every time screen is focused.
-- **Library Audio:** Fixed issue where audio continued playing after leaving the library screen.
-- **Library Screen Stability:** Resolved crashes when loading audio reports by implementing lazy-loading for audio players
-- **Text Reports Tab:** Fixed crash when switching to text reports tab with improved conditional rendering
-- **Audio Playback:** Resolved "already released" errors with defensive null checks and try-catch blocks
-- **SafeAreaView Deprecation:** Updated all screens to use `react-native-safe-area-context` instead of deprecated React Native SafeAreaView
-- **Audio Duration Display:** Fixed "0:00" issue by tracking recording duration and adding fallback logic
-- **FileSystem Deprecation:** Resolved `deleteAsync` error by migrating to `expo-file-system/legacy`
-- **Security Vulnerabilities:** Fixed 6 npm package vulnerabilities (1 high, 3 moderate, 2 low) via `npm audit fix`
-- **Decoy App Settings:** Fixed issue where decoy apps (Calculator, Calendar) were ignoring background recording settings.
-- **Package Updates:** Updated `expo`, `expo-audio`, and `expo-router` to recommended versions for stability.
+### Authentication
+- **Hybrid auth model** — Home and Explore screens are freely accessible without login. Recording, library, account, settings, and notifications require authentication. An auth modal appears automatically when needed and redirects back after login.
 
-### Improvements
-- **Library Features Restored:** Re-implemented Audio and Text tabs with proper filtering logic
-- **Audio Player Enhancements:** Audio now plays immediately without requiring Stop button first
-- **Error Handling:** Added comprehensive error handling for audio player lifecycle methods
-- **Code Stability:** Improved resource management and cleanup in audio components
-- **Home Screen Redesign (Concept 3):**
-  - Large centered animated wave (👋) as hero element
-  - Warm welcome message with mood check-in feature
-  - Quick action cards with emoji icons (🎤📚🌍) for easy navigation
-  - Safe space messaging and privacy reminders
-  - Hidden bottom navigation for immersive experience
-- **Explore Tab Redesign:** Complete UI overhaul with:
-  - Icon-based app launcher (Fake Calculator, Fake Calendar, Menstrual Tracker)
-  - Support resources for 6 East African countries (Uganda, Kenya, Tanzania, Rwanda, Burundi, South Sudan)
-  - Clickable toll-free helpline numbers with direct dialing
-  - Purple-themed modal design for support information
-  - Waving girl animation (👧) in header for friendly feel
-- **Decoy Apps & Safety:**
-  - **Fake Calendar:** Fully functional calendar with holiday display and background recording on launch.
-  - **Fake Calculator:** Updated to start recording immediately on launch for enhanced safety.
-  - **Menstrual Tracker:** Privacy-first cycle tracking with "Secret Notes" feature, background recording, cycle history, and daily health tips.
-  - **Secret Exit:** Standardized "Long Press" gesture (3s) on header titles to save & exit decoy modes.
-- **Home Tab Enhancements:**
-  - **Pulsating Heart:** The heart emoji below "You are safe here" pulsates continuously to create a living, welcoming feel.
-  - **Functional Mood Icons:** Tapping any mood icon navigates directly to the Menstrual Tracker for quick logging.
-  - **Privacy Policy Link:** Added link to privacy policy at the bottom of the home screen.
-- **Detailed Report Screen:**
-  - **Decoy App Quick Launch:** Added section at the bottom with buttons to quickly launch Calculator, Calendar, or Tracker apps for safety.
-- **Abuse Detection System:**
-  - **Aggressive Detection:** Automatically flags cycle tracker entries with severe pain + negative mood, multiple pain types, or concerning keywords in notes.
-  - **Silent Reporting:** Creates private text reports for evidence without alerting the user or potential abusers.
-  - **Expanded Keywords:** Detects 30+ terms related to violence, coercion, threats, and injury.
-- **Settings & Privacy:**
-  - **Background Recording Toggles:** Users can now enable/disable background recording for each decoy app (Calculator, Calendar, Tracker) individually.
-  - **Abuse Detection Toggle:** Option to enable/disable automatic abuse detection.
-  - **Data Management:** "Clear All Data" option to permanently delete all local data.
-  - **Settings Screen:** Accessible via the Explore tab.
-- **Expo SDK:** 54.0.25
-- **React Native:** 0.81.5
-- **React:** 19.1.0
-- **TypeScript:** 5.9.2
-- **expo-audio:** 1.0.15 (for audio recording and playback)
-- **expo-router:** 6.0.15 (file-based routing)
-- **@react-native-async-storage/async-storage:** 2.2.0 (for local data persistence)
+### Theming
+- **Light / Dark / Auto modes** — persisted across sessions via AsyncStorage.
 
----
-
-## Secret Gestures & Safety Features
-
-### 🤫 Secret Gestures
-- **Emergency Exit (Decoy Apps):** Long press (3 seconds) on the header title (e.g., "Calculator", "Calendar", "My Cycle") to save any recording and exit to the home screen.
-- **Fake Calculator:**
-  - **Clear (C) Button:** Long press (3s) to save recording and exit.
-  - **Standard Use:** Works as a normal calculator.
-- **Fake Calendar:**
-  - **Triple Tap Date:** Tap the same date 3 times to trigger emergency exit.
-  - **Holiday Info:** Tap dates to see holidays.
-- **Home Screen:**
-  - **Mood Icons:** Tapping any mood icon silently navigates to the Menstrual Tracker.
-
-### 🛡️ Trauma-Informed Features
-- **Background Recording:** Decoy apps (Calculator, Calendar, Tracker) can record audio in the background while appearing to be normal apps. Configurable in Settings.
-- **Abuse Detection:** The Menstrual Tracker analyzes symptoms and notes for signs of abuse (e.g., "hit", "forced", "scared") and silently creates evidence reports.
-- **Local-Only Storage:** All data is stored on the device. No cloud sync ensures data never leaves the user's possession without explicit action.
-- **Discreet Interface:** The app appears as a generic "SafeGirls" or utility app. The "Explore" tab disguises safety tools as common utilities.
-
----
-
-## Data Storage
-
-### Local Storage Implementation
-
-The app uses **AsyncStorage** to persist reports locally on the device. All reports are stored with the following structure:
-
-#### Report Data Model
-
-```typescript
-interface Report {
-  id: string;                    // Unique identifier
-  type: 'audio' | 'text' | 'mixed';
-  status: 'draft' | 'saved' | 'submitted' | 'failed';
-  createdAt: string;             // ISO 8601 timestamp
-  updatedAt: string;             // ISO 8601 timestamp
-  
-  // Audio data
-  audioUri?: string;             // File path to audio recording
-  audioDuration?: number;        // Duration in seconds
-  
-  // Text data
-  textContent?: string;          // Text report content
-  
-  // Metadata
-  metadata?: {
-    location?: string;
-    timestamp?: string;          // When incident occurred
-    tags?: string[];
-    notes?: string;
-  };
-  
-  // Backend submission tracking
-  submittedAt?: string;          // ISO 8601 timestamp
-  submissionId?: string;         // Backend-assigned ID
-  submissionError?: string;      // Error message if submission failed
-}
-```
-
-#### Storage Service
-
-The storage service (`services/storage.ts`) provides the following functions:
-
-- `getAllReports()` - Retrieve all stored reports
-- `getReportById(id)` - Get a specific report
-- `saveReport(report)` - Save or update a report
-- `deleteReport(id)` - Delete a report
-- `deleteAllReports()` - Clear all reports
-- `getReportsByStatus(status)` - Filter reports by status
-- `getReportsByType(type)` - Filter reports by type
-- `updateReportStatus(id, status)` - Update report submission status
-
-#### Storage Limits
-
-- **Maximum reports:** 100 reports stored locally (oldest removed when limit exceeded)
-- **Storage location:** Device's AsyncStorage (persists across app restarts)
-- **Audio files:** Stored in temporary file system (managed by expo-audio)
-
-#### Report Lifecycle
-
-1. **Draft** - Initial state when audio is recorded or text is entered
-2. **Saved** - Report is saved locally but not yet submitted
-3. **Submitted** - Successfully sent to backend
-4. **Failed** - Submission attempt failed (can be retried)
-
----
-
-## Backend Submission Framework
-
-### Overview
-
-The app is designed to connect to decentralized backends (blockchain/smart contracts) or traditional REST APIs. The backend submission framework is documented here for future implementation.
-
-### Architecture
-
-```
-┌─────────────┐
-│   UI Layer  │ (app/ screens)
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│  Storage    │ (services/storage.ts)
-│  Service    │
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│ Submission  │ (services/submission.ts - TO BE IMPLEMENTED)
-│  Service    │
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│   Backend   │ (Blockchain API / REST API)
-│   Endpoint  │
-└─────────────┘
-```
-
-### Implementation Plan
-
-#### 1. Submission Service (`services/submission.ts`)
-
-Create a service to handle backend communication:
-
-```typescript
-// Example structure (to be implemented)
-export interface SubmissionConfig {
-  apiEndpoint: string;
-  apiKey?: string;
-  blockchainNetwork?: string;
-  contractAddress?: string;
-}
-
-export async function submitReport(
-  report: Report,
-  config: SubmissionConfig
-): Promise<{ success: boolean; submissionId?: string; error?: string }> {
-  // Implementation:
-  // 1. Validate report data
-  // 2. Prepare payload (audio file upload, text content, metadata)
-  // 3. Authenticate/authorize request
-  // 4. Submit to backend
-  // 5. Handle response and update report status
-  // 6. Return result
-}
-```
-
-#### 2. Backend API Requirements
-
-##### REST API Endpoint
-
-**POST** `/api/reports`
-
-**Request:**
-```json
-{
-  "type": "audio" | "text" | "mixed",
-  "textContent": "string",
-  "audioFile": "base64 or multipart/form-data",
-  "metadata": {
-    "location": "string",
-    "timestamp": "ISO 8601",
-    "tags": ["string"]
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "submissionId": "unique-id",
-  "timestamp": "ISO 8601"
-}
-```
-
-##### Blockchain Integration
-
-For decentralized backends:
-
-- **Smart Contract Function:** `submitReport(bytes32 reportHash, string metadata)`
-- **IPFS Storage:** Upload audio files to IPFS, store hash on-chain
-- **Encryption:** Encrypt sensitive data before submission
-- **Wallet Integration:** Connect user wallet for transaction signing
-
-#### 3. Submission Queue
-
-Implement an offline queue for failed submissions:
-
-```typescript
-// Queue structure
-interface SubmissionQueue {
-  pending: Report[];
-  retryAttempts: Map<string, number>;
-  maxRetries: number;
-}
-
-// Auto-retry logic
-- Check network connectivity
-- Retry failed submissions on app launch
-- Exponential backoff for retries
-- Mark as permanently failed after max retries
-```
-
-#### 4. Authentication & Security
-
-- **User Authentication:** Implement auth flow (OAuth, JWT, wallet signature)
-- **Data Encryption:** Encrypt reports before submission
-- **Privacy:** Ensure audio/text data is encrypted in transit and at rest
-- **Anonymity:** Consider anonymous submission options
-
-#### 5. Error Handling
-
-```typescript
-// Error scenarios to handle:
-- Network failures (offline, timeout)
-- Authentication errors (expired token, invalid credentials)
-- Backend errors (server error, rate limiting)
-- Validation errors (invalid data format)
-- Storage errors (quota exceeded)
-```
-
-#### 6. Configuration
-
-Create a config file for backend settings:
-
-```typescript
-// config/backend.ts
-export const BACKEND_CONFIG = {
-  apiEndpoint: process.env.EXPO_PUBLIC_API_URL || 'https://api.example.com',
-  blockchainNetwork: process.env.EXPO_PUBLIC_NETWORK || 'mainnet',
-  contractAddress: process.env.EXPO_PUBLIC_CONTRACT_ADDRESS,
-  enableSubmission: process.env.EXPO_PUBLIC_ENABLE_SUBMISSION === 'true',
-};
-```
-
-### Integration Steps
-
-1. **Create submission service** (`services/submission.ts`)
-2. **Add network detection** (use `@react-native-community/netinfo`)
-3. **Implement retry logic** with exponential backoff
-4. **Add submission UI** (progress indicators, success/error messages)
-5. **Create backend configuration** (environment variables)
-6. **Add authentication flow** (if required)
-7. **Implement encryption** (for sensitive data)
-8. **Add submission queue** (for offline support)
-9. **Test with mock backend** before production integration
-
-### Environment Variables
-
-Add to `.env` or `app.json`:
-
-```env
-EXPO_PUBLIC_API_URL=https://api.safegirls.example.com
-EXPO_PUBLIC_ENABLE_SUBMISSION=true
-EXPO_PUBLIC_BLOCKCHAIN_NETWORK=mainnet
-EXPO_PUBLIC_CONTRACT_ADDRESS=0x...
-```
-
-### Testing
-
-- **Mock Backend:** Use tools like MSW (Mock Service Worker) for testing
-- **Offline Testing:** Test submission queue with network disabled
-- **Error Scenarios:** Test all error paths and edge cases
-- **Performance:** Test with large audio files and multiple reports
-
----
-
-## Get a fresh project
-
-When you're ready, run:
+## Getting Started
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Then open the app in [Expo Go](https://expo.dev/go), an [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/), or an [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/).
 
----
+## Project Structure
 
-## Learn more
+```
+app/            Screen routes (file-based routing via expo-router)
+  (tabs)/       Tab screens — Home, Record, Library, Explore
+components/     Reusable UI components
+config/         API configuration
+contexts/       React contexts (auth, settings, theme, etc.)
+hooks/          Custom hooks
+services/       Business logic (storage, auth, audio, security)
+types/          TypeScript type definitions
+utils/          Helper utilities
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Tech Stack
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+| Tool | Version |
+|------|---------|
+| Expo SDK | 54 |
+| React Native | 0.81.5 |
+| React | 19.1 |
+| TypeScript | 5.9 |
+| expo-router | 6 |
 
-## Join the community
+## Learn More
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- [Expo docs](https://docs.expo.dev/)
+- [Expo Router intro](https://docs.expo.dev/router/introduction)
+- [Expo Discord](https://chat.expo.dev)

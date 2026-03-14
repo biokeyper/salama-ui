@@ -15,6 +15,7 @@ export interface User {
   userId: string;
   phone: string;
   email: string;
+  pin?: string | null;
 }
 
 export interface AuthResponse {
@@ -115,6 +116,7 @@ export async function verifySignup(
         userId: userId || '',
         phone: response_data.phone || phone,
         email: response_data.email || '',
+        pin: pin ?? null,
       };
 
       // If token is nested in data object
@@ -126,6 +128,7 @@ export async function verifySignup(
           userId: userId || '',
           phone: response_data.data.phone || phone,
           email: response_data.data.email || '',
+          pin: pin ?? null,
         };
       }
 
@@ -144,7 +147,7 @@ export async function verifySignup(
 
       // Store PIN from backend response (signup always returns null for new users)
       const { storePinFromBackend } = await import('./security');
-      await storePinFromBackend(pin);
+      await storePinFromBackend(pin, userId);
 
       // Save user info
       const user: User = userData as User;
@@ -260,6 +263,7 @@ export async function verifyLogin(
         userId: userId || '',
         phone: response_data.phone || phone,
         email: response_data.email || '',
+        pin: pin ?? null,
       };
 
       // If token is nested in data object
@@ -271,6 +275,7 @@ export async function verifyLogin(
           userId: userId || '',
           phone: response_data.data.phone || phone,
           email: response_data.data.email || '',
+          pin: pin ?? null,
         };
       }
 
@@ -290,7 +295,7 @@ export async function verifyLogin(
 
       // Store PIN from backend response
       const { storePinFromBackend } = await import('./security');
-      await storePinFromBackend(pin);
+      await storePinFromBackend(pin, userId);
 
       // Save user info
       const user: User = userData as User;
@@ -548,6 +553,7 @@ export async function verifyChangePhone(
       let userData = {
         phone: response_data.phone || newPhone,
         email: response_data.email || '',
+        pin: pin ?? null,
       };
 
       // If token is nested in data object
@@ -557,6 +563,7 @@ export async function verifyChangePhone(
         userData = {
           phone: response_data.data.phone || newPhone,
           email: response_data.data.email || '',
+          pin: pin ?? null,
         };
       }
 
@@ -572,10 +579,10 @@ export async function verifyChangePhone(
 
       // Store PIN from backend response if provided
       const { storePinFromBackend } = await import('./security');
-      await storePinFromBackend(pin);
+      const currentUser = await getUserInfo();
+      await storePinFromBackend(pin, currentUser?.userId);
 
       // Update user info with new phone
-      const currentUser = await getUserInfo();
       const user: User = {
         userId: currentUser?.userId || '',
         ...userData,
@@ -705,6 +712,7 @@ export async function verifyPhoneChangeRecovery(
       let userData = {
         phone: response_data.phone || newPhone,
         email: response_data.email || email,
+        pin: pin ?? null,
       };
 
       // If token is nested in data object
@@ -714,6 +722,7 @@ export async function verifyPhoneChangeRecovery(
         userData = {
           phone: response_data.data.phone || newPhone,
           email: response_data.data.email || email,
+          pin: pin ?? null,
         };
       }
 

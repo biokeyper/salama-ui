@@ -93,10 +93,10 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                 }
             }
         } else {
-            // Verify mode - works whether logged in or not
+            // Verify mode - check PIN against user.pin from backend
             try {
-              // Check if PIN is set (temp PIN or user PIN)
-              const pinSet = await hasPin(user?.userId);
+              // Check if PIN is set
+              const pinSet = await hasPin(user?.pin);
 
               if (!pinSet) {
                 Alert.alert('Set PIN First', 'Please set a PIN first to access your library.');
@@ -104,8 +104,8 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                 return;
               }
 
-              // Verify PIN (checks appropriate PIN based on login status)
-              const isValid = await verifyPin(pin, user?.userId);
+              // Verify PIN against user.pin from backend
+              const isValid = await verifyPin(pin, user?.pin);
               if (isValid) {
                 console.log('[LOCK-SCREEN] ✅ PIN verified for user:', user?.userId || 'NOT LOGGED IN');
                 onUnlock();

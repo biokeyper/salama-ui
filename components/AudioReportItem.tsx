@@ -28,6 +28,7 @@ interface AudioReportItemProps {
   onShare?: (report: Report) => void;
   onViewViewers?: (report: Report) => void;
   onViewDetails?: (report: Report) => void;
+  isFetchingAudio?: boolean;
 }
 
 export default function AudioReportItem({
@@ -46,15 +47,14 @@ export default function AudioReportItem({
   onShare,
   onViewViewers,
   onViewDetails,
+  isFetchingAudio = false,
 }: AudioReportItemProps) {
   const isMenuOpen = openMenuReportId === report.id;
 
-  // Early return if no audio URI - this shouldn't render in the first place
-  if (!report.audioUri) {
-    return null;
-  }
-
-  const player = useAudioPlayer(report.audioUri, { updateInterval: 100 });
+  // Hooks must be called unconditionally (React rules of hooks)
+  const player = useAudioPlayer(report.audioUri ?? null, {
+    updateInterval: 100,
+  });
   const status = useAudioPlayerStatus(player);
 
   useEffect(() => {
@@ -184,9 +184,9 @@ export default function AudioReportItem({
       };
     }
 
-    // Confirmed (blockchain confirmed)
-    if (report.status === "confirmed") {
-      return { color: "#4CAF50", label: "Confirmed ✓" };
+    // Submitted (blockchain submitted)
+    if (report.status === "submitted") {
+      return { color: "#4CAF50", label: "Submitted ✓" };
     }
 
     // Failed (blockchain failed)
@@ -271,7 +271,7 @@ export default function AudioReportItem({
                   </TouchableOpacity>
                 )}
 
-                {report.status === "pending" && (
+                {(report.status === "pending" || report.status === "submitted") && (
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => onMenuToggle?.(report.id)}
@@ -285,7 +285,7 @@ export default function AudioReportItem({
         </View>
 
         {/* Dropdown Menu */}
-        {report.status === "pending" && isMenuOpen && (
+        {(report.status === "pending" || report.status === "submitted") && isMenuOpen && (
             <View style={styles.dropdownMenu}>
               <TouchableOpacity
                 style={styles.menuOption}
@@ -351,12 +351,17 @@ export default function AudioReportItem({
         <TouchableOpacity
           style={styles.controlButton}
           onPress={() => onPlayPause(report)}
+          disabled={isFetchingAudio}
         >
-          <MaterialIcons
-            name={isPlaying ? "pause-circle-filled" : "play-circle-filled"}
-            size={48}
-            color="#8A4FFF"
-          />
+          {isFetchingAudio ? (
+            <ActivityIndicator size={48} color="#8A4FFF" />
+          ) : (
+            <MaterialIcons
+              name={isPlaying ? "pause-circle-filled" : "play-circle-filled"}
+              size={48}
+              color="#8A4FFF"
+            />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity

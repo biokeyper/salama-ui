@@ -69,5 +69,7 @@ export function prepareReportMetadata(report: Report) {
   return {
     location: report.metadata?.location || 'Unknown',
     timestamp: report.metadata?.timestamp || report.createdAt,
+    ...(report.audioDuration && { audioDuration: report.audioDuration }),
+    ...(report.audioUri && { hasAudio: true }),
   };
 }

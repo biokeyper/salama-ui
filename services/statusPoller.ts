@@ -17,7 +17,7 @@ const activeSessions = new Map<string, PollingSession>();
 
 /**
  * Start polling status for a report
- * Polls until confirmed (12+ confirmations) or max duration exceeded
+ * Polls until submitted (12+ confirmations) or max duration exceeded
  */
 export function startStatusPolling(reportId: string): void {
   // Don't start duplicate polling
@@ -53,16 +53,16 @@ export function startStatusPolling(reportId: string): void {
       const confirmations = statusResult.confirmations || 0;
       console.log('[STATUS-POLLER] 📊 Report', reportId, '- Status:', statusResult.status, '- Confirmations:', confirmations + '/' + apiConfig.statusPolling.confirmationThreshold);
 
-      // Check if confirmed (12+ confirmations)
+      // Check if submitted (12+ confirmations)
       if (confirmations >= apiConfig.statusPolling.confirmationThreshold) {
-        console.log('[STATUS-POLLER] ✅ Report', reportId, 'reached', confirmations, 'confirmations - CONFIRMED');
+        console.log('[STATUS-POLLER] ✅ Report', reportId, 'reached', confirmations, 'confirmations - SUBMITTED');
 
         const { saveReport, getReportById } = await import('./storage');
         const existingReport = await getReportById(reportId);
         if (existingReport) {
           await saveReport({
             ...existingReport,
-            status: 'confirmed',
+            status: 'submitted',
             confirmations: confirmations,
             txHash: statusResult.txHash,
             ipfsHash: statusResult.ipfsHash,

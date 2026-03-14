@@ -68,15 +68,15 @@ export function getAvailableActions(report: Report): ActionAvailability {
     };
   }
 
-  // Confirmed - blockchain confirmed, immutable
-  if (status === 'confirmed') {
+  // Submitted - blockchain submitted, immutable
+  if (status === 'submitted') {
     return {
       canDelete: false,
       canEdit: false,
       canArchive: true,
       canSubmit: false,
       canRetry: false,
-      message: 'Confirmed on blockchain',
+      message: 'Submitted to blockchain',
     };
   }
 

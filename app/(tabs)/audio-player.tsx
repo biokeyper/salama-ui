@@ -33,7 +33,7 @@ import { BlurView } from "expo-blur";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -122,28 +122,33 @@ export default function LibraryScreen() {
     useCallback(() => {
       const checkPinStatus = async () => {
         setIsCheckingAuth(true);
+        setShowPinVerify(false);
+        setShowSetPinModal(false);
 
         // If user is logged in, require PIN to access library
         if (user) {
           console.log('[LIBRARY] User logged in - checking PIN status');
-          // Check if user has a PIN set
-          const hasPinSet = await hasPin(user?.userId);
+          // Check if user has a PIN set (from backend or secure local cache).
+          const hasPinSet = await hasPin(user?.pin);
           console.log('[LIBRARY] User has PIN set:', hasPinSet);
 
           if (hasPinSet) {
             // PIN exists - show verify PIN flow
             console.log('[LIBRARY] PIN exists - showing verify PIN modal');
             setShowPinVerify(true);
+            setShowSetPinModal(false);
           } else {
             // No PIN - show set PIN flow
             console.log('[LIBRARY] No PIN exists - showing set PIN modal');
             setShowSetPinModal(true);
+            setShowPinVerify(false);
           }
+          // User is logged in but still locked until they verify/set PIN.
           setIsAuthenticated(false);
         } else {
           // Not logged in - open library freely
           console.log('[LIBRARY] User not logged in - opening library freely');
-          setIsAuthenticated(true);
+          setIsAuthenticated(false);
           await loadReports();
         }
         setIsCheckingAuth(false);
@@ -164,66 +169,36 @@ export default function LibraryScreen() {
     try {
       // Load local reports (filtered by current user if logged in)
       const userId = user?.userId;
-      console.log('===============================================');
-      console.log('[LIBRARY] Full user object:', JSON.stringify(user));
       console.log('[LIBRARY] User Status:', userId ? `✅ LOGGED IN (${userId})` : '❌ NOT LOGGED IN');
-      console.log('[LIBRARY] Reports will be:', userId ? 'filtered to this user only' : 'unfiltered (all local reports)');
-      console.log('===============================================');
       const allReports = await getAllReports(userId);
       console.log('[LIBRARY] Loaded reports count:', allReports.length);
-      if (allReports.length > 0) {
-        console.log('[LIBRARY] Reports by userId:', allReports.map(r => ({ id: r.id, userId: r.userId, status: r.status })));
-      }
 
       // Sync submitted reports with backend to get latest status
       if (isAuthenticated) {
         try {
           console.log('[LIBRARY] 🔄 Fetching reports from backend...');
-          console.log('[LIBRARY] 📡 Endpoint: GET /api/search/reports?limit=100&offset=0');
           const backendResult = await searchBackendReports({
             limit: 100,
             offset: 0,
           });
 
-          console.log('[LIBRARY] ✅ Backend reports fetched:', backendResult.reports?.length || 0);
-          if (backendResult.reports?.length > 0) {
-            console.log('[LIBRARY] Backend reports:', backendResult.reports.map(r => ({ id: r.reportId, status: r.status })));
-          }
 
           if (backendResult.success && backendResult.reports) {
-            // Update local reports with backend data and add new backend reports
+            const localIds = new Set(allReports.map((r) => r.id));
+
             for (const backendReport of backendResult.reports) {
-              // Backend returns 'id', not 'reportId'
-              const reportId = backendReport.id || backendReport.reportId;
-              console.log('[LIBRARY] Processing backend report:', JSON.stringify(backendReport));
-
-              const localReportIndex = allReports.findIndex(
-                (r) => r.id === reportId,
-              );
-
-              if (localReportIndex !== -1) {
+              const reportId = backendReport.reportId || backendReport.id;
+              if (localIds.has(reportId)) {
                 // Update existing local report with backend data
-                const localReport = allReports[localReportIndex];
-                console.log('[LIBRARY] Updating local report:', reportId);
-                if (backendReport.status) {
-                  localReport.status = backendReport.status;
-                }
-                if (
-                  backendReport.confirmations !== undefined &&
-                  backendReport.confirmations !== null
-                ) {
-                  localReport.confirmations = backendReport.confirmations;
-                }
-                if (backendReport.txHash) {
-                  localReport.txHash = backendReport.txHash;
-                }
-                if (backendReport.ipfsHash) {
-                  localReport.ipfsHash = backendReport.ipfsHash;
+                const idx = allReports.findIndex((r) => r.id === reportId);
+                if (idx !== -1) {
+                  allReports[idx].status = backendReport.status ?? allReports[idx].status;
+                  allReports[idx].confirmations = backendReport.confirmations ?? allReports[idx].confirmations;
+                  allReports[idx].txHash = backendReport.txHash ?? allReports[idx].txHash;
+                  allReports[idx].ipfsHash = backendReport.ipfsHash ?? allReports[idx].ipfsHash;
                 }
               } else {
-                // Add backend report that doesn't exist locally
-                console.log('[LIBRARY] Adding new backend report:', reportId);
-                const newReport: Report = {
+                allReports.push({
                   id: reportId,
                   userId: userId,
                   type: backendReport.type || 'audio',
@@ -233,9 +208,7 @@ export default function LibraryScreen() {
                   confirmations: backendReport.confirmations,
                   txHash: backendReport.txHash,
                   ipfsHash: backendReport.ipfsHash,
-                };
-                console.log('[LIBRARY] Created report object:', JSON.stringify(newReport));
-                allReports.push(newReport);
+                });
               }
             }
           }
@@ -255,11 +228,17 @@ export default function LibraryScreen() {
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
-      console.log('[LIBRARY] Setting reports to state:', filteredReports.length, 'reports');
-      console.log('[LIBRARY] Reports details:', filteredReports.map(r => ({ id: r.id, status: r.status, archived: r.isArchived })));
+      console.log('[LIBRARY] Total reports loaded:', filteredReports.length);
       setReports(filteredReports);
+
+      // Log polling completion
+      const pendingCount = filteredReports.filter(r => r.status === 'pending').length;
+      const submittedCount = filteredReports.filter(r => r.status === 'submitted').length;
+      const failedCount = filteredReports.filter(r => r.status === 'failed').length;
+      console.log('[POLLING] ✅ Polling complete - Pending:', pendingCount, 'Submitted:', submittedCount, 'Failed:', failedCount);
     } catch (error) {
       console.log('[LIBRARY] Error loading reports:', error instanceof Error ? error.message : error);
+      console.log('[POLLING] ❌ Polling error:', error instanceof Error ? error.message : 'Unknown error');
       Alert.alert("Error", "Failed to load reports");
     } finally {
       setLoading(false);
@@ -293,33 +272,38 @@ export default function LibraryScreen() {
     }
   }, [isAuthenticated, showArchived]);
 
+  // Use ref to always call the latest loadReports without re-triggering the effect
+  const loadReportsRef = useRef(loadReports);
+  loadReportsRef.current = loadReports;
+
+  // Derived boolean: are there pending reports? Only changes when the answer flips.
+  const hasPendingReports = useMemo(
+    () => reports.some((r) => r.status === 'pending'),
+    [reports],
+  );
+
   // Auto-polling: Refresh report statuses every 30 seconds (only if there are pending reports)
   useEffect(() => {
-    if (!isAuthenticated) return;
-
-    // Check if there are any pending reports that need polling
-    const hasPendingReports = reports.some(
-      (r) => r.status === 'pending'
-    );
-
-    if (!hasPendingReports) {
-      console.log('[LIBRARY] ℹ️ No pending reports - polling skipped');
+    if (isCheckingAuth || !user || !isAuthenticated || !hasPendingReports) {
       return;
     }
 
-    console.log('[LIBRARY] 🔄 Starting auto-polling for pending reports (every 30s)');
+    console.log('[POLLING] 🔄 Starting auto-polling for pending reports (every 30s)');
 
-    const pollInterval = setInterval(() => {
-      console.log('[LIBRARY] ⏱️ Auto-polling: Fetching latest report statuses...');
-      loadReports();
-    }, 30000); // Poll every 30 seconds
-
-    // Cleanup interval on unmount or when authentication changes
-    return () => {
-      console.log('[LIBRARY] 🛑 Stopping auto-polling');
-      clearInterval(pollInterval);
+    const pollTick = async () => {
+      console.log('[POLLING] ⏱️ Auto-polling tick:', new Date().toLocaleTimeString());
+      await loadReportsRef.current();
     };
-  }, [isAuthenticated, reports, loadReports]);
+
+    // Poll immediately, then every 30 seconds
+    pollTick();
+    const intervalId = setInterval(pollTick, 30000);
+
+    return () => {
+      console.log('[POLLING] 🛑 Stopping auto-polling');
+      clearInterval(intervalId);
+    };
+  }, [isAuthenticated, isCheckingAuth, user, hasPendingReports]);
 
   const filteredReports = useMemo(() => {
     let filtered = reports.filter((r) => {
@@ -327,11 +311,12 @@ export default function LibraryScreen() {
       if (showArchived && !r.isArchived) return false;
       if (!showArchived && r.isArchived) return false;
 
+      // Backend-only reports (no local audioUri/textContent) show in audio tab by default
+      const isBackendOnly = !r.audioUri && !r.textContent && r.txHash;
+
       if (activeTab === "audio") {
-        // Show audio reports if they have audioUri OR if they're type audio with txHash (backend)
-        return (r.type === "audio" || r.type === "mixed") && (r.audioUri || r.txHash);
+        return (r.type === "audio" || r.type === "mixed" || isBackendOnly) && (r.audioUri || r.txHash);
       } else {
-        // Show text reports if they have textContent OR if they're type text with txHash (backend)
         return (r.type === "text" && (r.textContent || r.txHash)) || (r.type === "mixed" && r.textContent);
       }
     });
@@ -356,25 +341,87 @@ export default function LibraryScreen() {
     return filtered;
   }, [reports, activeTab, searchQuery, showArchived]);
 
-  const handlePlayPause = (report: Report) => {
+  const [isFetchingAudio, setIsFetchingAudio] = useState<string | null>(null);
+
+  const handlePlayPause = async (report: Report) => {
     // If clicking on a different report, stop the currently playing one
     if (playingReportId && playingReportId !== report.id) {
       setPlayingReportId(null);
     }
 
-    if (!report.audioUri) {
+    // If already playing this report, pause it
+    if (playingReportId === report.id) {
+      setPlayingReportId(null);
       return;
     }
 
-    try {
-      if (playingReportId === report.id) {
-        setPlayingReportId(null);
-      } else {
-        setPlayingReportId(report.id);
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to play audio");
+    // Has local audio — play directly
+    if (report.audioUri) {
+      setPlayingReportId(report.id);
+      return;
     }
+
+    // Backend-only report — fetch audio from backend
+    if (report.txHash || report.submissionId) {
+      if (isFetchingAudio) return; // Already fetching
+      setIsFetchingAudio(report.id);
+      try {
+        console.log('[LIBRARY] 🎙️ Fetching audio from backend for report:', report.id);
+        const result = await decryptReportFromBackend(report.id);
+        if (result.success && result.data?.audioUrl) {
+          // Download audio to local cache
+          const fileExtension = result.data.audioUrl.split('.').pop()?.split('?')[0] || 'm4a';
+          const localUri = `${FileSystem.cacheDirectory}audio_${report.id}.${fileExtension}`;
+
+          await FileSystem.downloadAsync(result.data.audioUrl, localUri);
+
+          // Update the report in state with the local audio URI
+          setReports((prev) =>
+            prev.map((r) =>
+              r.id === report.id ? { ...r, audioUri: localUri } : r,
+            ),
+          );
+
+          // Also persist to local storage so it doesn't need to re-download
+          const updatedReport = { ...report, audioUri: localUri };
+          await saveReport(updatedReport);
+
+          // Start playing
+          setPlayingReportId(report.id);
+        } else if (result.success && result.data?.audio) {
+          // Backend returns base64-encoded audio data
+          const localUri = `${FileSystem.cacheDirectory}audio_${report.id}.m4a`;
+          await FileSystem.writeAsStringAsync(localUri, result.data.audio, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          setReports((prev) =>
+            prev.map((r) =>
+              r.id === report.id ? { ...r, audioUri: localUri } : r,
+            ),
+          );
+
+          const updatedReport = { ...report, audioUri: localUri };
+          await saveReport(updatedReport);
+
+          setPlayingReportId(report.id);
+        } else {
+          Alert.alert(
+            "Audio Unavailable",
+            "The audio for this report could not be retrieved from the server.",
+          );
+        }
+      } catch (error) {
+        console.log('[LIBRARY] ❌ Failed to fetch audio:', error instanceof Error ? error.message : error);
+        Alert.alert("Error", "Failed to download audio from server.");
+      } finally {
+        setIsFetchingAudio(null);
+      }
+      return;
+    }
+
+    // No audio and no backend source
+    Alert.alert("Audio Unavailable", "No audio file available for this report.");
   };
 
   const handleStop = async (report: Report) => {
@@ -500,30 +547,12 @@ export default function LibraryScreen() {
             console.log('[REPORT SUBMISSION] Full backend response:', JSON.stringify(result, null, 2));
 
             if (result.success) {
-              console.log("[REPORT SUBMISSION] ✅ Resubmission successful!", { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
-              console.log('[REPORT SUBMISSION] Report object:', { id: report.id, type: report.type, status: report.status });
+              console.log("[REPORT SUBMISSION] ✅ Submission successful!", { submissionId: result.submissionId, txHash: result.txHash, status: result.status });
 
-              // Validate required fields
-              if (!report.id || !report.type) {
-                console.log('[REPORT SUBMISSION] ❌ Missing required fields for save:', { id: report.id, type: report.type });
-                throw new Error(`Report missing required fields: id=${report.id}, type=${report.type}`);
-              }
-
-              console.log('[REPORT SUBMISSION] Saving report to database with backend status:', result.status);
-              await saveReport({
-                id: report.id,
-                ...(report.userId && { userId: report.userId }),
-                type: report.type,
-                status: result.status || 'pending',
-                textContent: report.textContent,
-                audioUri: report.audioUri,
-                createdAt: report.createdAt,
-                updatedAt: new Date().toISOString(),
-                metadata: report.metadata,
-                txHash: result.txHash,
-                ipfsHash: result.ipfsHash,
-              });
-              console.log('[REPORT SUBMISSION] ✅ Report saved to database with status:', result.status || 'pending');
+              // Delete draft from local DB - submitted reports now come from backend only
+              console.log('[REPORT SUBMISSION] 🗑️ Deleting draft from local database:', report.id);
+              await deleteReport(report.id);
+              console.log('[REPORT SUBMISSION] ✅ Draft deleted - report now managed by backend');
 
               Alert.alert("Success", "Report submitted successfully!", [
                 {
@@ -1032,6 +1061,7 @@ export default function LibraryScreen() {
               ? () => {
                   console.log('[LIBRARY] PIN verified - loading library');
                   setShowPinVerify(false);
+                  setShowSetPinModal(false);
                   setIsAuthenticated(true);
                   loadReports();
                 }
@@ -1039,8 +1069,9 @@ export default function LibraryScreen() {
           }
           onSetPin={
             showSetPinModal
-              ? (pin: string) => {
+              ? (_pin: string) => {
                   console.log('[LIBRARY] PIN set - loading library');
+                  setShowPinVerify(false);
                   setShowSetPinModal(false);
                   setIsAuthenticated(true);
                   loadReports();
@@ -1357,7 +1388,7 @@ export default function LibraryScreen() {
                             styles.statusBadge,
                             {
                               backgroundColor:
-                                report.status === "confirmed"
+                                report.status === "submitted"
                                   ? "#10B981"
                                   : report.status === "pending"
                                     ? "#F59E0B"
@@ -1422,12 +1453,25 @@ export default function LibraryScreen() {
                         onShare={handleShareReport}
                         onViewViewers={handleViewViewers}
                         onViewDetails={handleViewSubmitted}
+                        isFetchingAudio={isFetchingAudio === report.id}
                       />
                     </View>
                   ))
                 : filteredReports.map((report) => {
                     const actions = getAvailableActions(report);
                     const isTextMenuOpen = openMenuReportId === report.id;
+                    // Debug: log pending reports with dropdown visibility
+                    if (report.status === 'pending') {
+                      console.log('[DROPDOWN] Pending report:', {
+                        id: report.id,
+                        status: report.status,
+                        isArchived: report.isArchived,
+                        shouldShowMenu: (report.status === "submitted" || report.isArchived),
+                        canEdit: actions.canEdit,
+                        canDelete: actions.canDelete,
+                        canArchive: actions.canArchive
+                      });
+                    }
                     return (
                       <View
                         key={report.id}
@@ -1449,8 +1493,8 @@ export default function LibraryScreen() {
                                     styles.draftBadge,
                                   report.status === "pending" &&
                                     styles.pendingBadge,
-                                  report.status === "confirmed" &&
-                                    styles.confirmedBadge,
+                                  report.status === "submitted" &&
+                                    styles.submittedBadge,
                                   report.status === "failed" &&
                                     styles.failedBadge,
                                 ]}
@@ -1488,9 +1532,7 @@ export default function LibraryScreen() {
                                   />
                                 </TouchableOpacity>
                               )}
-                              {(report.status === "pending" ||
-                                report.status === "confirmed" ||
-                                report.isArchived) && (
+                              {(report.status === "submitted" || report.isArchived) && (
                                 <TouchableOpacity
                                   style={styles.actionIcon}
                                   onPress={() =>
@@ -1510,9 +1552,7 @@ export default function LibraryScreen() {
                               )}
                             </View>
                           </View>
-                          {(report.status === "pending" ||
-                            report.status === "confirmed" ||
-                            report.isArchived) &&
+                          {(report.status === "submitted" || report.isArchived) &&
                             openMenuReportId === report.id && (
                               <>
                                 <Pressable
@@ -1742,7 +1782,7 @@ export default function LibraryScreen() {
                   <View
                     style={[
                       styles.statusBadge,
-                      decryptedContent.status === "confirmed" && {
+                      decryptedContent.status === "submitted" && {
                         backgroundColor: "#4CAF50",
                       },
                       decryptedContent.status === "pending" && {
@@ -1936,7 +1976,7 @@ export default function LibraryScreen() {
                     </View>
                   </View>
                 )}
-                {decryptedContent.timestamps?.confirmedAt && (
+                {decryptedContent.timestamps?.submittedAt && (
                   <View style={styles.timelineItem}>
                     <MaterialIcons
                       name="check-circle"
@@ -1944,9 +1984,9 @@ export default function LibraryScreen() {
                       color="#4CAF50"
                     />
                     <View style={styles.timelineText}>
-                      <Text style={styles.timelineLabel}>Confirmed</Text>
+                      <Text style={styles.timelineLabel}>Submitted</Text>
                       <Text style={styles.timelineDate}>
-                        {formatDate(decryptedContent.timestamps.confirmedAt)}
+                        {formatDate(decryptedContent.timestamps.submittedAt)}
                       </Text>
                     </View>
                   </View>
@@ -2569,7 +2609,7 @@ const styles = StyleSheet.create({
   pendingBadge: {
     backgroundColor: "#8A4FFF",
   },
-  confirmedBadge: {
+  submittedBadge: {
     backgroundColor: "#4CAF50",
   },
   failedBadge: {

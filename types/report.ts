@@ -4,7 +4,7 @@
 
 export type ReportType = 'audio' | 'text' | 'mixed';
 
-export type ReportStatus = 'draft' | 'saved' | 'pending' | 'confirmed' | 'failed';
+export type ReportStatus = 'draft' | 'saved' | 'pending' | 'submitted' | 'failed';
 
 export interface Report {
   id: string;
