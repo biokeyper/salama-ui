@@ -85,3 +85,20 @@ export async function archiveReport(
     return null;
   }
 }
+
+/**
+ * Clear entire local database (all reports and health logs)
+ * ⚠️ DESTRUCTIVE - Cannot be undone
+ */
+export async function clearAllLocalData(): Promise<boolean> {
+  try {
+    console.log('[STORAGE] 🗑️ Clearing all local data...');
+    await dbDeleteAllReports();
+    await dbDeleteAllHealthLogs();
+    console.log('[STORAGE] ✅ All local data cleared successfully');
+    return true;
+  } catch (error) {
+    console.log('[STORAGE] ❌ Error clearing local data:', error instanceof Error ? error.message : 'Unknown error');
+    return false;
+  }
+}

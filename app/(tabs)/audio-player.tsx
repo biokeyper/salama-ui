@@ -293,6 +293,34 @@ export default function LibraryScreen() {
     }
   }, [isAuthenticated, showArchived]);
 
+  // Auto-polling: Refresh report statuses every 30 seconds (only if there are pending reports)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // Check if there are any pending reports that need polling
+    const hasPendingReports = reports.some(
+      (r) => r.status === 'pending'
+    );
+
+    if (!hasPendingReports) {
+      console.log('[LIBRARY] ℹ️ No pending reports - polling skipped');
+      return;
+    }
+
+    console.log('[LIBRARY] 🔄 Starting auto-polling for pending reports (every 30s)');
+
+    const pollInterval = setInterval(() => {
+      console.log('[LIBRARY] ⏱️ Auto-polling: Fetching latest report statuses...');
+      loadReports();
+    }, 30000); // Poll every 30 seconds
+
+    // Cleanup interval on unmount or when authentication changes
+    return () => {
+      console.log('[LIBRARY] 🛑 Stopping auto-polling');
+      clearInterval(pollInterval);
+    };
+  }, [isAuthenticated, reports, loadReports]);
+
   const filteredReports = useMemo(() => {
     let filtered = reports.filter((r) => {
       // Filter by archived status
@@ -486,7 +514,7 @@ export default function LibraryScreen() {
                 id: report.id,
                 ...(report.userId && { userId: report.userId }),
                 type: report.type,
-                status: result.status || 'submitted',
+                status: result.status || 'pending',
                 textContent: report.textContent,
                 audioUri: report.audioUri,
                 createdAt: report.createdAt,
@@ -495,7 +523,7 @@ export default function LibraryScreen() {
                 txHash: result.txHash,
                 ipfsHash: result.ipfsHash,
               });
-              console.log('[REPORT SUBMISSION] ✅ Report saved to database with status:', result.status || 'submitted');
+              console.log('[REPORT SUBMISSION] ✅ Report saved to database with status:', result.status || 'pending');
 
               Alert.alert("Success", "Report submitted successfully!", [
                 {
@@ -1419,8 +1447,8 @@ export default function LibraryScreen() {
                                   styles.statusBadge,
                                   report.status === "saved" &&
                                     styles.draftBadge,
-                                  report.status === "submitted" &&
-                                    styles.submittedBadge,
+                                  report.status === "pending" &&
+                                    styles.pendingBadge,
                                   report.status === "confirmed" &&
                                     styles.confirmedBadge,
                                   report.status === "failed" &&
@@ -1460,8 +1488,7 @@ export default function LibraryScreen() {
                                   />
                                 </TouchableOpacity>
                               )}
-                              {(report.status === "submitted" ||
-                                report.status === "pending" ||
+                              {(report.status === "pending" ||
                                 report.status === "confirmed" ||
                                 report.isArchived) && (
                                 <TouchableOpacity
@@ -1483,8 +1510,7 @@ export default function LibraryScreen() {
                               )}
                             </View>
                           </View>
-                          {(report.status === "submitted" ||
-                            report.status === "pending" ||
+                          {(report.status === "pending" ||
                             report.status === "confirmed" ||
                             report.isArchived) &&
                             openMenuReportId === report.id && (
@@ -2540,8 +2566,8 @@ const styles = StyleSheet.create({
   draftBadge: {
     backgroundColor: "#FFA500",
   },
-  submittedBadge: {
-    backgroundColor: "#2196F3",
+  pendingBadge: {
+    backgroundColor: "#8A4FFF",
   },
   confirmedBadge: {
     backgroundColor: "#4CAF50",

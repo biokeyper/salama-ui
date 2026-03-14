@@ -175,11 +175,6 @@ export default function AudioReportItem({
       return { color: "#FFA500", label: "Draft" };
     }
 
-    // Submitted (sent to backend, waiting for blockchain to process)
-    if (report.status === "submitted") {
-      return { color: "#2196F3", label: "Submitted" };
-    }
-
     // Pending (blockchain is processing, waiting for confirmations)
     if (report.status === "pending") {
       const confirmations = report.confirmations || 0;
@@ -276,7 +271,7 @@ export default function AudioReportItem({
                   </TouchableOpacity>
                 )}
 
-                {report.status === "submitted" && (
+                {report.status === "pending" && (
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => onMenuToggle?.(report.id)}
@@ -290,7 +285,7 @@ export default function AudioReportItem({
         </View>
 
         {/* Dropdown Menu */}
-        {report.status === "submitted" && isMenuOpen && (
+        {report.status === "pending" && isMenuOpen && (
             <View style={styles.dropdownMenu}>
               <TouchableOpacity
                 style={styles.menuOption}
@@ -419,7 +414,7 @@ export default function AudioReportItem({
         </View>
       )}
 
-      {report.status === "submitted" && report.submittedAt && (
+      {report.status === "pending" && report.submittedAt && (
         <View style={styles.submittedContainer}>
           <MaterialIcons name="check-circle" size={16} color="#4CAF50" />
           <Text style={styles.submittedText}>

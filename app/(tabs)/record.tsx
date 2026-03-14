@@ -377,7 +377,19 @@ export default function RecordScreen() {
           [
             {
               text: 'OK',
-              onPress: () => {
+              onPress: async () => {
+                // Delete the old local draft (frontend-generated ID)
+                if (reportId) {
+                  try {
+                    const { deleteReport } = require('@/services/storage');
+                    await deleteReport(reportId);
+                    console.log('[REPORT SUBMISSION] ✅ Deleted local draft:', reportId);
+                  } catch (deleteError) {
+                    console.log('[REPORT SUBMISSION] Warning: Could not delete draft:', deleteError instanceof Error ? deleteError.message : 'Unknown error');
+                    // Continue anyway - backend report is what matters
+                  }
+                }
+
                 if (result.submissionId) {
                   console.log('[REPORT SUBMISSION] Starting status polling for submission:', result.submissionId);
                   startStatusPolling(result.submissionId);
