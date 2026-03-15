@@ -28,7 +28,7 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
   const [tapCount, setTapCount] = useState(0);
   const [isSending, setIsSending] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTap = async () => {
     // Clear previous timeout if it exists
@@ -64,7 +64,6 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
         const contactsResult = await getEmergencyContacts();
         const hasContacts = contactsResult.success && (contactsResult.data?.length ?? 0) > 0;
 
-        // Show warning if no contacts
         if (!hasContacts) {
           Alert.alert(
             'No Emergency Contacts',
@@ -98,7 +97,6 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
 
   const sendAlert = async () => {
     try {
-      // Request location permission (optional)
       let locationData = 'emergency-alert-triggered';
 
       try {
@@ -125,7 +123,7 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
       const result = await sendPanicAlert(locationData);
 
       if (result.success) {
-        Alert.alert('🚨 Alert Sent', 'Your emergency alert has been sent successfully.', [
+        Alert.alert('Alert Sent', 'Your emergency alert has been sent successfully.', [
           {
             text: 'OK',
             onPress: () => {

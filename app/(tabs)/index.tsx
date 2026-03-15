@@ -99,7 +99,7 @@ export default function HomeScreen() {
         </ThemedText>
         <View style={styles.heartContainer}>
           <ThemedText style={styles.welcomeSubtitle}>
-            You're safe here{' '}
+            You&apos;re safe here{' '}
           </ThemedText>
           <Animated.Text style={[styles.heartEmoji, { transform: [{ scale: pulseAnim }] }]}>
             ❤️

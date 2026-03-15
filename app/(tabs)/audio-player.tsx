@@ -108,7 +108,6 @@ export default function LibraryScreen() {
   );
   const [isRevokingUserId, setIsRevokingUserId] = useState<string | null>(null);
 
-  // Search functionality state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchStatus, setSearchStatus] = useState<string>("all");
   const [backendReports, setBackendReports] = useState<any[]>([]);
@@ -118,13 +117,10 @@ export default function LibraryScreen() {
   const [isSearchingBackend, setIsSearchingBackend] = useState(false);
   const searchLimit = 10;
 
-  // Audio player for details modal
   const [detailAudioUri, setDetailAudioUri] = useState<string | null>(null);
   const [isLoadingDetailAudio, setIsLoadingDetailAudio] = useState(false);
   const detailPlayer = useAudioPlayer(detailAudioUri, { updateInterval: 100 });
   const detailPlayerStatus = useAudioPlayerStatus(detailPlayer);
-
-  // Check PIN status every time the screen comes into focus
   useFocusEffect(
     useCallback(() => {
       const checkPinStatus = async () => {
@@ -132,32 +128,23 @@ export default function LibraryScreen() {
         setShowPinVerify(false);
         setShowSetPinModal(false);
 
-        // If user is logged in, require PIN to access library
         if (user) {
-          // Check if user has a PIN set (from backend or secure local cache).
           const hasPinSet = await hasPin(user?.pin);
-
           if (hasPinSet) {
-            // PIN exists - show verify PIN flow
             setShowPinVerify(true);
             setShowSetPinModal(false);
           } else {
-            // No PIN - show set PIN flow
             setShowSetPinModal(true);
             setShowPinVerify(false);
           }
-          // User is logged in but still locked until they verify/set PIN.
           setIsAuthenticated(false);
         } else {
-          // Not logged in - open library freely
           setIsAuthenticated(false);
           await loadReports();
         }
         setIsCheckingAuth(false);
       };
       checkPinStatus();
-
-      // Reset authentication and stop audio when leaving the screen
       return () => {
         setIsAuthenticated(false);
         setPlayingReportId(null);
@@ -166,14 +153,11 @@ export default function LibraryScreen() {
     }, [user]),
   );
 
-  // Load reports from local storage and sync with backend
   const loadReports = async () => {
     try {
-      // Load local reports (filtered by current user if logged in)
       const userId = user?.userId;
       const allReports = await getAllReports(userId);
 
-      // Sync submitted reports with backend to get latest status
       if (isAuthenticated) {
         try {
           const backendResult = await searchBackendReports({
@@ -187,7 +171,6 @@ export default function LibraryScreen() {
             for (const backendReport of backendResult.reports) {
               const reportId = backendReport.reportId || backendReport.id;
               if (localIds.has(reportId)) {
-                // Update existing local report with backend data
                 const idx = allReports.findIndex((r) => r.id === reportId);
                 if (idx !== -1) {
                   const wasArchived = allReports[idx].isArchived;
@@ -212,19 +195,12 @@ export default function LibraryScreen() {
                     backendReport.metadata?.audioDuration ??
                     allReports[idx].audioDuration;
 
-                  // Preserve archived state: use backend if available, else preserve local
                   if (backendReport.isArchived !== undefined) {
                     allReports[idx].isArchived =
                       backendReport.isArchived || wasArchived;
                   } else if (wasArchived) {
                     allReports[idx].isArchived = wasArchived;
                   }
-                  console.log("[ARCHIVE_SYNC] Updated report:", {
-                    id: reportId,
-                    wasArchived,
-                    isNowArchived: allReports[idx].isArchived,
-                    backendArchived: backendReport.isArchived,
-                  });
                 }
               } else {
                 allReports.push({
@@ -251,23 +227,19 @@ export default function LibraryScreen() {
             }
           }
         } catch (syncError) {
-          // Continue with local reports if sync fails
         }
       }
 
-      // Filter based on archived status
       const filteredReports = showArchived
         ? allReports.filter((r) => r.isArchived)
         : allReports.filter((r) => !r.isArchived);
 
-      // Sort by most recent first
       filteredReports.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
       setReports(filteredReports);
 
-      // Log polling completion
       const pendingCount = filteredReports.filter(
         (r) => r.status === "pending",
       ).length;
@@ -297,7 +269,6 @@ export default function LibraryScreen() {
         }
       } catch (error) {
         setHasNoAuthToken(true);
-        // Silent - PIN screen handles guidance
       }
     };
 
@@ -305,23 +276,19 @@ export default function LibraryScreen() {
   }, []);
 
   useEffect(() => {
-    // Only load reports if user is authenticated
     if (isAuthenticated) {
       loadReports();
     }
   }, [isAuthenticated, showArchived]);
 
-  // Use ref to always call the latest loadReports without re-triggering the effect
   const loadReportsRef = useRef(loadReports);
   loadReportsRef.current = loadReports;
 
-  // Derived boolean: are there pending reports? Only changes when the answer flips.
   const hasPendingReports = useMemo(
     () => reports.some((r) => r.status === "pending"),
     [reports],
   );
 
-  // Auto-polling: Refresh report statuses every 30 seconds (only if there are pending reports)
   useEffect(() => {
     if (isCheckingAuth || !user || !isAuthenticated || !hasPendingReports) {
       return;
@@ -331,7 +298,6 @@ export default function LibraryScreen() {
       await loadReportsRef.current();
     };
 
-    // Poll immediately, then every 30 seconds
     pollTick();
     const intervalId = setInterval(pollTick, 30000);
 
@@ -342,7 +308,6 @@ export default function LibraryScreen() {
 
   const filteredReports = useMemo(() => {
     let filtered = reports.filter((r) => {
-      // Filter by archived status
       if (showArchived && !r.isArchived) return false;
       if (!showArchived && r.isArchived) return false;
 
@@ -359,7 +324,6 @@ export default function LibraryScreen() {
       }
     });
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((r) => {
@@ -382,31 +346,26 @@ export default function LibraryScreen() {
   const [isFetchingAudio, setIsFetchingAudio] = useState<string | null>(null);
 
   const handlePlayPause = async (report: Report) => {
-    // If clicking on a different report, stop the currently playing one
     if (playingReportId && playingReportId !== report.id) {
       setPlayingReportId(null);
     }
 
-    // If already playing this report, pause it
     if (playingReportId === report.id) {
       setPlayingReportId(null);
       return;
     }
 
-    // Has local audio — play directly
     if (report.audioUri) {
       setPlayingReportId(report.id);
       return;
     }
 
-    // Backend-only report — download audio from IPFS gateway
     if (report.audioGatewayUrl) {
-      if (isFetchingAudio) return; // Already fetching
+      if (isFetchingAudio) return;
       setIsFetchingAudio(report.id);
       try {
         const localUri = `${FileSystem.cacheDirectory}audio_${report.id}.m4a`;
 
-        // Check if already cached
         const fileInfo = await FileSystem.getInfoAsync(localUri);
         if (fileInfo.exists) {
           setReports((prev) =>
@@ -419,23 +378,18 @@ export default function LibraryScreen() {
           return;
         }
 
-        // Download from IPFS gateway
         const download = await FileSystem.downloadAsync(
           report.audioGatewayUrl,
           localUri,
         );
 
-        // Update report in state with local audio URI
         setReports((prev) =>
           prev.map((r) =>
             r.id === report.id ? { ...r, audioUri: localUri } : r,
           ),
         );
 
-        // Persist so it doesn't re-download next time
         await saveReport({ ...report, audioUri: localUri });
-
-        // Start playing
         setPlayingReportId(report.id);
       } catch (error) {
         Alert.alert("Error", "Failed to download audio from IPFS.");
@@ -445,7 +399,6 @@ export default function LibraryScreen() {
       return;
     }
 
-    // No audio and no IPFS source
     Alert.alert(
       "Audio Unavailable",
       "No audio file available for this report.",
@@ -453,7 +406,6 @@ export default function LibraryScreen() {
   };
 
   const handleStop = async (report: Report) => {
-    // Stop is handled in AudioReportItem component
     setPlayingReportId(null);
   };
 
@@ -483,22 +435,18 @@ export default function LibraryScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              // Stop playback if playing
               if (playingReportId === report.id) {
                 setPlayingReportId(null);
               }
 
-              // Delete audio file if it exists
               if (report.audioUri) {
                 try {
                   await FileSystem.deleteAsync(report.audioUri);
                 } catch (error) {}
               }
 
-              // Delete report from storage (local only)
               await deleteReport(report.id);
 
-              // Reload reports
               await loadReports();
 
               Alert.alert("Success", "Report deleted successfully");
@@ -512,14 +460,12 @@ export default function LibraryScreen() {
   };
 
   const handleResubmit = async (report: Report) => {
-    // CHECK AUTH FIRST - before showing any dialogs
     const token = await getAuthToken();
     if (!token || !user) {
       setShowAuthGate(true);
       return;
     }
 
-    // Only show submit confirmation if authenticated
     Alert.alert("Submit Report", "Submit this report securely?", [
       {
         text: "Cancel",
@@ -530,7 +476,6 @@ export default function LibraryScreen() {
         onPress: async () => {
           setIsSubmittingReportId(report.id);
           try {
-            // Capture location if available
             try {
               const { status } =
                 await Location.requestForegroundPermissionsAsync();
@@ -548,21 +493,17 @@ export default function LibraryScreen() {
                   timestamp: new Date().toISOString(),
                 };
 
-                // Add location to report metadata
                 if (!report.metadata) {
                   report.metadata = {};
                 }
                 report.metadata.location = JSON.stringify(locationData);
-              } else {
               }
             } catch (locError) {
-              // Continue without location if permission denied or GPS fails
             }
 
             const result = await submitReportToBackend(report);
 
             if (result.success) {
-              // Delete draft from local DB - submitted reports now come from backend only
               await deleteReport(report.id);
 
               Alert.alert("Success", "Report submitted successfully!", [
@@ -710,12 +651,11 @@ export default function LibraryScreen() {
                 }
               }
 
-              // Update local status
               await saveReport({
                 ...report,
                 isArchived: false,
-                archivedAt: null,
-                archivedReason: null,
+                archivedAt: undefined,
+                archivedReason: undefined,
               });
 
               // Optimistically update: mark as unarchived immediately
@@ -962,7 +902,7 @@ export default function LibraryScreen() {
             setIsRevokingUserId(userId);
             try {
               const reportId =
-                selectedReport.submissionId || selectedReport.reportId;
+                selectedReport.reportId || selectedReport.submissionId || selectedReport.id;
               const result = await revokeAccess(reportId!, userId);
 
               if (result.success) {
@@ -1039,7 +979,6 @@ export default function LibraryScreen() {
     }
   };
 
-  // Show blank screen while checking auth status
   if (isCheckingAuth) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -1048,7 +987,6 @@ export default function LibraryScreen() {
     );
   }
 
-  // Only show loading spinner if authenticated (not during PIN entry)
   if (loading && isAuthenticated) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -1103,7 +1041,6 @@ export default function LibraryScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -1129,7 +1066,6 @@ export default function LibraryScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar */}
         <View style={styles.searchBarContainer}>
           <MaterialIcons
             name="search"
@@ -1151,7 +1087,6 @@ export default function LibraryScreen() {
           )}
         </View>
 
-        {/* Tabs */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[
@@ -1472,19 +1407,7 @@ export default function LibraryScreen() {
                 : filteredReports.map((report) => {
                     const actions = getAvailableActions(report);
                     const isTextMenuOpen = openMenuReportId === report.id;
-                    // Debug: log pending reports with dropdown visibility
-                    if (report.status === "pending") {
-                      console.log("[DROPDOWN] Pending report:", {
-                        id: report.id,
-                        status: report.status,
-                        isArchived: report.isArchived,
-                        shouldShowMenu:
-                          report.status === "submitted" || report.isArchived,
-                        canEdit: actions.canEdit,
-                        canDelete: actions.canDelete,
-                        canArchive: actions.canArchive,
-                      });
-                    }
+                    
                     return (
                       <View
                         key={report.id}
@@ -1522,10 +1445,10 @@ export default function LibraryScreen() {
                                         ? "Submitted ✓"
                                         : report.status === "failed"
                                           ? "Failed"
-                                          : report.status
-                                              ?.charAt(0)
-                                              .toUpperCase() +
-                                            report.status?.slice(1)}
+                                          : (typeof report.status === "string"
+                                              ? report.status.charAt(0).toUpperCase() +
+                                                report.status.slice(1)
+                                              : "")}
                                 </Text>
                               </View>
                             </View>

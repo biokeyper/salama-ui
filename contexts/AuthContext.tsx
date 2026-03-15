@@ -123,7 +123,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (reportsNeedingUserId.length > 0) {
           }
         } catch (migrateError) {
-          // Don't fail login if this fails
         }
 
         // Sync local PIN to backend (if user set PIN while not logged in)

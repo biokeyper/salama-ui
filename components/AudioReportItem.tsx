@@ -271,7 +271,8 @@ export default function AudioReportItem({
                   </TouchableOpacity>
                 )}
 
-                {(report.status === "pending" || report.status === "submitted") && (
+                {(report.status === "pending" ||
+                  report.status === "submitted") && (
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => onMenuToggle?.(report.id)}
@@ -285,7 +286,8 @@ export default function AudioReportItem({
         </View>
 
         {/* Dropdown Menu */}
-        {(report.status === "pending" || report.status === "submitted") && isMenuOpen && (
+        {(report.status === "pending" || report.status === "submitted") &&
+          isMenuOpen && (
             <View style={styles.dropdownMenu}>
               <TouchableOpacity
                 style={styles.menuOption}

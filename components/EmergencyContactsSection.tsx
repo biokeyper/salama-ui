@@ -50,7 +50,6 @@ export default function EmergencyContactsSection() {
   const [isEditing, setIsEditing] = useState(false);
   const [pendingAction, setPendingAction] = useState<'add' | 'edit' | 'panic' | null>(null);
 
-  // Refs for TextInputs in edit modal
   const editPhoneRef = useRef<TextInput>(null);
   const editNameRef = useRef<TextInput>(null);
   const editRelationshipRef = useRef<TextInput>(null);
@@ -142,7 +141,7 @@ export default function EmergencyContactsSection() {
         const contactsWithPhones = data
           .filter((contact) => contact.phoneNumbers && contact.phoneNumbers.length > 0)
           .map((contact) => ({
-            name: contact.name || 'Unknown',
+            name: contact.name || 'Unnamed Contact',
             phone: contact.phoneNumbers?.[0]?.number || '',
           }));
 
@@ -227,8 +226,7 @@ export default function EmergencyContactsSection() {
     try {
       const result = await setPanicMessage(panicMessage);
       if (result.success) {
-        // Use the message returned from backend
-        const savedMessage = result.data?.panicMessage || panicMessage;
+        const savedMessage = result?.data?.panicMessage || panicMessage;
         setPanicMsg(savedMessage);
         Alert.alert('Success', 'Panic message saved');
         setShowPanicMessageModal(false);
@@ -315,7 +313,7 @@ export default function EmergencyContactsSection() {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>🚨 Emergency Contacts</Text>
+      <Text style={styles.sectionTitle}>Emergency Contacts</Text>
       <Text style={styles.sectionDescription}>
         Set up emergency contacts to notify when you trigger a panic alert
       </Text>
@@ -464,7 +462,7 @@ export default function EmergencyContactsSection() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView style={styles.modalForm}>
               <Text style={styles.inputLabel}>Name</Text>
               <TextInput
                 ref={editNameRef}
@@ -506,7 +504,7 @@ export default function EmergencyContactsSection() {
                   <Text style={styles.saveButtonText}>Save Changes</Text>
                 )}
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -600,11 +598,9 @@ export default function EmergencyContactsSection() {
         </View>
       </Modal>
 
-      {/* Auth Gate Modal for emergency contact operations */}
       <AuthGateModal
         visible={showAuthGate}
         onClose={handleAuthGateClosed}
-        message="Sign in to manage emergency contacts"
       />
     </View>
   );
