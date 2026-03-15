@@ -42,3 +42,7 @@ app-example
 
 # Google Play Store Credentials
 google-play-key.json
+
+# Development tools
+.qodo/
+.vscode/

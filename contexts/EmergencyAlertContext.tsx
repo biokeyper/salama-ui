@@ -28,7 +28,7 @@ export function EmergencyAlertProvider({ children }: { children: React.ReactNode
 
     // Show confirmation dialog
     Alert.alert(
-      '🚨 Emergency Alert',
+      'Emergency Alert',
       'Send an emergency alert? This will notify authorities.',
       [
         {

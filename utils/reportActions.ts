@@ -14,10 +14,6 @@ export interface ActionAvailability {
   message?: string;
 }
 
-/**
- * Get available actions for a report based on its status
- * Implements action rules per the status model specification
- */
 export function getAvailableActions(report: Report): ActionAvailability {
   const { status, isArchived } = report;
 
@@ -52,7 +48,7 @@ export function getAvailableActions(report: Report): ActionAvailability {
       canArchive: true,
       canSubmit: false,
       canRetry: false,
-      message: 'Submitted - processing on blockchain',
+      message: 'Submitted',
     };
   }
 
@@ -64,19 +60,7 @@ export function getAvailableActions(report: Report): ActionAvailability {
       canArchive: true,
       canSubmit: false,
       canRetry: false,
-      message: 'Pending blockchain confirmation',
-    };
-  }
-
-  // Submitted - blockchain submitted, immutable
-  if (status === 'submitted') {
-    return {
-      canDelete: false,
-      canEdit: false,
-      canArchive: true,
-      canSubmit: false,
-      canRetry: false,
-      message: 'Submitted to blockchain',
+      message: 'Pending',
     };
   }
 
@@ -92,7 +76,6 @@ export function getAvailableActions(report: Report): ActionAvailability {
     };
   }
 
-  // Unknown status (default to read-only)
   return {
     canDelete: false,
     canEdit: false,

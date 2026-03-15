@@ -44,10 +44,7 @@ export async function getNotifications(
       params: params || {},
     });
 
-    // Log the entire response from backend
-
     if (response.status === 200) {
-      // Ensure we always return an array
       let notifications: any[] = [];
 
       if (response.data.data?.notifications) {
@@ -55,9 +52,6 @@ export async function getNotifications(
       } else if (response.data.data) {
         notifications = Array.isArray(response.data.data) ? response.data.data : [];
       }
-
-      notifications.forEach((notif, idx) => {
-      });
 
       return {
         success: true,

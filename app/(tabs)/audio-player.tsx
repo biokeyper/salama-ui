@@ -181,7 +181,6 @@ export default function LibraryScreen() {
             offset: 0,
           });
 
-
           if (backendResult.success && backendResult.reports) {
             const localIds = new Set(allReports.map((r) => r.id));
 
@@ -194,31 +193,53 @@ export default function LibraryScreen() {
                   const wasArchived = allReports[idx].isArchived;
 
                   allReports[idx].submissionId = reportId;
-                  allReports[idx].status = backendReport.status ?? allReports[idx].status;
-                  allReports[idx].confirmations = backendReport.confirmations ?? allReports[idx].confirmations;
-                  allReports[idx].txHash = backendReport.txHash ?? allReports[idx].txHash;
-                  allReports[idx].ipfsHash = backendReport.ipfsHash ?? allReports[idx].ipfsHash;
-                  allReports[idx].audioIpfsHash = backendReport.metadata?.audioIpfsHash ?? allReports[idx].audioIpfsHash;
-                  allReports[idx].audioGatewayUrl = backendReport.metadata?.audioGatewayUrl ?? allReports[idx].audioGatewayUrl;
-                  allReports[idx].audioDuration = backendReport.metadata?.audioDuration ?? allReports[idx].audioDuration;
+                  allReports[idx].status =
+                    backendReport.status ?? allReports[idx].status;
+                  allReports[idx].confirmations =
+                    backendReport.confirmations ??
+                    allReports[idx].confirmations;
+                  allReports[idx].txHash =
+                    backendReport.txHash ?? allReports[idx].txHash;
+                  allReports[idx].ipfsHash =
+                    backendReport.ipfsHash ?? allReports[idx].ipfsHash;
+                  allReports[idx].audioIpfsHash =
+                    backendReport.metadata?.audioIpfsHash ??
+                    allReports[idx].audioIpfsHash;
+                  allReports[idx].audioGatewayUrl =
+                    backendReport.metadata?.audioGatewayUrl ??
+                    allReports[idx].audioGatewayUrl;
+                  allReports[idx].audioDuration =
+                    backendReport.metadata?.audioDuration ??
+                    allReports[idx].audioDuration;
 
                   // Preserve archived state: use backend if available, else preserve local
                   if (backendReport.isArchived !== undefined) {
-                    allReports[idx].isArchived = backendReport.isArchived || wasArchived;
+                    allReports[idx].isArchived =
+                      backendReport.isArchived || wasArchived;
                   } else if (wasArchived) {
                     allReports[idx].isArchived = wasArchived;
                   }
-                  console.log('[ARCHIVE_SYNC] Updated report:', { id: reportId, wasArchived, isNowArchived: allReports[idx].isArchived, backendArchived: backendReport.isArchived });
+                  console.log("[ARCHIVE_SYNC] Updated report:", {
+                    id: reportId,
+                    wasArchived,
+                    isNowArchived: allReports[idx].isArchived,
+                    backendArchived: backendReport.isArchived,
+                  });
                 }
               } else {
                 allReports.push({
                   id: reportId,
                   submissionId: reportId,
                   userId: userId,
-                  type: backendReport.type || backendReport.metadata?.type || 'audio',
+                  type:
+                    backendReport.type ||
+                    backendReport.metadata?.type ||
+                    "audio",
                   status: backendReport.status,
-                  createdAt: backendReport.createdAt || new Date().toISOString(),
-                  updatedAt: backendReport.updatedAt || new Date().toISOString(),
+                  createdAt:
+                    backendReport.createdAt || new Date().toISOString(),
+                  updatedAt:
+                    backendReport.updatedAt || new Date().toISOString(),
                   confirmations: backendReport.confirmations,
                   txHash: backendReport.txHash,
                   ipfsHash: backendReport.ipfsHash,
@@ -247,9 +268,15 @@ export default function LibraryScreen() {
       setReports(filteredReports);
 
       // Log polling completion
-      const pendingCount = filteredReports.filter(r => r.status === 'pending').length;
-      const submittedCount = filteredReports.filter(r => r.status === 'submitted').length;
-      const failedCount = filteredReports.filter(r => r.status === 'failed').length;
+      const pendingCount = filteredReports.filter(
+        (r) => r.status === "pending",
+      ).length;
+      const submittedCount = filteredReports.filter(
+        (r) => r.status === "submitted",
+      ).length;
+      const failedCount = filteredReports.filter(
+        (r) => r.status === "failed",
+      ).length;
     } catch (error) {
       Alert.alert("Error", "Failed to load reports");
     } finally {
@@ -290,7 +317,7 @@ export default function LibraryScreen() {
 
   // Derived boolean: are there pending reports? Only changes when the answer flips.
   const hasPendingReports = useMemo(
-    () => reports.some((r) => r.status === 'pending'),
+    () => reports.some((r) => r.status === "pending"),
     [reports],
   );
 
@@ -299,7 +326,6 @@ export default function LibraryScreen() {
     if (isCheckingAuth || !user || !isAuthenticated || !hasPendingReports) {
       return;
     }
-
 
     const pollTick = async () => {
       await loadReportsRef.current();
@@ -321,9 +347,15 @@ export default function LibraryScreen() {
       if (!showArchived && r.isArchived) return false;
 
       if (activeTab === "audio") {
-        return (r.type === "audio" || r.type === "mixed") && (r.audioUri || r.txHash || r.audioGatewayUrl);
+        return (
+          (r.type === "audio" || r.type === "mixed") &&
+          (r.audioUri || r.txHash || r.audioGatewayUrl)
+        );
       } else {
-        return (r.type === "text" && (r.textContent || r.txHash)) || (r.type === "mixed" && r.textContent);
+        return (
+          (r.type === "text" && (r.textContent || r.txHash)) ||
+          (r.type === "mixed" && r.textContent)
+        );
       }
     });
 
@@ -372,7 +404,6 @@ export default function LibraryScreen() {
       if (isFetchingAudio) return; // Already fetching
       setIsFetchingAudio(report.id);
       try {
-
         const localUri = `${FileSystem.cacheDirectory}audio_${report.id}.m4a`;
 
         // Check if already cached
@@ -389,7 +420,10 @@ export default function LibraryScreen() {
         }
 
         // Download from IPFS gateway
-        const download = await FileSystem.downloadAsync(report.audioGatewayUrl, localUri);
+        const download = await FileSystem.downloadAsync(
+          report.audioGatewayUrl,
+          localUri,
+        );
 
         // Update report in state with local audio URI
         setReports((prev) =>
@@ -412,7 +446,10 @@ export default function LibraryScreen() {
     }
 
     // No audio and no IPFS source
-    Alert.alert("Audio Unavailable", "No audio file available for this report.");
+    Alert.alert(
+      "Audio Unavailable",
+      "No audio file available for this report.",
+    );
   };
 
   const handleStop = async (report: Report) => {
@@ -482,7 +519,6 @@ export default function LibraryScreen() {
       return;
     }
 
-
     // Only show submit confirmation if authenticated
     Alert.alert("Submit Report", "Submit this report securely?", [
       {
@@ -512,7 +548,6 @@ export default function LibraryScreen() {
                   timestamp: new Date().toISOString(),
                 };
 
-
                 // Add location to report metadata
                 if (!report.metadata) {
                   report.metadata = {};
@@ -526,9 +561,7 @@ export default function LibraryScreen() {
 
             const result = await submitReportToBackend(report);
 
-
             if (result.success) {
-
               // Delete draft from local DB - submitted reports now come from backend only
               await deleteReport(report.id);
 
@@ -636,7 +669,7 @@ export default function LibraryScreen() {
               // Optimistically update: mark as archived immediately
               setReports((prev) => {
                 const updated = prev.map((r) =>
-                  r.id === report.id ? { ...r, isArchived: true } : r
+                  r.id === report.id ? { ...r, isArchived: true } : r,
                 );
                 return updated;
               });
@@ -688,7 +721,7 @@ export default function LibraryScreen() {
               // Optimistically update: mark as unarchived immediately
               setReports((prev) => {
                 const updated = prev.map((r) =>
-                  r.id === report.id ? { ...r, isArchived: false } : r
+                  r.id === report.id ? { ...r, isArchived: false } : r,
                 );
                 return updated;
               });
@@ -706,7 +739,10 @@ export default function LibraryScreen() {
   };
 
   const handleArchiveToggle = (report: Report) => {
-    console.log('[ARCHIVE_TOGGLE] Toggling archive for report:', { id: report.id, currentIsArchived: report.isArchived });
+    console.log("[ARCHIVE_TOGGLE] Toggling archive for report:", {
+      id: report.id,
+      currentIsArchived: report.isArchived,
+    });
     if (report.isArchived) {
       handleUnarchive(report);
     } else {
@@ -1033,7 +1069,7 @@ export default function LibraryScreen() {
         transparent={false}
       >
         <LockScreen
-          mode={showSetPinModal ? 'set' : 'verify'}
+          mode={showSetPinModal ? "set" : "verify"}
           onUnlock={
             showPinVerify
               ? () => {
@@ -1057,7 +1093,7 @@ export default function LibraryScreen() {
           onClose={() => {
             setShowPinVerify(false);
             setShowSetPinModal(false);
-            router.replace('/(tabs)');
+            router.replace("/(tabs)");
           }}
         />
       </Modal>
@@ -1437,15 +1473,16 @@ export default function LibraryScreen() {
                     const actions = getAvailableActions(report);
                     const isTextMenuOpen = openMenuReportId === report.id;
                     // Debug: log pending reports with dropdown visibility
-                    if (report.status === 'pending') {
-                      console.log('[DROPDOWN] Pending report:', {
+                    if (report.status === "pending") {
+                      console.log("[DROPDOWN] Pending report:", {
                         id: report.id,
                         status: report.status,
                         isArchived: report.isArchived,
-                        shouldShowMenu: (report.status === "submitted" || report.isArchived),
+                        shouldShowMenu:
+                          report.status === "submitted" || report.isArchived,
                         canEdit: actions.canEdit,
                         canDelete: actions.canDelete,
-                        canArchive: actions.canArchive
+                        canArchive: actions.canArchive,
                       });
                     }
                     return (
@@ -1476,7 +1513,8 @@ export default function LibraryScreen() {
                                 ]}
                               >
                                 <Text style={styles.statusBadgeText}>
-                                  {report.status === "saved" || report.status === "draft"
+                                  {report.status === "saved" ||
+                                  report.status === "draft"
                                     ? "Draft"
                                     : report.status === "pending"
                                       ? `Pending ${report.confirmations || 0}/12`
@@ -1484,7 +1522,9 @@ export default function LibraryScreen() {
                                         ? "Submitted ✓"
                                         : report.status === "failed"
                                           ? "Failed"
-                                          : report.status?.charAt(0).toUpperCase() +
+                                          : report.status
+                                              ?.charAt(0)
+                                              .toUpperCase() +
                                             report.status?.slice(1)}
                                 </Text>
                               </View>
@@ -1514,7 +1554,8 @@ export default function LibraryScreen() {
                                   />
                                 </TouchableOpacity>
                               )}
-                              {(report.status === "submitted" || report.isArchived) && (
+                              {(report.status === "submitted" ||
+                                report.isArchived) && (
                                 <TouchableOpacity
                                   style={styles.actionIcon}
                                   onPress={() =>
@@ -1534,7 +1575,8 @@ export default function LibraryScreen() {
                               )}
                             </View>
                           </View>
-                          {(report.status === "submitted" || report.isArchived) &&
+                          {(report.status === "submitted" ||
+                            report.isArchived) &&
                             openMenuReportId === report.id && (
                               <>
                                 <Pressable
@@ -1605,9 +1647,7 @@ export default function LibraryScreen() {
                                   >
                                     <Feather
                                       name={
-                                        report.isArchived
-                                          ? "inbox"
-                                          : "archive"
+                                        report.isArchived ? "inbox" : "archive"
                                       }
                                       size={18}
                                       color="#FF3B30"
@@ -1637,7 +1677,8 @@ export default function LibraryScreen() {
                               : report.textContent
                             : "No content"}
                         </Text>
-                        {(report.status === "draft" || report.status === "saved") && (
+                        {(report.status === "draft" ||
+                          report.status === "saved") && (
                           <TouchableOpacity
                             style={styles.viewButton}
                             onPress={() => handleEditReport(report)}
@@ -1686,7 +1727,6 @@ export default function LibraryScreen() {
                             </TouchableOpacity>
                           </View>
                         )}
-
                       </View>
                     );
                   })}
@@ -1706,7 +1746,9 @@ export default function LibraryScreen() {
           setSelectedReport(null);
           setDetailAudioUri(null);
           if (detailPlayer?.playing) {
-            try { detailPlayer.pause(); } catch (_) {}
+            try {
+              detailPlayer.pause();
+            } catch (_) {}
           }
         }}
       >
@@ -1719,7 +1761,9 @@ export default function LibraryScreen() {
                 setSelectedReport(null);
                 setDetailAudioUri(null);
                 if (detailPlayer?.playing) {
-                  try { detailPlayer.pause(); } catch (_) {}
+                  try {
+                    detailPlayer.pause();
+                  } catch (_) {}
                 }
               }}
             >
@@ -1869,7 +1913,11 @@ export default function LibraryScreen() {
                         style={styles.detailPlayButton}
                       >
                         <MaterialIcons
-                          name={detailPlayerStatus?.playing ? "pause-circle-filled" : "play-circle-filled"}
+                          name={
+                            detailPlayerStatus?.playing
+                              ? "pause-circle-filled"
+                              : "play-circle-filled"
+                          }
                           size={40}
                           color="#8A4FFF"
                         />
@@ -1877,21 +1925,30 @@ export default function LibraryScreen() {
                     ) : (
                       <TouchableOpacity
                         onPress={async () => {
-                          const audioUrl = selectedReport?.audioGatewayUrl || selectedReport?.audioUri;
+                          const audioUrl =
+                            selectedReport?.audioGatewayUrl ||
+                            selectedReport?.audioUri;
                           if (!audioUrl) {
-                            Alert.alert("Error", "No audio available for this report");
+                            Alert.alert(
+                              "Error",
+                              "No audio available for this report",
+                            );
                             return;
                           }
                           setIsLoadingDetailAudio(true);
                           try {
                             // If it's a remote URL, download to cache first
-                            if (audioUrl.startsWith('http')) {
+                            if (audioUrl.startsWith("http")) {
                               const localUri = `${FileSystem.cacheDirectory}detail_audio_${selectedReport?.id}.m4a`;
-                              const fileInfo = await FileSystem.getInfoAsync(localUri);
+                              const fileInfo =
+                                await FileSystem.getInfoAsync(localUri);
                               if (fileInfo.exists) {
                                 setDetailAudioUri(localUri);
                               } else {
-                                const download = await FileSystem.downloadAsync(audioUrl, localUri);
+                                const download = await FileSystem.downloadAsync(
+                                  audioUrl,
+                                  localUri,
+                                );
                                 setDetailAudioUri(download.uri);
                               }
                             } else {
@@ -1905,13 +1962,17 @@ export default function LibraryScreen() {
                         }}
                         style={styles.detailPlayButton}
                       >
-                        <MaterialIcons name="play-circle-filled" size={40} color="#8A4FFF" />
+                        <MaterialIcons
+                          name="play-circle-filled"
+                          size={40}
+                          color="#8A4FFF"
+                        />
                       </TouchableOpacity>
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={styles.audioText}>
                         {detailAudioUri && detailPlayerStatus?.duration
-                          ? `${Math.floor((detailPlayerStatus.currentTime || 0))}s / ${Math.floor(detailPlayerStatus.duration)}s`
+                          ? `${Math.floor(detailPlayerStatus.currentTime || 0)}s / ${Math.floor(detailPlayerStatus.duration)}s`
                           : decryptedContent.metadata.audioDuration
                             ? `${Math.round(decryptedContent.metadata.audioDuration / 1000)} seconds`
                             : "Audio file available"}
@@ -2322,7 +2383,6 @@ export default function LibraryScreen() {
         </View>
       </Modal>
 
-
       {/* Shared With Me Report Details Modal */}
       <Modal
         visible={showSharedWithMeDetailsModal}
@@ -2413,7 +2473,6 @@ export default function LibraryScreen() {
                         : "Inactive"}
                     </Text>
                   </View>
-
                 </View>
               )}
             </ScrollView>
@@ -2437,10 +2496,13 @@ export default function LibraryScreen() {
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#8A4FFF" />
             <Text style={styles.loadingText}>
-              {isArchivingReportId && (() => {
-                const report = reports.find(r => r.id === isArchivingReportId);
-                return report?.isArchived ? "Unarchiving..." : "Archiving...";
-              })()}
+              {isArchivingReportId &&
+                (() => {
+                  const report = reports.find(
+                    (r) => r.id === isArchivingReportId,
+                  );
+                  return report?.isArchived ? "Unarchiving..." : "Archiving...";
+                })()}
             </Text>
           </View>
         </View>

@@ -30,47 +30,18 @@ export async function initializeAudio() {
  */
 export async function playNotificationSound() {
   try {
-    // Prevent multiple sounds playing in quick succession
     const now = Date.now();
     if (now - lastPlayTime < 500) {
       return;
     }
     lastPlayTime = now;
 
-    // Log that notification sound is playing
-
-    // For now, just use vibration as a notification indicator
-    // since we don't have system sound files available
     try {
       const { Vibration } = await import('react-native');
-      Vibration.vibrate([0, 100, 50, 100]); // Vibration pattern: wait 0ms, vibrate 100ms, wait 50ms, vibrate 100ms
+      Vibration.vibrate([0, 100, 50, 100]);
     } catch (vibError) {
     }
   } catch (error) {
   }
 }
 
-/**
- * Stop current sound
- */
-export async function stopSound() {
-  try {
-    if (soundObject) {
-      await soundObject.stopAsync();
-    }
-  } catch (error) {
-  }
-}
-
-/**
- * Unload sound and free resources
- */
-export async function unloadSound() {
-  try {
-    if (soundObject) {
-      await soundObject.unloadAsync();
-      soundObject = null;
-    }
-  } catch (error) {
-  }
-}

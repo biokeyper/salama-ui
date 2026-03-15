@@ -71,6 +71,7 @@ utils/          Helper utilities
 ### Authentication
 
 #### Sign Up
+
 1. Open the app — you land on the **Home** screen
 2. Tap **Create Account** or **Sign Up**
 3. Enter your email address
@@ -80,12 +81,14 @@ utils/          Helper utilities
 7. **Result:** You're now logged in and can access all protected features
 
 #### Log In
+
 1. Open the app and tap **Log In** (or tap any protected feature to trigger the auth modal)
 2. Enter your email and password
 3. Tap **Log In**
 4. **You get:** Instant access to Record, Library, Account, Settings, and Notifications
 
 #### Recover Your Account
+
 1. On the login screen, tap **Forgot Password?**
 2. Enter the email address for your account
 3. **You get:** Recovery email with a reset link
@@ -93,11 +96,13 @@ utils/          Helper utilities
 5. **Result:** You can log in with your new password
 
 #### Log Out
+
 1. Go to **Explore** → **Account** (or **Settings**)
 2. Scroll to bottom and tap **Log Out**
 3. **You get:** Returned to home screen, all protected features locked
 
 #### Delete Your Account
+
 1. Go to **Explore** → **Account**
 2. Scroll to bottom and tap **Delete Account**
 3. Confirm the deletion (this cannot be undone)
@@ -109,6 +114,7 @@ utils/          Helper utilities
 ### Recording an Incident
 
 #### Audio Recording
+
 1. Tap the **Record** tab (if logged in, or log in when prompted)
 2. Tap the **microphone icon** to start
 3. **You see:** A blue pulse animation — recording is active
@@ -120,6 +126,7 @@ utils/          Helper utilities
 9. **Result:** Report saved to your device; no internet needed
 
 #### Text Reporting
+
 1. From the **Record** tab, tap the **text bubble icon** (instead of microphone)
 2. Tap **Create Text Report**
 3. Type out the incident details (date, time, people, what happened, any evidence)
@@ -129,6 +136,7 @@ utils/          Helper utilities
 7. **Result:** Can be viewed later and submitted to backend when ready
 
 #### Emergency Exit (Panic Button)
+
 1. While recording (audio or text), press the large red **EXIT NOW** button
 2. **You get:** Current recording instantly saved
 3. **Result:** App immediately switches to the **Fake Calculator** — anyone looking won't see what you were doing
@@ -138,6 +146,7 @@ utils/          Helper utilities
 ### Managing Your Report Library
 
 #### Set Up PIN Protection
+
 1. Go to **Explore** → **Settings** (gear icon)
 2. Scroll to **PIN Protection**
 3. Tap **Set PIN**
@@ -147,6 +156,7 @@ utils/          Helper utilities
 7. **Result:** Reports stay hidden even if someone else opens the app
 
 #### View Your Reports
+
 1. Tap the **Library** tab
 2. Enter your PIN
 3. **You get:** Full list of all saved reports (audio, text, and auto-detected)
@@ -157,6 +167,7 @@ utils/          Helper utilities
 5. **Result:** Can review all documentation at any time
 
 #### Filter & Search Reports
+
 1. In the Library, use the **filter tabs** at the top:
    - **All** — shows everything
    - **Audio** — audio recordings only
@@ -166,6 +177,7 @@ utils/          Helper utilities
 3. **You get:** Quick access to specific report types
 
 #### Archive Reports
+
 1. In the Library, find a report you want to hide (but keep)
 2. Tap **⋯** menu on the report card
 3. Tap **Archive**
@@ -173,6 +185,7 @@ utils/          Helper utilities
 5. **Result:** Report still exists but doesn't clutter your library; can be restored anytime
 
 #### Unarchive Reports
+
 1. In the Library, tap **Archived** filter at the top
 2. Find the report you want to restore
 3. Tap **⋯** menu → **Unarchive**
@@ -183,6 +196,7 @@ utils/          Helper utilities
 ### Using the Decoy Apps
 
 #### Fake Calculator
+
 1. Go to **Explore** → **Fake Calculator**
 2. **You see:** Working calculator with full functionality
 3. Use it normally — perform actual calculations
@@ -194,6 +208,7 @@ utils/          Helper utilities
    - **Result:** Saved recording, then switched back to SafeGirl
 
 #### Fake Calendar
+
 1. Go to **Explore** → **Fake Calendar**
 2. **You see:** Working calendar with dates, holidays marked
 3. Navigate months with **< >** buttons
@@ -210,6 +225,7 @@ utils/          Helper utilities
 ### Enable Background Recording
 
 #### Set Up Background Recording
+
 1. Go to **Explore** → **Settings** (gear icon)
 2. Scroll to **Background Recording**
 3. Toggle **ON** for each decoy app you want to use:
@@ -224,6 +240,7 @@ utils/          Helper utilities
 ### Using the Menstrual Tracker
 
 #### Log Your Cycle & Health
+
 1. Go to **Explore** → **Menstrual Tracker**
 2. **Day View** — see your current cycle status
 3. Tap **+ Log** to add an entry:
@@ -236,22 +253,26 @@ utils/          Helper utilities
    - **Result:** Evidence captured while logging
 
 #### View Health Tips
+
 1. In the Menstrual Tracker, scroll down
 2. **You see:** Health tips and resources
 3. Tap any tip to read more information
 4. **Result:** Learn about wellness and self-care
 
 #### Use Secret Notes
+
 1. While logging an entry, tap **Secret Notes**
 2. Write observations you don't want visible to casual viewers
 3. **You get:** Notes that are less obvious in the main log
 4. **Result:** Private thoughts protected
 
 #### Exit the App
+
 1. Long-press the **header title** (where it says "Menstrual Tracker") for 3 seconds
 2. **Result:** Saved entry, recording stopped, returned to SafeGirl
 
 #### View Abuse Alerts
+
 1. The tracker automatically detects concerning patterns:
    - Severe pain + negative mood together
    - Keywords like "hit", "forced", "scared", "abuse"
@@ -264,6 +285,7 @@ utils/          Helper utilities
 ### Submitting & Syncing Reports
 
 #### Submit a Report to Backend
+
 1. Go to **Library** and find a saved report
 2. Tap **⋯** menu → **Submit Report**
 3. **You get:** Report encrypted and sent to backend
@@ -271,6 +293,7 @@ utils/          Helper utilities
 5. **Result:** Report now stored on blockchain with transaction record
 
 #### View Submitted Reports
+
 1. In **Library**, look for the **Submitted** label on report cards
 2. Tap the report to see:
    - Blockchain transaction hash
@@ -279,6 +302,7 @@ utils/          Helper utilities
 3. **Result:** Proof that report was documented on immutable ledger
 
 #### Check Sync Status
+
 1. Go to **Notifications** tab to see sync status
 2. **You get:** Updates on what's been uploaded, what's pending
 3. Failed submissions show with retry option
@@ -289,6 +313,7 @@ utils/          Helper utilities
 ### Account Settings
 
 #### Change Email Address
+
 1. Go to **Explore** → **Account**
 2. Scroll to **Email Address**
 3. Tap to edit
@@ -298,12 +323,14 @@ utils/          Helper utilities
 7. **Result:** Account now uses new email for login
 
 #### Update Phone Number
+
 1. Go to **Explore** → **Account**
 2. Scroll to **Phone Number**
 3. Tap to edit and enter new number
 4. **Result:** Phone number updated for emergency contacts
 
 #### Change Password
+
 1. Go to **Explore** → **Settings**
 2. Scroll to **Security**
 3. Tap **Change Password**
@@ -312,6 +339,7 @@ utils/          Helper utilities
 6. **Result:** Password changed; must use new password on next login
 
 #### Add Emergency Contacts
+
 1. Go to **Explore** → **Account**
 2. Scroll to **Emergency Contacts**
 3. Tap **+ Add Contact**
@@ -320,6 +348,7 @@ utils/          Helper utilities
 6. **Result:** Can quickly reach trusted people if needed
 
 #### Set Email Recovery
+
 1. Go to **Explore** → **Settings**
 2. Scroll to **Account Recovery**
 3. Toggle **Email Recovery** ON
@@ -331,6 +360,7 @@ utils/          Helper utilities
 ### Notifications
 
 #### View Your Notifications
+
 1. Tap the **Notifications** icon in the bottom navigation
 2. Or go to **Explore** → **Notifications**
 3. **You see:** List of all messages and alerts:
@@ -342,6 +372,7 @@ utils/          Helper utilities
 6. **Result:** Stay informed on account activity
 
 #### Clear Notifications
+
 1. In Notifications, tap **⋯** menu → **Clear All**
 2. Or swipe left on individual notification to dismiss
 3. **Result:** Notification cleared but still appears in history
@@ -351,6 +382,7 @@ utils/          Helper utilities
 ### Themes & Appearance
 
 #### Change Theme
+
 1. Go to **Explore** → **Settings**
 2. Scroll to **Appearance**
 3. Choose:
@@ -366,6 +398,7 @@ utils/          Helper utilities
 ### Exploring the App
 
 #### Browse Home Screen (No Login Needed)
+
 1. Tap the **Home** tab
 2. **You see:**
    - Welcome message
@@ -376,6 +409,7 @@ utils/          Helper utilities
 4. **Result:** Understand the app without committing to signup
 
 #### Explore Features
+
 1. Tap the **Explore** tab
 2. **You see:** All available features:
    - Menstrual Tracker
@@ -390,13 +424,16 @@ utils/          Helper utilities
 ## Architecture & Design
 
 ### Hybrid Authentication Model
+
 SafeGirl uses a flexible auth system:
+
 - **Public screens** (Home, Explore, Onboarding) — accessible without login
 - **Protected screens** (Record, Library, Account, Settings, Notifications) — require authentication
 - **AuthGateModal** — appears on protected screens, redirects to login then back to original action
 - **Benefit** — Users can explore features before committing to signup; reduces friction while protecting sensitive data
 
 ### Report Flow
+
 ```
 User creates report → Saved locally (draft/saved status)
   ↓
@@ -408,6 +445,7 @@ User views submitted report → Decryption & display
 ## Development Setup
 
 ### Prerequisites
+
 ```bash
 Node.js 18+
 npm or yarn
@@ -415,7 +453,9 @@ Expo CLI: npm install -g expo-cli
 ```
 
 ### Environment Variables
+
 Create `.env` file in root:
+
 ```env
 # Backend API
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
@@ -429,6 +469,7 @@ EXPO_PUBLIC_AUTH_ENABLED=true
 ```
 
 ### Local Development
+
 ```bash
 # Install dependencies
 npm install
@@ -441,6 +482,7 @@ npx expo start
 ```
 
 ### Building for Production
+
 ```bash
 # EAS build (requires account)
 eas build --platform android
@@ -450,7 +492,6 @@ eas build --platform ios
 expo build:android
 expo build:ios
 ```
-
 
 ## Learn More
 

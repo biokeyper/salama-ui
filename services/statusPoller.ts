@@ -3,9 +3,8 @@
  * Polls blockchain confirmation status for submitted reports
  */
 
-import { checkReportStatus } from './api';
-import { updateReportStatus, getReportById } from './storage';
-import { apiConfig } from '@/config/api';
+import { apiConfig } from "@/config/api";
+import { checkReportStatus } from "./api";
 
 interface PollingSession {
   reportId: string;
@@ -48,13 +47,12 @@ export function startStatusPolling(reportId: string): void {
 
       // Check if submitted (12+ confirmations)
       if (confirmations >= apiConfig.statusPolling.confirmationThreshold) {
-
-        const { saveReport, getReportById } = await import('./storage');
+        const { saveReport, getReportById } = await import("./storage");
         const existingReport = await getReportById(reportId);
         if (existingReport) {
           await saveReport({
             ...existingReport,
-            status: 'submitted',
+            status: "submitted",
             confirmations: confirmations,
             txHash: statusResult.txHash,
             ipfsHash: statusResult.ipfsHash,
@@ -67,13 +65,13 @@ export function startStatusPolling(reportId: string): void {
       }
 
       // Check if failed
-      if (statusResult.status === 'failed') {
-        const { saveReport, getReportById } = await import('./storage');
+      if (statusResult.status === "failed") {
+        const { saveReport, getReportById } = await import("./storage");
         const existingReport = await getReportById(reportId);
         if (existingReport) {
           await saveReport({
             ...existingReport,
-            status: 'failed',
+            status: "failed",
           });
         }
         stopStatusPolling(reportId);
@@ -81,24 +79,22 @@ export function startStatusPolling(reportId: string): void {
       }
 
       // Update with latest status and confirmations (still pending)
-      const { saveReport, getReportById } = await import('./storage');
+      const { saveReport, getReportById } = await import("./storage");
       const existingReport = await getReportById(reportId);
       if (existingReport) {
         await saveReport({
           ...existingReport,
-          status: 'pending',
+          status: "pending",
           confirmations: confirmations,
           txHash: statusResult.txHash,
           ipfsHash: statusResult.ipfsHash,
         });
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   }, apiConfig.statusPolling.interval);
 
   session.intervalId = pollInterval;
   activeSessions.set(reportId, session);
-
 }
 
 /**
@@ -127,6 +123,8 @@ export function stopAllStatusPolling(): void {
 /**
  * Get active polling sessions (for debugging)
  */
-export function getActivePollingSession(reportId: string): PollingSession | null {
+export function getActivePollingSession(
+  reportId: string,
+): PollingSession | null {
   return activeSessions.get(reportId) || null;
 }

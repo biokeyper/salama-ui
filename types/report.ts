@@ -1,40 +1,36 @@
-/**
- * Report data model for storing incident reports
- */
+export type ReportType = "audio" | "text" | "mixed";
 
-export type ReportType = 'audio' | 'text' | 'mixed';
-
-export type ReportStatus = 'draft' | 'saved' | 'pending' | 'submitted' | 'failed';
+export type ReportStatus =
+  | "draft"
+  | "saved"
+  | "pending"
+  | "submitted"
+  | "failed";
 
 export interface Report {
   id: string;
-  userId?: string; // User who created this report (for multi-user devices) - optional if not logged in
+  userId?: string; 
   type: ReportType;
   status: ReportStatus;
-  createdAt: string; // ISO 8601 timestamp
-  updatedAt: string; // ISO 8601 timestamp
+  createdAt: string;
+  updatedAt: string;
 
-  // Audio report data
   audioUri?: string;
-  audioDuration?: number; // in seconds
+  audioDuration?: number; 
 
-  // Text report data
   textContent?: string;
 
-  // Metadata
   metadata?: {
     location?: string;
-    timestamp?: string; // When the incident occurred
+    timestamp?: string; 
     tags?: string[];
     notes?: string;
   };
 
-  // Backend submission
-  submittedAt?: string; // ISO 8601 timestamp
-  submissionId?: string; // ID from backend after successful submission
-  submissionError?: string; // Error message if submission failed
+  submittedAt?: string;
+  submissionId?: string; 
+  submissionError?: string;
 
-  // Blockchain details
   confirmations?: number; // 0-12+
   txHash?: string; // Blockchain transaction hash
   ipfsHash?: string; // IPFS location
@@ -43,20 +39,19 @@ export interface Report {
 
   // Archive flag (soft delete for blockchain records)
   isArchived?: boolean;
-  archivedAt?: string; // ISO 8601 timestamp
-  archivedReason?: string; // Why archived
+  archivedAt?: string;
+  archivedReason?: string; 
 }
 
 export interface ReportStorage {
   reports: Report[];
-  healthLogs?: HealthLog[]; // New: Store health logs separately
-  lastSyncAt?: string; // ISO 8601 timestamp
+  healthLogs?: HealthLog[];
+  lastSyncAt?: string;
 }
 
-// Health Tracker Types
-export type CycleFlow = 'light' | 'medium' | 'heavy' | 'spotting';
-export type CycleMood = 'happy' | 'sad' | 'anxious' | 'angry' | 'neutral';
-export type CyclePain = 'cramps' | 'headache' | 'backache' | 'nausea' | 'none';
+export type CycleFlow = "light" | "medium" | "heavy" | "spotting";
+export type CycleMood = "happy" | "sad" | "anxious" | "angry" | "neutral";
+export type CyclePain = "cramps" | "headache" | "backache" | "nausea" | "none";
 
 export interface HealthLog {
   id: string;
@@ -68,5 +63,3 @@ export interface HealthLog {
   createdAt: string;
   updatedAt: string;
 }
-
-

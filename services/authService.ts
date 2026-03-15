@@ -4,12 +4,12 @@
  * Stores JWT token and user info in SecureStore
  */
 
-import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
-import { apiConfig } from '@/config/api';
+import { apiConfig } from "@/config/api";
+import axios from "axios";
+import * as SecureStore from "expo-secure-store";
 
-const AUTH_TOKEN_KEY = 'salama_auth_token';
-const AUTH_USER_KEY = 'salama_auth_user';
+const AUTH_TOKEN_KEY = "salama_auth_token";
+const AUTH_USER_KEY = "salama_auth_user";
 
 export interface User {
   userId: string;
@@ -42,14 +42,14 @@ export interface AuthResponse {
  * Sends OTP to phone number
  */
 export async function initiateSignup(
-  phone: string
+  phone: string,
 ): Promise<{ success: boolean; error?: string }> {
   const payload = { phone };
 
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.signupInitiate}`,
-      payload
+      payload,
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -58,21 +58,22 @@ export async function initiateSignup(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to initiate signup',
+      error: response.data?.error || "Failed to initiate signup",
     };
   } catch (error) {
-    let message = 'Signup initiation failed';
+    let message = "Signup initiation failed";
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-
       // Handle specific status codes
       if (status === 409) {
-        message = errorData?.message || 'Phone number already registered. Please login instead.';
+        message =
+          errorData?.message ||
+          "Phone number already registered. Please login instead.";
       } else if (status === 400) {
-        message = errorData?.message || 'Invalid phone number format';
+        message = errorData?.message || "Invalid phone number format";
       } else if (errorData?.message) {
         message = errorData.message;
       } else if (errorData?.error === true && errorData?.message) {
@@ -94,16 +95,15 @@ export async function initiateSignup(
  */
 export async function verifySignup(
   phone: string,
-  otp: string
+  otp: string,
 ): Promise<{ success: boolean; error?: string; user?: User }> {
   const payload = { phone, otp };
 
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.signupVerify}`,
-      payload
+      payload,
     );
-
 
     if (response.status === 200 || response.status === 201) {
       const response_data: AuthResponse = response.data;
@@ -113,9 +113,9 @@ export async function verifySignup(
       let pin = response_data.pin;
       let userId = response_data.userId;
       let userData = {
-        userId: userId || '',
+        userId: userId || "",
         phone: response_data.phone || phone,
-        email: response_data.email || '',
+        email: response_data.email || "",
         pin: pin ?? null,
       };
 
@@ -125,9 +125,9 @@ export async function verifySignup(
         pin = response_data.data.pin;
         userId = response_data.data.userId;
         userData = {
-          userId: userId || '',
+          userId: userId || "",
           phone: response_data.data.phone || phone,
-          email: response_data.data.email || '',
+          email: response_data.data.email || "",
           pin: pin ?? null,
         };
       }
@@ -135,18 +135,12 @@ export async function verifySignup(
       if (!token) {
         return {
           success: false,
-          error: 'No token received from server',
+          error: "No token received from server",
         };
       }
 
-      // Save token
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
-
-      // Verify token was saved
-      const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-
-      // Store PIN from backend response (signup always returns null for new users)
-      const { storePinFromBackend } = await import('./security');
+      const { storePinFromBackend } = await import("./security");
       await storePinFromBackend(pin, userId);
 
       // Save user info
@@ -158,18 +152,17 @@ export async function verifySignup(
 
     return {
       success: false,
-      error: response.data?.error || 'Signup verification failed',
+      error: response.data?.error || "Signup verification failed",
     };
   } catch (error) {
-    let message = 'Signup verification failed';
+    let message = "Signup verification failed";
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-
       if (status === 401) {
-        message = errorData?.message || 'Invalid OTP. Please try again.';
+        message = errorData?.message || "Invalid OTP. Please try again.";
       } else if (errorData?.message) {
         message = errorData.message;
       } else if (error.message) {
@@ -188,14 +181,14 @@ export async function verifySignup(
  * Sends OTP to phone
  */
 export async function initiateLogin(
-  phone: string
+  phone: string,
 ): Promise<{ success: boolean; error?: string; _testOTP?: string }> {
   const payload = { phone };
 
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.loginInitiate}`,
-      payload
+      payload,
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -207,21 +200,22 @@ export async function initiateLogin(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to initiate login',
+      error: response.data?.error || "Failed to initiate login",
     };
   } catch (error) {
-    let message = 'Login initiation failed';
+    let message = "Login initiation failed";
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-
       // Handle specific status codes
       if (status === 404) {
-        message = errorData?.message || 'Phone number not found. Please sign up instead.';
+        message =
+          errorData?.message ||
+          "Phone number not found. Please sign up instead.";
       } else if (status === 400) {
-        message = errorData?.message || 'Invalid phone number format';
+        message = errorData?.message || "Invalid phone number format";
       } else if (errorData?.message) {
         message = errorData.message;
       } else if (error.message) {
@@ -241,16 +235,15 @@ export async function initiateLogin(
  */
 export async function verifyLogin(
   phone: string,
-  otp: string
+  otp: string,
 ): Promise<{ success: boolean; error?: string; user?: User }> {
   const payload = { phone, otp };
 
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.loginVerify}`,
-      payload
+      payload,
     );
-
 
     if (response.status === 200 || response.status === 201) {
       const response_data: AuthResponse = response.data;
@@ -260,9 +253,9 @@ export async function verifyLogin(
       let pin = response_data.pin;
       let userId = response_data.userId;
       let userData = {
-        userId: userId || '',
+        userId: userId || "",
         phone: response_data.phone || phone,
-        email: response_data.email || '',
+        email: response_data.email || "",
         pin: pin ?? null,
       };
 
@@ -272,29 +265,22 @@ export async function verifyLogin(
         pin = response_data.data.pin;
         userId = response_data.data.userId;
         userData = {
-          userId: userId || '',
+          userId: userId || "",
           phone: response_data.data.phone || phone,
-          email: response_data.data.email || '',
+          email: response_data.data.email || "",
           pin: pin ?? null,
         };
       }
 
-
       if (!token) {
         return {
           success: false,
-          error: 'No token received from server',
+          error: "No token received from server",
         };
       }
 
-      // Save token
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
-
-      // Verify token was saved
-      const retrievedToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-
-      // Store PIN from backend response
-      const { storePinFromBackend } = await import('./security');
+      const { storePinFromBackend } = await import("./security");
       await storePinFromBackend(pin, userId);
 
       // Save user info
@@ -306,18 +292,17 @@ export async function verifyLogin(
 
     return {
       success: false,
-      error: response.data?.error || 'Login verification failed',
+      error: response.data?.error || "Login verification failed",
     };
   } catch (error) {
-    let message = 'Login verification failed';
+    let message = "Login verification failed";
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-
       if (status === 401) {
-        message = errorData?.message || 'Invalid OTP. Please try again.';
+        message = errorData?.message || "Invalid OTP. Please try again.";
       } else if (errorData?.message) {
         message = errorData.message;
       } else if (error.message) {
@@ -388,7 +373,7 @@ export async function logout(): Promise<void> {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
       } catch (error) {
         // Even if backend call fails, continue with local logout
@@ -411,13 +396,11 @@ export async function logout(): Promise<void> {
 
     // Also clear temp PIN if it exists
     try {
-      await SecureStore.deleteItemAsync('pin_local_temp');
+      await SecureStore.deleteItemAsync("pin_local_temp");
     } catch (error) {
       // Temp PIN might not exist, that's okay
     }
-
-  } catch (error) {
-  }
+  } catch (error) {}
 }
 
 /**
@@ -425,14 +408,14 @@ export async function logout(): Promise<void> {
  * Allows user to set an email for account recovery
  */
 export async function setupEmailRecovery(
-  email: string
+  email: string,
 ): Promise<{ success: boolean; error?: string }> {
   const payload = { email };
 
   try {
     const token = await getAuthToken();
     if (!token) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: "Not authenticated" };
     }
 
     const response = await axios.post(
@@ -442,7 +425,7 @@ export async function setupEmailRecovery(
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -451,21 +434,21 @@ export async function setupEmailRecovery(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to setup email recovery',
+      error: response.data?.error || "Failed to setup email recovery",
     };
   } catch (error) {
-    let message = 'Email recovery setup failed';
+    let message = "Email recovery setup failed";
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const errorData = error.response?.data;
 
       if (status === 500) {
-        message = errorData?.message || 'Server error. Please try again later.';
+        message = errorData?.message || "Server error. Please try again later.";
       } else if (status === 400) {
-        message = errorData?.message || 'Invalid email format';
+        message = errorData?.message || "Invalid email format";
       } else if (status === 409) {
-        message = errorData?.message || 'Email already registered';
+        message = errorData?.message || "Email already registered";
       } else if (errorData?.message) {
         message = errorData.message;
       } else if (error.message) {
@@ -484,12 +467,12 @@ export async function setupEmailRecovery(
  * Sends OTP to new phone number
  */
 export async function initiateChangePhone(
-  newPhone: string
+  newPhone: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const token = await getAuthToken();
     if (!token) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: "Not authenticated" };
     }
 
     const response = await axios.post(
@@ -499,7 +482,7 @@ export async function initiateChangePhone(
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -508,11 +491,11 @@ export async function initiateChangePhone(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to initiate phone change',
+      error: response.data?.error || "Failed to initiate phone change",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Phone change initiation failed';
+      error instanceof Error ? error.message : "Phone change initiation failed";
     return { success: false, error: message };
   }
 }
@@ -523,12 +506,12 @@ export async function initiateChangePhone(
  */
 export async function verifyChangePhone(
   newPhone: string,
-  otp: string
+  otp: string,
 ): Promise<{ success: boolean; error?: string; user?: User }> {
   try {
     const token = await getAuthToken();
     if (!token) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: "Not authenticated" };
     }
 
     const response = await axios.post(
@@ -538,7 +521,7 @@ export async function verifyChangePhone(
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -549,7 +532,7 @@ export async function verifyChangePhone(
       let pin = response_data.pin;
       let userData = {
         phone: response_data.phone || newPhone,
-        email: response_data.email || '',
+        email: response_data.email || "",
         pin: pin ?? null,
       };
 
@@ -559,7 +542,7 @@ export async function verifyChangePhone(
         pin = response_data.data.pin;
         userData = {
           phone: response_data.data.phone || newPhone,
-          email: response_data.data.email || '',
+          email: response_data.data.email || "",
           pin: pin ?? null,
         };
       }
@@ -567,7 +550,7 @@ export async function verifyChangePhone(
       if (!token) {
         return {
           success: false,
-          error: 'No token received from server',
+          error: "No token received from server",
         };
       }
 
@@ -575,13 +558,13 @@ export async function verifyChangePhone(
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
       // Store PIN from backend response if provided
-      const { storePinFromBackend } = await import('./security');
+      const { storePinFromBackend } = await import("./security");
       const currentUser = await getUserInfo();
       await storePinFromBackend(pin, currentUser?.userId);
 
       // Update user info with new phone
       const user: User = {
-        userId: currentUser?.userId || '',
+        userId: currentUser?.userId || "",
         ...userData,
       };
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
@@ -591,11 +574,13 @@ export async function verifyChangePhone(
 
     return {
       success: false,
-      error: response.data?.error || 'Phone change verification failed',
+      error: response.data?.error || "Phone change verification failed",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Phone change verification failed';
+      error instanceof Error
+        ? error.message
+        : "Phone change verification failed";
     return { success: false, error: message };
   }
 }
@@ -605,12 +590,12 @@ export async function verifyChangePhone(
  * Sends recovery link to email
  */
 export async function initiateForgotPhone(
-  email: string
+  email: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.forgotPhone}`,
-      { email }
+      { email },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -619,11 +604,11 @@ export async function initiateForgotPhone(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to initiate recovery',
+      error: response.data?.error || "Failed to initiate recovery",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Recovery initiation failed';
+      error instanceof Error ? error.message : "Recovery initiation failed";
     return { success: false, error: message };
   }
 }
@@ -633,12 +618,12 @@ export async function initiateForgotPhone(
  */
 export async function verifyRecoveryEmail(
   email: string,
-  token: string
+  token: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.verifyRecovery}`,
-      { email, token }
+      { email, token },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -647,11 +632,11 @@ export async function verifyRecoveryEmail(
 
     return {
       success: false,
-      error: response.data?.error || 'Token verification failed',
+      error: response.data?.error || "Token verification failed",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Token verification failed';
+      error instanceof Error ? error.message : "Token verification failed";
     return { success: false, error: message };
   }
 }
@@ -662,12 +647,12 @@ export async function verifyRecoveryEmail(
  */
 export async function initiatePhoneChangeRecovery(
   email: string,
-  newPhone: string
+  newPhone: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.changePhoneRecovery}`,
-      { email, newPhone }
+      { email, newPhone },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -676,11 +661,11 @@ export async function initiatePhoneChangeRecovery(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to initiate phone change',
+      error: response.data?.error || "Failed to initiate phone change",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Phone change initiation failed';
+      error instanceof Error ? error.message : "Phone change initiation failed";
     return { success: false, error: message };
   }
 }
@@ -692,12 +677,12 @@ export async function initiatePhoneChangeRecovery(
 export async function verifyPhoneChangeRecovery(
   email: string,
   newPhone: string,
-  otp: string
+  otp: string,
 ): Promise<{ success: boolean; error?: string; user?: User }> {
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.verifyPhoneChangeRecovery}`,
-      { email, newPhone, otp }
+      { email, newPhone, otp },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -726,7 +711,7 @@ export async function verifyPhoneChangeRecovery(
       if (!token) {
         return {
           success: false,
-          error: 'No token received from server',
+          error: "No token received from server",
         };
       }
 
@@ -734,12 +719,12 @@ export async function verifyPhoneChangeRecovery(
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
       // Store PIN from backend response if provided
-      const { storePinFromBackend } = await import('./security');
+      const { storePinFromBackend } = await import("./security");
       await storePinFromBackend(pin);
 
       // Save user info
       const user: User = {
-        userId: '',
+        userId: "",
         ...userData,
       };
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
@@ -749,11 +734,13 @@ export async function verifyPhoneChangeRecovery(
 
     return {
       success: false,
-      error: response.data?.error || 'Phone change verification failed',
+      error: response.data?.error || "Phone change verification failed",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Phone change verification failed';
+      error instanceof Error
+        ? error.message
+        : "Phone change verification failed";
     return { success: false, error: message };
   }
 }
@@ -763,12 +750,12 @@ export async function verifyPhoneChangeRecovery(
  */
 export async function backupEncryptionKey(
   pin: string,
-  encryptionKey: string
+  encryptionKey: string,
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     const token = await getAuthToken();
     if (!token) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: "Not authenticated" };
     }
 
     const response = await axios.post(
@@ -778,7 +765,7 @@ export async function backupEncryptionKey(
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -787,11 +774,11 @@ export async function backupEncryptionKey(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to backup encryption key',
+      error: response.data?.error || "Failed to backup encryption key",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Key backup failed';
+      error instanceof Error ? error.message : "Key backup failed";
     return { success: false, error: message };
   }
 }
@@ -801,12 +788,12 @@ export async function backupEncryptionKey(
  */
 export async function recoverEncryptionKey(
   phone: string,
-  pin: string
+  pin: string,
 ): Promise<{ success: boolean; encryptionKey?: string; error?: string }> {
   try {
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.keysRecover}`,
-      { phone, pin }
+      { phone, pin },
     );
 
     if (response.status === 200 || response.status === 201) {
@@ -818,11 +805,11 @@ export async function recoverEncryptionKey(
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to recover encryption key',
+      error: response.data?.error || "Failed to recover encryption key",
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Key recovery failed';
+      error instanceof Error ? error.message : "Key recovery failed";
     return { success: false, error: message };
   }
 }
@@ -832,13 +819,16 @@ export async function recoverEncryptionKey(
  * Permanently removes all user data from backend
  * Note: Submitted reports remain on blockchain
  */
-export async function deleteUserAccount(): Promise<{ success: boolean; error?: string; data?: any }> {
+export async function deleteUserAccount(): Promise<{
+  success: boolean;
+  error?: string;
+  data?: any;
+}> {
   try {
     const token = await getAuthToken();
     if (!token) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: "Not authenticated" };
     }
-
 
     const response = await axios.post(
       `${apiConfig.baseURL}${apiConfig.endpoints.deleteAccount}`,
@@ -847,9 +837,8 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
-
 
     if (response.status === 200 || response.status === 201) {
       // Clear all local auth data after successful deletion
@@ -859,18 +848,18 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
 
     return {
       success: false,
-      error: response.data?.error || 'Failed to delete account',
+      error: response.data?.error || "Failed to delete account",
     };
   } catch (error) {
-    let message = 'Account deletion failed';
+    let message = "Account deletion failed";
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const errorData = error.response?.data;
 
-
       if (status === 401) {
-        message = errorData?.message || 'Authentication failed. Please login again.';
+        message =
+          errorData?.message || "Authentication failed. Please login again.";
       } else if (errorData?.message) {
         message = errorData.message;
       } else if (error.message) {

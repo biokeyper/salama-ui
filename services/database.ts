@@ -94,11 +94,6 @@ async function runDatabaseMigrations(): Promise<void> {
     try {
         const database = db;
         if (!database) return;
-
-        // Note: Add migrations here as needed
-        // Example:
-        // const tableInfo = await database.getAllAsync("PRAGMA table_info(reports)");
-        // if column exists, do migration
     } catch (error) {
     }
 }
@@ -125,7 +120,6 @@ async function migrateFromAsyncStorage(): Promise<void> {
             }
         }
 
-        // Mark migration as complete
         await AsyncStorage.setItem(MIGRATION_KEY, 'true');
     } catch (error) {
     }

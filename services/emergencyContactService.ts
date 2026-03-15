@@ -42,7 +42,6 @@ export async function addEmergencyContact(
       }
     );
 
-
     if (response.status === 200 || response.status === 201) {
       return { success: true, data: response.data.data };
     }
@@ -145,7 +144,6 @@ export async function editEmergencyContact(
         },
       }
     );
-
 
     if (response.status === 200) {
       return { success: true, data: response.data.data };
