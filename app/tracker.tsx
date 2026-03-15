@@ -1,4 +1,5 @@
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { useAuth } from "@/contexts/AuthContext";
 import { useBackgroundRecording } from "@/contexts/BackgroundRecordingContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import {
@@ -68,6 +69,7 @@ export default function TrackerScreen() {
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const audioRecorderRef = useRef(audioRecorder);
   const { settings } = useSettings();
+  const { user } = useAuth();
 
   // Keep audioRecorder ref in sync
   useEffect(() => {
@@ -158,6 +160,7 @@ export default function TrackerScreen() {
         const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         await saveReport({
           id: reportId,
+          userId: user?.userId,
           type: "audio",
           status: "saved",
           audioUri: uri,
@@ -255,6 +258,7 @@ export default function TrackerScreen() {
       const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       await saveReport({
         id: reportId,
+        userId: user?.userId,
         type: "text",
         status: "saved",
         textContent: reportText,

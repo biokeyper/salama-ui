@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { saveReport } from '@/services/storage';
@@ -32,6 +33,7 @@ export default function FakeCalendarScreen() {
     const { exitDecoyMode, setBackgroundRecordingUri } = useBackgroundRecording();
     const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
     const { settings } = useSettings();
+    const { user } = useAuth();
 
     // Start recording immediately on launch if settings allow
     useEffect(() => {
@@ -96,6 +98,7 @@ export default function FakeCalendarScreen() {
                 const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 const savedReport = await saveReport({
                     id: reportId,
+                    userId: user?.userId,
                     type: 'audio',
                     status: 'saved',
                     audioUri: uri,

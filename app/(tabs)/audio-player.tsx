@@ -191,6 +191,8 @@ export default function LibraryScreen() {
                 // Update existing local report with backend data
                 const idx = allReports.findIndex((r) => r.id === reportId);
                 if (idx !== -1) {
+                  const wasArchived = allReports[idx].isArchived;
+
                   allReports[idx].submissionId = reportId;
                   allReports[idx].status = backendReport.status ?? allReports[idx].status;
                   allReports[idx].confirmations = backendReport.confirmations ?? allReports[idx].confirmations;
@@ -199,6 +201,14 @@ export default function LibraryScreen() {
                   allReports[idx].audioIpfsHash = backendReport.metadata?.audioIpfsHash ?? allReports[idx].audioIpfsHash;
                   allReports[idx].audioGatewayUrl = backendReport.metadata?.audioGatewayUrl ?? allReports[idx].audioGatewayUrl;
                   allReports[idx].audioDuration = backendReport.metadata?.audioDuration ?? allReports[idx].audioDuration;
+
+                  // Preserve archived state: use backend if available, else preserve local
+                  if (backendReport.isArchived !== undefined) {
+                    allReports[idx].isArchived = backendReport.isArchived || wasArchived;
+                  } else if (wasArchived) {
+                    allReports[idx].isArchived = wasArchived;
+                  }
+                  console.log('[ARCHIVE_SYNC] Updated report:', { id: reportId, wasArchived, isNowArchived: allReports[idx].isArchived, backendArchived: backendReport.isArchived });
                 }
               } else {
                 allReports.push({
@@ -624,11 +634,12 @@ export default function LibraryScreen() {
               await archiveReport(report.id, "User archived");
 
               // Optimistically update: mark as archived immediately
-              setReports((prev) =>
-                prev.map((r) =>
+              setReports((prev) => {
+                const updated = prev.map((r) =>
                   r.id === report.id ? { ...r, isArchived: true } : r
-                )
-              );
+                );
+                return updated;
+              });
 
               Alert.alert("Success", "Report archived successfully");
             } catch (error) {
@@ -675,11 +686,12 @@ export default function LibraryScreen() {
               });
 
               // Optimistically update: mark as unarchived immediately
-              setReports((prev) =>
-                prev.map((r) =>
+              setReports((prev) => {
+                const updated = prev.map((r) =>
                   r.id === report.id ? { ...r, isArchived: false } : r
-                )
-              );
+                );
+                return updated;
+              });
 
               Alert.alert("Success", "Report restored successfully");
             } catch (error) {
@@ -694,6 +706,7 @@ export default function LibraryScreen() {
   };
 
   const handleArchiveToggle = (report: Report) => {
+    console.log('[ARCHIVE_TOGGLE] Toggling archive for report:', { id: report.id, currentIsArchived: report.isArchived });
     if (report.isArchived) {
       handleUnarchive(report);
     } else {

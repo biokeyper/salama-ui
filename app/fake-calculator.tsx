@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { useBackgroundRecording } from '@/contexts/BackgroundRecordingContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { saveReport } from '@/services/storage';
@@ -23,6 +24,7 @@ export default function FakeCalculatorScreen() {
   const { exitDecoyMode, setBackgroundRecordingUri } = useBackgroundRecording();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const { settings } = useSettings();
+  const { user } = useAuth();
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Start recording immediately on launch if settings allow
@@ -101,6 +103,7 @@ export default function FakeCalculatorScreen() {
         const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const savedReport = await saveReport({
           id: reportId,
+          userId: user?.userId,
           type: 'audio',
           status: 'saved',
           audioUri: uri,

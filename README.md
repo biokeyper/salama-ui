@@ -66,6 +66,51 @@ utils/          Helper utilities
 | TypeScript   | 5.9     |
 | expo-router  | 6       |
 
+## User Guide
+
+### Setting Up Your PIN
+1. Open the app and log in (or sign up)
+2. Go to **Explore** → **Settings** (gear icon)
+3. Tap **Set PIN** and enter a 4-6 digit code
+4. Re-enter to confirm
+5. Your PIN is now required every time you access the library
+
+### Recording an Incident
+1. Tap the **Record** tab
+2. Tap the microphone icon to start recording
+3. Speak naturally — a pulse animation shows the recording is active
+4. Tap **Stop** when finished
+5. Optionally add notes or location
+6. Tap **Save** to store locally
+
+### Using Background Recording
+1. Go to **Explore** → **Settings**
+2. Under **Background Recording**, toggle on the apps you want:
+   - Fake Calculator
+   - Fake Calendar
+   - Menstrual Tracker
+3. When enabled, opening that decoy app automatically starts silent recording
+4. Use the app normally while evidence is captured
+
+### Emergency Exit
+- While recording, press the large red **EXIT NOW** button to:
+  - Instantly save your recording
+  - Switch immediately to the Fake Calculator
+  - Hide all evidence of what you were doing
+
+### Accessing Your Reports
+1. Tap the **Library** tab
+2. Enter your PIN
+3. Browse your saved reports (audio/text, by date)
+4. Tap any report to play back or view details
+
+### Using the Menstrual Tracker
+1. Go to **Explore** → **Menstrual Tracker**
+2. Log your cycle, symptoms, and mood
+3. Use **Secret Notes** for private observations (hidden from casual viewing)
+4. Exit by long-pressing the header title (3 seconds)
+5. The app automatically detects concerning patterns and creates silent evidence reports
+
 ## Learn More
 
 - [Expo docs](https://docs.expo.dev/)

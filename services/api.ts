@@ -331,6 +331,10 @@ export async function searchBackendReports(
   }
 ): Promise<{ success: boolean; reports?: any[]; pagination?: any; error?: string }> {
   try {
+    console.log("[API] Fetching all reports from backend:", {
+      endpoint: apiConfig.endpoints.searchReports,
+      params: params || {},
+    });
     const response = await apiClient.get(apiConfig.endpoints.searchReports, {
       params: params || {},
     });
