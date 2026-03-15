@@ -1,13 +1,15 @@
-
-import axios, { AxiosInstance } from 'axios';
-import { Report } from '@/types/report';
-import { apiConfig } from '@/config/api';
-import { mapReportToResponses, prepareReportMetadata } from '@/utils/reportMapper';
-import { extractErrorMessage } from '@/utils/errorExtractor';
-import { updateReportStatus } from './storage';
-import { getAuthToken, isAuthenticated, logout } from './authService';
-import * as SecureStore from 'expo-secure-store';
-import * as FileSystem from 'expo-file-system/legacy';
+import { apiConfig } from "@/config/api";
+import { Report } from "@/types/report";
+import { extractErrorMessage } from "@/utils/errorExtractor";
+import {
+  mapReportToResponses,
+  prepareReportMetadata,
+} from "@/utils/reportMapper";
+import axios, { AxiosInstance } from "axios";
+import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
+import { getAuthToken, isAuthenticated } from "./authService";
+import { updateReportStatus } from "./storage";
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: apiConfig.baseURL,
@@ -21,11 +23,10 @@ apiClient.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (error) {
-    }
+    } catch (error) {}
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 apiClient.interceptors.response.use(
@@ -33,14 +34,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       try {
-        await SecureStore.deleteItemAsync('salama_auth_token');
-        await SecureStore.deleteItemAsync('salama_auth_user');
-        await SecureStore.setItemAsync('salama_token_expired', 'true');
-      } catch (err) {
-      }
+        await SecureStore.deleteItemAsync("salama_auth_token");
+        await SecureStore.deleteItemAsync("salama_auth_user");
+        await SecureStore.setItemAsync("salama_token_expired", "true");
+      } catch (err) {}
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export interface SubmissionResult {
@@ -71,14 +71,14 @@ export async function checkBackendHealth(): Promise<boolean> {
 }
 
 export async function submitReportToBackend(
-  report: Report
+  report: Report,
 ): Promise<SubmissionResult> {
   try {
     const authenticated = await isAuthenticated();
     if (!authenticated) {
       return {
         success: false,
-        error: 'Authentication required',
+        error: "Authentication required",
         requiresAuth: true,
       };
     }
@@ -86,7 +86,7 @@ export async function submitReportToBackend(
     if (!report.id) {
       return {
         success: false,
-        error: 'Report missing ID',
+        error: "Report missing ID",
       };
     }
 
@@ -108,43 +108,47 @@ export async function submitReportToBackend(
       if (!fileInfo.exists) {
         return {
           success: false,
-          error: 'Audio file not found',
+          error: "Audio file not found",
         };
       }
 
       const formData = new FormData();
-      formData.append('payload', JSON.stringify(payloadData));
+      formData.append("payload", JSON.stringify(payloadData));
 
-      const fileExtension = report.audioUri.split('.').pop()?.toLowerCase() || 'm4a';
-      const mimeType = fileExtension === 'wav' ? 'audio/wav' : 'audio/m4a';
+      const fileExtension =
+        report.audioUri.split(".").pop()?.toLowerCase() || "m4a";
+      const mimeType = fileExtension === "wav" ? "audio/wav" : "audio/m4a";
 
-      formData.append('audio', {
+      formData.append("audio", {
         uri: report.audioUri,
         name: `recording_${report.id}.${fileExtension}`,
         type: mimeType,
       } as any);
 
-      response = await apiClient.post(apiConfig.endpoints.submitReport, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
+      response = await apiClient.post(
+        apiConfig.endpoints.submitReport,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          timeout: 120000,
         },
-        timeout: 120000,
-      });
+      );
     } else {
       const submitPayload = { payload: payloadData };
-      response = await apiClient.post(apiConfig.endpoints.submitReport, submitPayload);
+      response = await apiClient.post(
+        apiConfig.endpoints.submitReport,
+        submitPayload,
+      );
     }
 
     if (response.status === 200 || response.status === 201) {
       const data = response.data;
 
       const submissionId = data.reportId || data.submissionId;
-      const backendStatus = data.status || 'pending';
-      await updateReportStatus(
-        report.id,
-        backendStatus,
-        submissionId
-      );
+      const backendStatus = data.status || "pending";
+      await updateReportStatus(report.id, backendStatus, submissionId);
 
       return {
         success: true,
@@ -158,26 +162,26 @@ export async function submitReportToBackend(
 
     return {
       success: false,
-      error: 'Unexpected response from backend',
+      error: "Unexpected response from backend",
     };
   } catch (error) {
-    const errorMessage = extractErrorMessage(error, 'Failed to submit report');
+    const errorMessage = extractErrorMessage(error, "Failed to submit report");
 
-    const isAuthError = errorMessage.toLowerCase().includes('authentication') ||
-      (error instanceof Error && error.message.includes('401'));
+    const isAuthError =
+      errorMessage.toLowerCase().includes("authentication") ||
+      (error instanceof Error && error.message.includes("401"));
 
     if (isAuthError) {
       return {
         success: false,
-        error: 'Authentication required',
+        error: "Authentication required",
         requiresAuth: true,
       };
     }
 
     try {
-      await updateReportStatus(report.id, 'failed', undefined, errorMessage);
-    } catch (updateError) {
-    }
+      await updateReportStatus(report.id, "failed", undefined, errorMessage);
+    } catch (updateError) {}
 
     return {
       success: false,
@@ -187,7 +191,7 @@ export async function submitReportToBackend(
 }
 
 export async function checkReportStatus(
-  reportId: string
+  reportId: string,
 ): Promise<StatusCheckResult> {
   try {
     const response = await apiClient.get(apiConfig.endpoints.reportStatus, {
@@ -196,15 +200,15 @@ export async function checkReportStatus(
 
     const data = response.data;
     return {
-      status: data.status || 'unknown',
+      status: data.status || "unknown",
       confirmations: data.confirmations || 0,
       txHash: data.txHash,
       ipfsHash: data.ipfsHash,
     };
   } catch (error) {
-    extractErrorMessage(error, 'Failed to check report status');
+    extractErrorMessage(error, "Failed to check report status");
     return {
-      status: 'error',
+      status: "error",
       confirmations: 0,
     };
   }
@@ -212,22 +216,19 @@ export async function checkReportStatus(
 
 export async function archiveReportOnBackend(
   reportId: string,
-  reason?: string
+  reason?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await apiClient.post(
-      `/api/report/${reportId}/archive`,
-      {
-        reason: reason || 'User archived',
-      }
-    );
+    const response = await apiClient.post(`/api/report/${reportId}/archive`, {
+      reason: reason || "User archived",
+    });
 
     return {
       success: response.status === 200 || response.status === 201,
     };
   } catch (error) {
     const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
+      error instanceof Error ? error.message : "Unknown error";
     return {
       success: false,
       error: errorMessage,
@@ -236,11 +237,11 @@ export async function archiveReportOnBackend(
 }
 
 export async function decryptReportFromBackend(
-  reportId: string
+  reportId: string,
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     const response = await apiClient.get(
-      `${apiConfig.endpoints.reportDecrypt}/${reportId}/decrypt`
+      `${apiConfig.endpoints.reportDecrypt}/${reportId}/decrypt`,
     );
 
     if (response.status === 200) {
@@ -252,25 +253,28 @@ export async function decryptReportFromBackend(
 
     return {
       success: false,
-      error: 'Unexpected response from backend',
+      error: "Unexpected response from backend",
     };
   } catch (error) {
     return {
       success: false,
-      error: extractErrorMessage(error, 'Failed to decrypt report'),
+      error: extractErrorMessage(error, "Failed to decrypt report"),
     };
   }
 }
 
-export async function searchBackendReports(
-  params?: {
-    status?: string;
-    createdAfter?: string;
-    createdBefore?: string;
-    limit?: number;
-    offset?: number;
-  }
-): Promise<{ success: boolean; reports?: any[]; pagination?: any; error?: string }> {
+export async function searchBackendReports(params?: {
+  status?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  success: boolean;
+  reports?: any[];
+  pagination?: any;
+  error?: string;
+}> {
   try {
     const response = await apiClient.get(apiConfig.endpoints.searchReports, {
       params: params || {},
@@ -286,17 +290,21 @@ export async function searchBackendReports(
 
     return {
       success: false,
-      error: 'Unexpected response from backend',
+      error: "Unexpected response from backend",
     };
   } catch (error) {
     return {
       success: false,
-      error: extractErrorMessage(error, 'Failed to search reports'),
+      error: extractErrorMessage(error, "Failed to search reports"),
     };
   }
 }
 
-export async function getReportStats(): Promise<{ success: boolean; stats?: any; error?: string }> {
+export async function getReportStats(): Promise<{
+  success: boolean;
+  stats?: any;
+  error?: string;
+}> {
   try {
     const response = await apiClient.get(apiConfig.endpoints.searchStats);
 
@@ -309,16 +317,15 @@ export async function getReportStats(): Promise<{ success: boolean; stats?: any;
 
     return {
       success: false,
-      error: 'Unexpected response from backend',
+      error: "Unexpected response from backend",
     };
   } catch (error) {
     return {
       success: false,
-      error: extractErrorMessage(error, 'Failed to fetch report stats'),
+      error: extractErrorMessage(error, "Failed to fetch report stats"),
     };
   }
 }
-
 
 export function getApiClient(): AxiosInstance {
   return apiClient;

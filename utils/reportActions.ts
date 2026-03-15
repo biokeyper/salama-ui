@@ -3,7 +3,7 @@
  * Determines which actions are available for a report based on its status
  */
 
-import { Report } from '@/types/report';
+import { Report } from "@/types/report";
 
 export interface ActionAvailability {
   canDelete: boolean;
@@ -25,12 +25,12 @@ export function getAvailableActions(report: Report): ActionAvailability {
       canArchive: false,
       canSubmit: false,
       canRetry: false,
-      message: 'Archived report (read-only)',
+      message: "Archived report (read-only)",
     };
   }
 
   // Draft/saved reports (not yet submitted)
-  if (status === 'draft' || status === 'saved') {
+  if (status === "draft" || status === "saved") {
     return {
       canDelete: true,
       canEdit: true,
@@ -41,38 +41,38 @@ export function getAvailableActions(report: Report): ActionAvailability {
   }
 
   // Submitted - waiting for blockchain to process
-  if (status === 'submitted') {
+  if (status === "submitted") {
     return {
       canDelete: false,
       canEdit: false,
       canArchive: true,
       canSubmit: false,
       canRetry: false,
-      message: 'Submitted',
+      message: "Submitted",
     };
   }
 
   // Pending - blockchain is confirming
-  if (status === 'pending') {
+  if (status === "pending") {
     return {
       canDelete: false,
       canEdit: false,
       canArchive: true,
       canSubmit: false,
       canRetry: false,
-      message: 'Pending',
+      message: "Pending",
     };
   }
 
   // Failed - submission failed
-  if (status === 'failed') {
+  if (status === "failed") {
     return {
       canDelete: true,
       canEdit: false,
       canArchive: false,
       canSubmit: true,
       canRetry: true,
-      message: 'Submission failed - can retry',
+      message: "Submission failed - can retry",
     };
   }
 

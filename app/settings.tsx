@@ -411,12 +411,6 @@ export default function SettingsScreen() {
                     onSetPin={() => { }}
                     onClose={() => setShowVerifyPin(false)}
                 />
-                <TouchableOpacity
-                    style={styles.modalCloseButton}
-                    onPress={() => setShowVerifyPin(false)}
-                >
-                    <Feather name="x" size={24} color="#666" />
-                </TouchableOpacity>
             </Modal>
 
             <Modal visible={showSetPin} animationType="slide" transparent={false}>
@@ -426,12 +420,6 @@ export default function SettingsScreen() {
                     onUnlock={() => { }}
                     onClose={() => setShowSetPin(false)}
                 />
-                <TouchableOpacity
-                    style={styles.modalCloseButton}
-                    onPress={() => setShowSetPin(false)}
-                >
-                    <Feather name="x" size={24} color="#666" />
-                </TouchableOpacity>
             </Modal>
 
             <Modal visible={showEmailRecoveryModal} animationType="slide" transparent={true}>

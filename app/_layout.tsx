@@ -141,6 +141,13 @@ function RootNavigator({
           />
 
           <Stack.Screen
+            name="panic-alert-details"
+            options={{
+              headerShown: false,
+            }}
+          />
+
+          <Stack.Screen
             name="notifications"
             options={{
               headerShown: false,

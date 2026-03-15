@@ -19,6 +19,7 @@ import {
   submitReportToBackend,
 } from "@/services/api";
 import { getAuthToken } from "@/services/authService";
+import { getPanicAlertHistory, PanicAlertHistoryItem } from "@/services/panicService";
 import { hasPin } from "@/services/security";
 import {
   archiveReport,
@@ -61,7 +62,7 @@ export default function LibraryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingReportId, setPlayingReportId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"audio" | "text">("audio");
+  const [activeTab, setActiveTab] = useState<"audio" | "text" | "panic">("audio");
   const [showPinRequired, setShowPinRequired] = useState(false);
   const [showPinVerify, setShowPinVerify] = useState(false);
   const [showSetPinModal, setShowSetPinModal] = useState(false);
@@ -107,6 +108,12 @@ export default function LibraryScreen() {
     null,
   );
   const [isRevokingUserId, setIsRevokingUserId] = useState<string | null>(null);
+  const [panicAlerts, setPanicAlerts] = useState<PanicAlertHistoryItem[]>([]);
+  const [isLoadingPanicAlerts, setIsLoadingPanicAlerts] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [showPanicAlertDetailsModal, setShowPanicAlertDetailsModal] = useState(false);
+  const [selectedPanicAlert, setSelectedPanicAlert] = useState<PanicAlertHistoryItem | null>(null);
+  const [showPanicMapModal, setShowPanicMapModal] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchStatus, setSearchStatus] = useState<string>("all");
@@ -808,6 +815,27 @@ export default function LibraryScreen() {
     }
   };
 
+  const loadPanicAlerts = async () => {
+    setIsLoadingPanicAlerts(true);
+    try {
+      const result = await getPanicAlertHistory(50, 0);
+      console.log("Panic Alert Response:", result);
+      if (result.success && result.alerts) {
+        console.log("Panic Alerts Loaded:", result.alerts);
+        setPanicAlerts(result.alerts);
+      } else {
+        console.log("No panic alerts or request failed");
+        setPanicAlerts([]);
+      }
+    } catch (error) {
+      console.error("Error loading panic alerts:", error);
+      Alert.alert("Error", "Failed to load panic alerts");
+      setPanicAlerts([]);
+    } finally {
+      setIsLoadingPanicAlerts(false);
+    }
+  };
+
   const handleGrantAccess = async () => {
     if (!selectedReport || !shareUserId.trim()) {
       Alert.alert("Error", "Please enter a user ID");
@@ -1131,6 +1159,30 @@ export default function LibraryScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[
+              styles.tab,
+              !showSharedWithMeTab && activeTab === "panic" && styles.activeTab,
+            ]}
+            onPress={() => {
+              setActiveTab("panic");
+              setShowSharedWithMeTab(false);
+              if (panicAlerts.length === 0) {
+                loadPanicAlerts();
+              }
+            }}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                !showSharedWithMeTab &&
+                  activeTab === "panic" &&
+                  styles.activeTabText,
+              ]}
+            >
+              Panic History
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.tab, showSharedWithMeTab && styles.activeTab]}
             onPress={() => {
               setShowSharedWithMeTab(!showSharedWithMeTab);
@@ -1354,6 +1406,50 @@ export default function LibraryScreen() {
                 </View>
               )}
             </>
+          ) : activeTab === "panic" ? (
+            isLoadingPanicAlerts ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+              </View>
+            ) : panicAlerts.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Feather name="heart" size={64} color="#CCC" />
+                <Text style={styles.emptyText}>No panic alerts</Text>
+                <Text style={styles.emptySubtext}>
+                  Your panic alert history will appear here
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.reportsList}>
+                {panicAlerts.map((alert) => (
+                  <View
+                    key={alert.id}
+                    style={styles.panicAlertCard}
+                  >
+                    <View style={styles.panicAlertHeader}>
+                      <View style={styles.panicAlertInfo}>
+                        <Text style={styles.panicAlertTitle}>Panic Alert Sent</Text>
+                        <Text style={styles.panicAlertTime}>
+                          {new Date(alert.createdAt).toLocaleDateString()} at{" "}
+                          {new Date(alert.createdAt).toLocaleTimeString()}
+                        </Text>
+                        <Text style={styles.panicAlertStatus}>
+                          Status: <Text style={styles.panicAlertStatusValue}>{alert.status}</Text>
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedPanicAlert(alert);
+                          setShowPanicAlertDetailsModal(true);
+                        }}
+                      >
+                        <Text style={styles.viewDetailsLink}>View Details</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )
           ) : filteredReports.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Feather
@@ -1598,7 +1694,9 @@ export default function LibraryScreen() {
                             ? report.textContent.length > 40
                               ? report.textContent.slice(0, 40) + "…"
                               : report.textContent
-                            : "No content"}
+                            : report.status === "submitted"
+                              ? `Report ID: ${report.id}`
+                              : "No content"}
                         </Text>
                         {(report.status === "draft" ||
                           report.status === "saved") && (
@@ -1734,17 +1832,19 @@ export default function LibraryScreen() {
                                           </Text>
                                           {location.mapLink && (
                                             <TouchableOpacity
-                                              onPress={async () => {
-                                                try {
-                                                  await Linking.openURL(
+                                              onPress={() => {
+                                                setShowMapModal(true);
+                                                setTimeout(() => {
+                                                  Linking.openURL(
                                                     location.mapLink,
-                                                  );
-                                                } catch (_) {
-                                                  Alert.alert(
-                                                    "Error",
-                                                    "Could not open map",
-                                                  );
-                                                }
+                                                  ).catch(() => {
+                                                    Alert.alert(
+                                                      "Error",
+                                                      "Could not open map",
+                                                    );
+                                                  });
+                                                  setShowMapModal(false);
+                                                }, 1500);
                                               }}
                                             >
                                               <Text style={styles.mapLinkText}>
@@ -1814,6 +1914,12 @@ export default function LibraryScreen() {
                   </Text>
                 </View>
               )}
+
+              {/* Report ID */}
+              <View style={styles.contentSection}>
+                <Text style={styles.contentLabel}>Report ID:</Text>
+                <Text style={styles.reportId}>{decryptedContent.reportId}</Text>
+              </View>
 
               {/* Audio Duration */}
               {decryptedContent.metadata?.hasAudio && (
@@ -1892,7 +1998,7 @@ export default function LibraryScreen() {
                         />
                       </TouchableOpacity>
                     )}
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, flexDirection: "column" }}>
                       <Text style={styles.audioText}>
                         {detailAudioUri && detailPlayerStatus?.duration
                           ? `${Math.floor(detailPlayerStatus.currentTime || 0)}s / ${Math.floor(detailPlayerStatus.duration)}s`
@@ -1912,61 +2018,6 @@ export default function LibraryScreen() {
                           />
                         </View>
                       ) : null}
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* Location from metadata */}
-              {decryptedContent.metadata?.location && (
-                <View style={styles.contentSection}>
-                  <Text style={styles.contentLabel}>Location:</Text>
-                  <View style={styles.metadataItem}>
-                    <MaterialIcons
-                      name="location-on"
-                      size={16}
-                      color="#8A4FFF"
-                    />
-                    <View style={styles.locationContent}>
-                      {(() => {
-                        try {
-                          const location = JSON.parse(
-                            decryptedContent.metadata.location,
-                          );
-                          return (
-                            <>
-                              <Text style={styles.metadataText}>
-                                {location.latitude.toFixed(4)},{" "}
-                                {location.longitude.toFixed(4)}
-                              </Text>
-                              {location.mapLink && (
-                                <TouchableOpacity
-                                  onPress={async () => {
-                                    try {
-                                      await Linking.openURL(location.mapLink);
-                                    } catch (_) {
-                                      Alert.alert(
-                                        "Error",
-                                        "Could not open map",
-                                      );
-                                    }
-                                  }}
-                                >
-                                  <Text style={styles.mapLinkText}>
-                                    View on Map →
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-                            </>
-                          );
-                        } catch (_) {
-                          return (
-                            <Text style={styles.metadataText}>
-                              {decryptedContent.metadata.location}
-                            </Text>
-                          );
-                        }
-                      })()}
                     </View>
                   </View>
                 </View>
@@ -2031,11 +2082,6 @@ export default function LibraryScreen() {
                 )}
               </View>
 
-              {/* Report ID */}
-              <View style={styles.contentSection}>
-                <Text style={styles.contentLabel}>Report ID:</Text>
-                <Text style={styles.reportId}>{decryptedContent.reportId}</Text>
-              </View>
             </ScrollView>
           ) : null}
         </SafeAreaView>
@@ -2429,6 +2475,170 @@ export default function LibraryScreen() {
             </Text>
           </View>
         </View>
+      </Modal>
+
+      {/* Map Opening Modal */}
+      <Modal
+        visible={showMapModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.mapModalContainer}>
+          <View style={styles.mapModalContent}>
+            <ActivityIndicator size="large" color="#8A4FFF" />
+            <Text style={styles.mapModalText}>Opening Google Maps...</Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Panic Alert Details Modal */}
+      <Modal
+        visible={showPanicAlertDetailsModal}
+        animationType="slide"
+        onRequestClose={() => setShowPanicAlertDetailsModal(false)}
+      >
+        <SafeAreaView style={styles.panicDetailsContainer}>
+          <View style={styles.panicDetailsHeader}>
+            <TouchableOpacity
+              onPress={() => setShowPanicAlertDetailsModal(false)}
+              style={styles.panicDetailsBackButton}
+            >
+              <Feather name="arrow-left" size={24} color="#8B5CF6" />
+            </TouchableOpacity>
+            <Text style={styles.panicDetailsTitle}>Panic Alert Details</Text>
+            <View style={styles.panicDetailsPlaceholder} />
+          </View>
+
+          {selectedPanicAlert ? (
+            <ScrollView style={styles.panicDetailsContent}>
+              {/* Alert Status Card */}
+              <View style={styles.panicDetailsStatusCard}>
+                <View style={styles.panicDetailsStatusHeader}>
+                  <Text style={styles.panicDetailsStatusTitle}>Alert Status</Text>
+                  <View
+                    style={[
+                      styles.panicDetailsStatusBadge,
+                      selectedPanicAlert.status === "confirmed" && styles.panicDetailsStatusBadgeConfirmed,
+                      selectedPanicAlert.status === "pending" && styles.panicDetailsStatusBadgePending,
+                    ]}
+                  >
+                    <Text style={styles.panicDetailsStatusBadgeText}>
+                      {selectedPanicAlert.status?.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Timestamp */}
+              <View style={styles.panicDetailsSection}>
+                <Text style={styles.panicDetailsSectionTitle}>Sent At</Text>
+                <Text style={styles.panicDetailsSectionValue}>
+                  {new Date(selectedPanicAlert.createdAt).toLocaleString()}
+                </Text>
+              </View>
+
+              {/* Panic Message */}
+              {(selectedPanicAlert as any).panicMessage && (
+                <View style={styles.panicDetailsSection}>
+                  <Text style={styles.panicDetailsSectionTitle}>Panic Message</Text>
+                  <Text style={styles.panicDetailsMessageText}>{(selectedPanicAlert as any).panicMessage}</Text>
+                </View>
+              )}
+
+              {/* Location Data */}
+              <View style={styles.panicDetailsSection}>
+                <Text style={styles.panicDetailsSectionTitle}>Location</Text>
+                {(() => {
+                  if (!selectedPanicAlert.locationData) {
+                    return <Text style={styles.panicDetailsSectionValue}>Location not provided</Text>;
+                  }
+
+                  if (typeof selectedPanicAlert.locationData === 'string') {
+                    if (selectedPanicAlert.locationData.startsWith('{')) {
+                      try {
+                        const locationObj = JSON.parse(selectedPanicAlert.locationData);
+                        if (locationObj.mapLink) {
+                          return (
+                            <TouchableOpacity
+                              onPress={() => {
+                                setShowPanicMapModal(true);
+                                setTimeout(() => {
+                                  Linking.openURL(locationObj.mapLink).catch(() => {
+                                    Alert.alert("Error", "Could not open map");
+                                  });
+                                  setShowPanicMapModal(false);
+                                }, 1500);
+                              }}
+                            >
+                              <Text style={styles.panicDetailsMapLink}>📍 View on Map</Text>
+                            </TouchableOpacity>
+                          );
+                        }
+                      } catch {
+                        return <Text style={styles.panicDetailsSectionValue}>Location not provided</Text>;
+                      }
+                    } else if (selectedPanicAlert.locationData === 'emergency-alert-triggered') {
+                      return <Text style={styles.panicDetailsSectionValue}>Location not provided</Text>;
+                    }
+                    return <Text style={styles.panicDetailsSectionValue}>{selectedPanicAlert.locationData}</Text>;
+                  }
+
+                  return <Text style={styles.panicDetailsSectionValue}>{JSON.stringify(selectedPanicAlert.locationData)}</Text>;
+                })()}
+              </View>
+
+              {/* Emergency Contacts */}
+              {selectedPanicAlert.emergencyContacts && selectedPanicAlert.emergencyContacts.length > 0 && (
+                <View style={styles.panicDetailsSection}>
+                  <Text style={styles.panicDetailsSectionTitle}>Emergency Contacts Notified</Text>
+                  {selectedPanicAlert.emergencyContacts.map((contact: any, index: number) => (
+                    <View key={index} style={styles.panicDetailsContactCard}>
+                      <View style={styles.panicDetailsContactCardHeader}>
+                        <Feather name="user" size={18} color="#8B5CF6" />
+                        <View style={styles.panicDetailsContactCardInfo}>
+                          {contact.name && (
+                            <Text style={styles.panicDetailsContactCardName}>{contact.name}</Text>
+                          )}
+                          {contact.relationship && (
+                            <Text style={styles.panicDetailsContactCardRelationship}>{contact.relationship}</Text>
+                          )}
+                        </View>
+                      </View>
+                      <View style={styles.panicDetailsContactCardDetails}>
+                        {contact.phone && (
+                          <View style={styles.panicDetailsContactDetail}>
+                            <Feather name="phone" size={14} color="#6B7280" />
+                            <Text style={styles.panicDetailsContactDetailText}>{contact.phone}</Text>
+                          </View>
+                        )}
+                        {contact.email && (
+                          <View style={styles.panicDetailsContactDetail}>
+                            <Feather name="mail" size={14} color="#6B7280" />
+                            <Text style={styles.panicDetailsContactDetailText}>{contact.email}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          ) : null}
+
+          {/* Panic Map Modal */}
+          <Modal
+            visible={showPanicMapModal}
+            transparent={true}
+            animationType="fade"
+          >
+            <View style={styles.mapModalContainer}>
+              <View style={styles.mapModalContent}>
+                <ActivityIndicator size="large" color="#8A4FFF" />
+                <Text style={styles.mapModalText}>Opening Google Maps...</Text>
+              </View>
+            </View>
+          </Modal>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -2846,7 +3056,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#8A4FFF",
     fontWeight: "600",
-    flex: 1,
   },
   audioFormat: {
     fontSize: 12,
@@ -3331,5 +3540,203 @@ const styles = StyleSheet.create({
   },
   revokeButtonDisabled: {
     opacity: 0.6,
+  },
+  panicAlertCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    padding: 16,
+    marginVertical: 8,
+    marginHorizontal: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  panicAlertHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  panicAlertInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  panicAlertTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginBottom: 6,
+  },
+  panicAlertTime: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginBottom: 6,
+  },
+  panicAlertStatus: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  panicAlertStatusValue: {
+    fontWeight: "600",
+    color: "#10B981",
+    textTransform: "capitalize",
+  },
+  viewDetailsLink: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#8B5CF6",
+    textDecorationLine: "underline",
+  },
+  mapModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mapModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 32,
+    alignItems: "center",
+    minWidth: 200,
+  },
+  mapModalText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  panicDetailsContainer: {
+    flex: 1,
+    backgroundColor: "#F8F9FE",
+  },
+  panicDetailsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  panicDetailsBackButton: {
+    padding: 8,
+  },
+  panicDetailsTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  panicDetailsPlaceholder: {
+    width: 40,
+  },
+  panicDetailsContent: {
+    flex: 1,
+    padding: 16,
+  },
+  panicDetailsStatusCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  panicDetailsStatusHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  panicDetailsStatusTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  panicDetailsStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+  },
+  panicDetailsStatusBadgeConfirmed: {
+    backgroundColor: "#ECFDF5",
+  },
+  panicDetailsStatusBadgePending: {
+    backgroundColor: "#FEF3C7",
+  },
+  panicDetailsStatusBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  panicDetailsSection: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  panicDetailsSectionTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  panicDetailsSectionValue: {
+    fontSize: 14,
+    color: "#1F2937",
+    lineHeight: 20,
+  },
+  panicDetailsMessageText: {
+    fontSize: 14,
+    color: "#1F2937",
+    lineHeight: 20,
+    fontStyle: "italic",
+  },
+  panicDetailsMapLink: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#8B5CF6",
+    textDecorationLine: "underline",
+    marginTop: 8,
+  },
+  panicDetailsContactCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
+  panicDetailsContactCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  panicDetailsContactCardInfo: {
+    flex: 1,
+  },
+  panicDetailsContactCardName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  panicDetailsContactCardRelationship: {
+    fontSize: 12,
+    color: "#8B5CF6",
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  panicDetailsContactCardDetails: {
+    gap: 6,
+  },
+  panicDetailsContactDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  panicDetailsContactDetailText: {
+    fontSize: 12,
+    color: "#6B7280",
   },
 });

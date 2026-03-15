@@ -1,54 +1,58 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  FlatList,
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  Keyboard,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import * as Contacts from 'expo-contacts';
+import AuthGateModal from "@/components/AuthGateModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { getAuthToken } from "@/services/authService";
 import {
   addEmergencyContact,
-  getEmergencyContacts,
-  removeEmergencyContact,
   editEmergencyContact,
-  getPanicMessage,
-  setPanicMessage,
   EmergencyContact,
-} from '@/services/emergencyContactService';
-import { getAuthToken } from '@/services/authService';
-import { useAuth } from '@/contexts/AuthContext';
-import AuthGateModal from '@/components/AuthGateModal';
+  getEmergencyContacts,
+  getPanicMessage,
+  removeEmergencyContact,
+  setPanicMessage,
+} from "@/services/emergencyContactService";
+import { Feather } from "@expo/vector-icons";
+import * as Contacts from "expo-contacts";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Keyboard,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function EmergencyContactsSection() {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [panicMessage, setPanicMsg] = useState('');
+  const [panicMessage, setPanicMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPanicMessageModal, setShowPanicMessageModal] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
-  const [newPhone, setNewPhone] = useState('');
-  const [newName, setNewName] = useState('');
-  const [newRelationship, setNewRelationship] = useState('');
+  const [newPhone, setNewPhone] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newRelationship, setNewRelationship] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [isSavingMessage, setIsSavingMessage] = useState(false);
   const [deviceContacts, setDeviceContacts] = useState<any[]>([]);
   const [showDeviceContacts, setShowDeviceContacts] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingContact, setEditingContact] = useState<EmergencyContact | null>(null);
-  const [editPhone, setEditPhone] = useState('');
-  const [editName, setEditName] = useState('');
-  const [editRelationship, setEditRelationship] = useState('');
+  const [editingContact, setEditingContact] = useState<EmergencyContact | null>(
+    null,
+  );
+  const [editPhone, setEditPhone] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editRelationship, setEditRelationship] = useState("");
   const [isEditing, setIsEditing] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'add' | 'edit' | 'panic' | null>(null);
+  const [pendingAction, setPendingAction] = useState<
+    "add" | "edit" | "panic" | null
+  >(null);
 
   const editPhoneRef = useRef<TextInput>(null);
   const editNameRef = useRef<TextInput>(null);
@@ -75,13 +79,12 @@ export default function EmergencyContactsSection() {
   const loadPanicMessage = async () => {
     try {
       const result = await getPanicMessage();
-      if (result.success && typeof result.data === 'string') {
+      if (result.success && typeof result.data === "string") {
         setPanicMsg(result.data);
       } else if (result.success && result.data) {
-        setPanicMsg('');
+        setPanicMsg("");
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const checkAuth = async (): Promise<boolean> => {
@@ -92,7 +95,7 @@ export default function EmergencyContactsSection() {
   const handleOpenAddModal = async () => {
     const isAuth = await checkAuth();
     if (!isAuth) {
-      setPendingAction('add');
+      setPendingAction("add");
       setShowAuthGate(true);
       return;
     }
@@ -102,7 +105,7 @@ export default function EmergencyContactsSection() {
   const handleOpenEditModal = async (contact: EmergencyContact) => {
     const isAuth = await checkAuth();
     if (!isAuth) {
-      setPendingAction('edit');
+      setPendingAction("edit");
       setShowAuthGate(true);
       return;
     }
@@ -116,7 +119,7 @@ export default function EmergencyContactsSection() {
   const handleOpenPanicMessageModal = async () => {
     const isAuth = await checkAuth();
     if (!isAuth) {
-      setPendingAction('panic');
+      setPendingAction("panic");
       setShowAuthGate(true);
       return;
     }
@@ -132,24 +135,27 @@ export default function EmergencyContactsSection() {
     try {
       const { status } = await Contacts.requestPermissionsAsync();
 
-      if (status === 'granted') {
+      if (status === "granted") {
         const { data } = await Contacts.getContactsAsync({
           fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
         });
 
         // Filter contacts that have phone numbers
         const contactsWithPhones = data
-          .filter((contact) => contact.phoneNumbers && contact.phoneNumbers.length > 0)
+          .filter(
+            (contact) =>
+              contact.phoneNumbers && contact.phoneNumbers.length > 0,
+          )
           .map((contact) => ({
-            name: contact.name || 'Unnamed Contact',
-            phone: contact.phoneNumbers?.[0]?.number || '',
+            name: contact.name || "Unnamed Contact",
+            phone: contact.phoneNumbers?.[0]?.number || "",
           }));
 
         setDeviceContacts(contactsWithPhones);
         setShowDeviceContacts(true);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load device contacts');
+      Alert.alert("Error", "Failed to load device contacts");
     }
   };
 
@@ -162,25 +168,29 @@ export default function EmergencyContactsSection() {
 
   const handleAddContact = async () => {
     if (!newPhone.trim() || !newName.trim() || !newRelationship.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     setIsAdding(true);
     try {
-      const result = await addEmergencyContact(newPhone, newName, newRelationship);
+      const result = await addEmergencyContact(
+        newPhone,
+        newName,
+        newRelationship,
+      );
       if (result.success) {
-        Alert.alert('Success', 'Emergency contact added');
-        setNewPhone('');
-        setNewName('');
-        setNewRelationship('');
+        Alert.alert("Success", "Emergency contact added");
+        setNewPhone("");
+        setNewName("");
+        setNewRelationship("");
         setShowAddModal(false);
         await loadContacts();
       } else {
-        Alert.alert('Error', result.error || 'Failed to add contact');
+        Alert.alert("Error", result.error || "Failed to add contact");
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred while adding contact');
+      Alert.alert("Error", "An error occurred while adding contact");
     } finally {
       setIsAdding(false);
     }
@@ -188,34 +198,37 @@ export default function EmergencyContactsSection() {
 
   const handleRemoveContact = (contactId: number, name: string) => {
     Alert.alert(
-      'Remove Contact',
+      "Remove Contact",
       `Are you sure you want to remove ${name} from emergency contacts?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "Remove",
+          style: "destructive",
           onPress: async () => {
             try {
               const result = await removeEmergencyContact(contactId);
               if (result.success) {
-                Alert.alert('Success', 'Contact removed');
+                Alert.alert("Success", "Contact removed");
                 await loadContacts();
               } else {
-                Alert.alert('Error', result.error || 'Failed to remove contact');
+                Alert.alert(
+                  "Error",
+                  result.error || "Failed to remove contact",
+                );
               }
             } catch (error) {
-              Alert.alert('Error', 'An error occurred while removing contact');
+              Alert.alert("Error", "An error occurred while removing contact");
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const handleSavePanicMessage = async () => {
     if (!panicMessage.trim()) {
-      Alert.alert('Error', 'Please enter a panic message');
+      Alert.alert("Error", "Please enter a panic message");
       return;
     }
 
@@ -228,13 +241,13 @@ export default function EmergencyContactsSection() {
       if (result.success) {
         const savedMessage = result?.data?.panicMessage || panicMessage;
         setPanicMsg(savedMessage);
-        Alert.alert('Success', 'Panic message saved');
+        Alert.alert("Success", "Panic message saved");
         setShowPanicMessageModal(false);
       } else {
-        Alert.alert('Error', result.error || 'Failed to save panic message');
+        Alert.alert("Error", result.error || "Failed to save panic message");
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred while saving panic message');
+      Alert.alert("Error", "An error occurred while saving panic message");
     } finally {
       setIsSavingMessage(false);
     }
@@ -245,14 +258,13 @@ export default function EmergencyContactsSection() {
   };
 
   const handleSaveEdit = async () => {
-
     // Prevent duplicate submissions
     if (isEditing || !editingContact) {
       return;
     }
 
     if (!editName.trim() || !editPhone.trim() || !editRelationship.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
@@ -265,21 +277,24 @@ export default function EmergencyContactsSection() {
         relationship: editRelationship.trim(),
       };
 
-      const result = await editEmergencyContact(editingContact.contactId, updatePayload);
+      const result = await editEmergencyContact(
+        editingContact.contactId,
+        updatePayload,
+      );
 
       if (result.success) {
-        Alert.alert('Success', 'Contact updated successfully');
+        Alert.alert("Success", "Contact updated successfully");
         setShowEditModal(false);
         setEditingContact(null);
-        setEditPhone('');
-        setEditName('');
-        setEditRelationship('');
+        setEditPhone("");
+        setEditName("");
+        setEditRelationship("");
         await loadContacts();
       } else {
-        Alert.alert('Error', result.error || 'Failed to update contact');
+        Alert.alert("Error", result.error || "Failed to update contact");
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred while updating contact');
+      Alert.alert("Error", "An error occurred while updating contact");
     } finally {
       setIsEditing(false);
     }
@@ -328,7 +343,7 @@ export default function EmergencyContactsSection() {
           <View style={styles.panicMessageText}>
             <Text style={styles.panicMessageLabel}>Custom Panic Message</Text>
             <Text style={styles.panicMessageValue} numberOfLines={1}>
-              {panicMessage || 'Set a message to send to your contacts'}
+              {panicMessage || "Set a message to send to your contacts"}
             </Text>
           </View>
         </View>
@@ -338,9 +353,7 @@ export default function EmergencyContactsSection() {
       {/* Contacts List */}
       <View style={styles.contactsContainer}>
         <View style={styles.contactsHeader}>
-          <Text style={styles.contactsTitle}>
-            Contacts ({contacts.length})
-          </Text>
+          <Text style={styles.contactsTitle}>Contacts ({contacts.length})</Text>
         </View>
 
         {isLoading ? (
@@ -369,10 +382,7 @@ export default function EmergencyContactsSection() {
           />
         )}
 
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleOpenAddModal}
-        >
+        <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
           <Feather name="plus" size={20} color="#8B5CF6" />
           <Text style={styles.addButtonText}>Add Emergency Contact</Text>
         </TouchableOpacity>
@@ -398,7 +408,9 @@ export default function EmergencyContactsSection() {
                 onPress={loadDeviceContacts}
               >
                 <Feather name="smartphone" size={18} color="#8B5CF6" />
-                <Text style={styles.loadContactsButtonText}>Load from Phone Contacts</Text>
+                <Text style={styles.loadContactsButtonText}>
+                  Load from Phone Contacts
+                </Text>
               </TouchableOpacity>
 
               <Text style={styles.inputLabel}>Name</Text>
@@ -433,7 +445,10 @@ export default function EmergencyContactsSection() {
               />
 
               <TouchableOpacity
-                style={[styles.saveButton, isAdding && styles.saveButtonDisabled]}
+                style={[
+                  styles.saveButton,
+                  isAdding && styles.saveButtonDisabled,
+                ]}
                 onPress={handleAddContact}
                 disabled={isAdding}
               >
@@ -495,7 +510,10 @@ export default function EmergencyContactsSection() {
               />
 
               <TouchableOpacity
-                style={[styles.saveButton, isEditing && styles.saveButtonDisabled]}
+                style={[
+                  styles.saveButton,
+                  isEditing && styles.saveButtonDisabled,
+                ]}
                 onPress={handleSaveEdit}
               >
                 {isEditing ? (
@@ -510,7 +528,11 @@ export default function EmergencyContactsSection() {
       </Modal>
 
       {/* Panic Message Modal */}
-      <Modal visible={showPanicMessageModal} animationType="slide" transparent={true}>
+      <Modal
+        visible={showPanicMessageModal}
+        animationType="slide"
+        transparent={true}
+      >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -541,7 +563,10 @@ export default function EmergencyContactsSection() {
               </Text>
 
               <TouchableOpacity
-                style={[styles.saveButton, isSavingMessage && styles.saveButtonDisabled]}
+                style={[
+                  styles.saveButton,
+                  isSavingMessage && styles.saveButtonDisabled,
+                ]}
                 onPress={handleSavePanicMessage}
                 disabled={isSavingMessage}
               >
@@ -560,7 +585,11 @@ export default function EmergencyContactsSection() {
       </Modal>
 
       {/* Device Contacts Modal */}
-      <Modal visible={showDeviceContacts} animationType="slide" transparent={true}>
+      <Modal
+        visible={showDeviceContacts}
+        animationType="slide"
+        transparent={true}
+      >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -590,7 +619,9 @@ export default function EmergencyContactsSection() {
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               ListEmptyComponent={() => (
-                <Text style={styles.emptyMessage}>No contacts with phone numbers found</Text>
+                <Text style={styles.emptyMessage}>
+                  No contacts with phone numbers found
+                </Text>
               )}
               style={{ paddingHorizontal: 16 }}
             />
@@ -598,47 +629,44 @@ export default function EmergencyContactsSection() {
         </View>
       </Modal>
 
-      <AuthGateModal
-        visible={showAuthGate}
-        onClose={handleAuthGateClosed}
-      />
+      <AuthGateModal visible={showAuthGate} onClose={handleAuthGateClosed} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     marginTop: 16,
     paddingVertical: 16,
     paddingHorizontal: 20,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
     lineHeight: 20,
     marginBottom: 16,
   },
   panicMessageCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F5F3FF',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F5F3FF",
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: "#E9D5FF",
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
   },
   panicMessageContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
     gap: 12,
   },
@@ -647,13 +675,13 @@ const styles = StyleSheet.create({
   },
   panicMessageLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontWeight: "500",
+    color: "#1F2937",
     marginBottom: 4,
   },
   panicMessageValue: {
     fontSize: 13,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   contactsContainer: {
     marginTop: 16,
@@ -663,39 +691,39 @@ const styles = StyleSheet.create({
   },
   contactsTitle: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontWeight: "500",
+    color: "#1F2937",
   },
   loader: {
     marginVertical: 20,
   },
   emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 32,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
     marginBottom: 12,
   },
   emptyStateText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontWeight: "500",
+    color: "#6B7280",
     marginTop: 12,
   },
   emptyStateSubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 4,
   },
   contactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 12,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     paddingHorizontal: 12,
     borderRadius: 8,
     marginBottom: 8,
@@ -704,35 +732,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contactHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginBottom: 4,
   },
   contactName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
   },
   contactRelationship: {
     fontSize: 12,
-    color: '#8B5CF6',
-    backgroundColor: '#F5F3FF',
+    color: "#8B5CF6",
+    backgroundColor: "#F5F3FF",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   contactPhone: {
     fontSize: 13,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   separator: {
     height: 0,
     marginBottom: 0,
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   editButton: {
@@ -742,12 +770,12 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F3FF',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F5F3FF",
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: "#E9D5FF",
     borderRadius: 12,
     padding: 14,
     marginTop: 12,
@@ -755,35 +783,35 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#8B5CF6',
+    fontWeight: "600",
+    color: "#8B5CF6",
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 24,
     paddingBottom: 32,
-    maxHeight: '85%',
+    maxHeight: "85%",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: "#E5E7EB",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
   },
   modalCloseButton: {
     padding: 6,
@@ -793,56 +821,56 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontWeight: "500",
+    color: "#1F2937",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#1F2937',
+    color: "#1F2937",
     marginBottom: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
   messageInput: {
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     paddingTop: 12,
   },
   messageHint: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginBottom: 16,
     lineHeight: 18,
   },
   saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#8B5CF6',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#8B5CF6",
     paddingVertical: 12,
     borderRadius: 8,
     marginBottom: 16,
     gap: 10,
   },
   saveButtonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: "#D1D5DB",
   },
   saveButtonText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   loadContactsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F3FF',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F5F3FF",
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: "#E9D5FF",
     borderRadius: 8,
     paddingVertical: 12,
     marginBottom: 16,
@@ -850,29 +878,29 @@ const styles = StyleSheet.create({
   },
   loadContactsButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#8B5CF6',
+    fontWeight: "600",
+    color: "#8B5CF6",
   },
   deviceContactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 12,
   },
   deviceContactName: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
     marginBottom: 2,
   },
   deviceContactPhone: {
     fontSize: 13,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   emptyMessage: {
     fontSize: 14,
-    color: '#9CA3AF',
-    textAlign: 'center',
+    color: "#9CA3AF",
+    textAlign: "center",
     marginTop: 20,
   },
 });
