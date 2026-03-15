@@ -22,6 +22,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (user) {
       refreshUnreadCount();
+    } else {
+      // Clear count when user logs out or deletes account
+      setUnreadCount(0);
     }
   }, [user]);
 
