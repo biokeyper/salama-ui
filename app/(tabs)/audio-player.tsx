@@ -819,16 +819,12 @@ export default function LibraryScreen() {
     setIsLoadingPanicAlerts(true);
     try {
       const result = await getPanicAlertHistory(50, 0);
-      console.log("Panic Alert Response:", result);
       if (result.success && result.alerts) {
-        console.log("Panic Alerts Loaded:", result.alerts);
         setPanicAlerts(result.alerts);
       } else {
-        console.log("No panic alerts or request failed");
         setPanicAlerts([]);
       }
     } catch (error) {
-      console.error("Error loading panic alerts:", error);
       Alert.alert("Error", "Failed to load panic alerts");
       setPanicAlerts([]);
     } finally {
