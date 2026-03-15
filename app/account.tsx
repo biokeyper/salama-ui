@@ -234,11 +234,9 @@ export default function AccountScreen() {
         )}
       </ScrollView>
 
-      {/* Auth gate for unauthenticated users */}
       <AuthGateModal
         visible={showAuthGate}
         onClose={() => {
-          // User chose "Continue as Guest" or closed modal
           router.back();
         }}
       />

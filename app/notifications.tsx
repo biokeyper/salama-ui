@@ -27,7 +27,6 @@ export default function NotificationsScreen() {
     loadNotifications();
   }, []);
 
-  // Initialize audio for notification sounds
   useEffect(() => {
     initializeAudio();
   }, []);
@@ -36,7 +35,6 @@ export default function NotificationsScreen() {
     setIsLoading(true);
     setError('');
 
-    // Check if user is logged in
     if (!user) {
       setError('Sign in to view your notifications');
       setIsLoading(false);
@@ -47,24 +45,17 @@ export default function NotificationsScreen() {
       const result = await getNotifications({ limit: 50, offset: 0 });
       if (result.success && result.notifications) {
         const newCount = result.notifications.length;
-        result.notifications.forEach((notif, idx) => {
-        });
         setNotifications(result.notifications);
 
-        // Play notification sound ONLY if:
-        // 1. App has initialized (not first load)
-        // 2. There are NEW notifications (more than before)
         if (hasInitialized && newCount > previousNotificationCount) {
           await playNotificationSound();
         }
 
-        // Update counts for next comparison
         setPreviousNotificationCount(newCount);
         if (!hasInitialized) {
           setHasInitialized(true);
         }
       } else {
-        // For logged-in users, just show empty state instead of error
         setNotifications([]);
       }
     } catch (err) {
@@ -121,7 +112,6 @@ export default function NotificationsScreen() {
 
       const date = new Date(dateString);
 
-      // Validate the date
       if (isNaN(date.getTime())) {
         return 'Invalid date';
       }
@@ -160,8 +150,6 @@ export default function NotificationsScreen() {
   };
 
   const renderNotification = ({ item }: { item: Notification }) => {
-    // Log each notification's date for debugging
-
     return (
       <TouchableOpacity
         style={[

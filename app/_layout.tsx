@@ -18,21 +18,6 @@ import { initDatabase } from '@/services/database';
 import FloatingEmergencyButton from '@/components/FloatingEmergencyButton';
 import EmergencyAlertModal from '@/components/EmergencyAlertModal';
 
-// Deep linking configuration
-const linking = {
-  prefixes: ['safegirlapp://', 'https://safegirl.app'],
-  config: {
-    screens: {
-      'verify-email': 'verify-email/:email/:userId',
-      'recovery': 'recovery/:token',
-      index: '',
-      '(tabs)': '(tabs)',
-      login: 'login',
-      signup: 'signup',
-    },
-  },
-};
-
 interface RootNavigatorProps {
   emergencyModalVisible: boolean;
   onOpenEmergencyModal: () => void;
@@ -115,14 +100,13 @@ function RootNavigator({
             name="login"
             options={{
               headerShown: false,
-              animationEnabled: true,
             }}
           />
           <Stack.Screen
             name="signup"
             options={{
               headerShown: false,
-              animationEnabled: true,
+              animation: 'slide_from_bottom',
             }}
           />
 
@@ -130,7 +114,7 @@ function RootNavigator({
             name="verify-email"
             options={{
               headerShown: false,
-              animationEnabled: true,
+              animation: 'slide_from_bottom',
             }}
           />
 
@@ -138,7 +122,7 @@ function RootNavigator({
             name="recovery"
             options={{
               headerShown: false,
-              animationEnabled: true,
+              animation: 'slide_from_bottom',
             }}
           />
 
@@ -190,14 +174,14 @@ export default function RootLayout() {
       .then(() => {
         setDbInitialized(true);
       })
-      .catch((error) => {
+      .catch((_error) => {
         // Retry after a delay
         setTimeout(() => {
           initDatabase()
             .then(() => {
               setDbInitialized(true);
             })
-            .catch((retryError) => {
+            .catch((_retryError) => {
               setDbInitialized(true); // Allow app to continue anyway
             });
         }, 1000);

@@ -7,7 +7,6 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { verifyPin, hasPin, setPin as savePinToBackend } from '@/services/security';
-import { getAuthToken } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGateModal from '@/components/AuthGateModal';
 
@@ -70,7 +69,6 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                     try {
                         const success = await savePinToBackend(pin, user?.userId);
                         if (success) {
-                            const logStatus = user?.userId ? `✅ PIN set for user: ${user.userId}` : '✅ PIN set locally (not logged in)';
                             onSetPin?.(pin);
                         } else {
                             Alert.alert('Error', 'Failed to set PIN. Please try again.');
@@ -78,7 +76,7 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                             setConfirmPin('');
                             setIsConfirming(false);
                         }
-                    } catch (error) {
+                    } catch (_error) {
                         Alert.alert('Error', 'An error occurred while setting PIN');
                         setPin('');
                         setConfirmPin('');
@@ -95,7 +93,7 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
             // Verify mode - check PIN against user.pin from backend
             try {
               // Check if PIN is set
-              const pinSet = await hasPin(user?.pin);
+              const pinSet = await hasPin(user?.pin || null);
 
               if (!pinSet) {
                 Alert.alert('Set PIN First', 'Please set a PIN first to access your library.');
@@ -104,14 +102,14 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
               }
 
               // Verify PIN against user.pin from backend
-              const isValid = await verifyPin(pin, user?.pin);
+              const isValid = await verifyPin(pin, user?.pin || null);
               if (isValid) {
-                onUnlock();
+                onUnlock?.();
               } else {
                 Alert.alert('Incorrect PIN', 'Please try again');
                 setPin('');
               }
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'An error occurred. Please try again.');
               setPin('');
             }

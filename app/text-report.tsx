@@ -25,14 +25,14 @@ export default function TextReportScreen() {
   const audioUri = params.audioUri as string | undefined;
   const editReportId = params.editReportId as string | undefined;
 
-  // Check if user is logged in - if not, show auth gate
+ 
   useEffect(() => {
     if (!user) {
       setShowAuthGate(true);
     }
   }, [user]);
 
-  // Load existing report if editing
+  
   useEffect(() => {
     if (editReportId) {
       loadReportForEditing(editReportId);
@@ -90,7 +90,7 @@ export default function TextReportScreen() {
   };
 
   const handleSaveDraft = async () => {
-    // Check if user is logged in
+   
     if (!user) {
       setShowAuthGate(true);
       return;
@@ -122,7 +122,7 @@ export default function TextReportScreen() {
         {
           text: 'OK',
           onPress: () => {
-            // Clear input and stay on same page
+            
             setReport('');
           },
         },
@@ -140,14 +140,14 @@ export default function TextReportScreen() {
       return;
     }
 
-    // Check authentication BEFORE allowing submission
+   
     const token = await getAuthToken();
     if (!token || !user) {
       setShowAuthGate(true);
       return;
     }
 
-    // Show confirmation modal
+    
     Alert.alert(
       'Submit Report?',
       'Are you sure you want to submit this report?',
@@ -155,7 +155,6 @@ export default function TextReportScreen() {
         {
           text: 'Cancel',
           onPress: () => {
-            // Do nothing, stay on page
           },
           style: 'cancel',
         },
@@ -216,7 +215,6 @@ export default function TextReportScreen() {
         metadata,
       });
 
-      // Then submit to backend
       const result = await submitReportToBackend(savedReport);
 
 
@@ -268,11 +266,9 @@ export default function TextReportScreen() {
   if (!user) {
     return (
       <View style={{ flex: 1 }}>
-        {/* Show auth gate - user must log in to continue */}
         <AuthGateModal
           visible={showAuthGate}
           onClose={() => {
-            // Close modal and redirect back
             router.back();
           }}
         />

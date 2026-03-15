@@ -21,7 +21,7 @@ export default function RecordPastScreen() {
   const [showAuthGate, setShowAuthGate] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
 
-  // Check if user is logged in - if not, show auth gate
+  
   useEffect(() => {
     if (!user) {
       setShowAuthGate(true);
@@ -118,7 +118,6 @@ export default function RecordPastScreen() {
   };
 
   const handleEmergencyExit = async () => {
-    // Check if user is logged in before allowing emergency exit
     if (!user) {
       setShowAuthGate(true);
       return;
@@ -191,11 +190,9 @@ export default function RecordPastScreen() {
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
-        {/* Show auth gate - user must log in to continue */}
         <AuthGateModal
           visible={showAuthGate}
           onClose={() => {
-            // Close modal and redirect back
             router.back();
           }}
         />

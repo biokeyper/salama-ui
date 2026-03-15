@@ -1,7 +1,4 @@
-/**
- * Login Screen
- * 2-step login flow: phone → OTP verification
- */
+
 
 import React, { useState } from 'react';
 import {
@@ -30,7 +27,6 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [testOtp, setTestOtp] = useState<string | undefined>();
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
   const [newPhone, setNewPhone] = useState('');
@@ -47,7 +43,6 @@ export default function LoginScreen() {
     try {
       const result = await initiateLoginFlow(phone.trim());
       if (result.success) {
-        setTestOtp(result._testOTP); // For dev mode
         setStep('otp');
       } else {
         Alert.alert('Error', result.error || 'Failed to initiate login');
@@ -71,13 +66,11 @@ export default function LoginScreen() {
     try {
       const result = await login(phone.trim(), otp.trim());
       if (result.success) {
-        // Navigate immediately, then show success message
-        // This ensures navigation happens first before any modal shows
+        
         setTimeout(() => {
           router.replace('/');
         }, 100);
 
-        // Show brief success alert
         Alert.alert('Success', 'You are now logged in');
       } else {
         Alert.alert('Error', result.error || 'Failed to verify OTP');
@@ -106,7 +99,7 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Error', result.error || 'Failed to initiate recovery');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'An error occurred');
     } finally {
       setIsLoading(false);
@@ -127,7 +120,7 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Error', result.error || 'Invalid token');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'An error occurred');
     } finally {
       setIsLoading(false);
@@ -148,7 +141,7 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Error', result.error || 'Failed to initiate phone change');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'An error occurred');
     } finally {
       setIsLoading(false);
@@ -181,7 +174,7 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Error', result.error || 'Failed to verify phone change');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'An error occurred');
     } finally {
       setIsLoading(false);
@@ -265,11 +258,6 @@ export default function LoginScreen() {
                 keyboardType="number-pad"
                 maxLength={6}
               />
-              {testOtp && (
-                <ThemedText style={styles.testOtpText}>
-                  Dev mode: {testOtp}
-                </ThemedText>
-              )}
               <TouchableOpacity
                 style={[styles.button, styles.primaryButton, isLoading && styles.buttonDisabled]}
                 onPress={handleVerifyOtp}
@@ -286,7 +274,6 @@ export default function LoginScreen() {
                 onPress={() => {
                   setStep('phone');
                   setOtp('');
-                  setTestOtp(undefined);
                 }}
                 disabled={isLoading}
               >
@@ -430,7 +417,7 @@ export default function LoginScreen() {
 
         <View style={styles.bottomContainer}>
           <View style={styles.signupLinkContainer}>
-            <ThemedText style={styles.signupLinkText}>Don't have an account? </ThemedText>
+            <ThemedText style={styles.signupLinkText}>Don&apos;t have an account? </ThemedText>
             <TouchableOpacity onPress={() => router.navigate('/signup')}>
               <ThemedText style={styles.signupLink}>Sign Up</ThemedText>
             </TouchableOpacity>
@@ -470,12 +457,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#faf8ff',
     color: '#222',
-  },
-  testOtpText: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 16,
-    fontStyle: 'italic',
   },
   button: {
     paddingVertical: 16,

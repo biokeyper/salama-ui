@@ -16,12 +16,9 @@ import * as SecureStore from 'expo-secure-store';
 import EmergencyContactsSection from '@/components/EmergencyContactsSection';
 import AuthGateModal from '@/components/AuthGateModal';
 
-const EMAIL_RECOVERY_KEY = 'salama_email_recovery_setup';
-
-
 export default function SettingsScreen() {
     const router = useRouter();
-    const { settings, updateSettings, resetSettings } = useSettings();
+    const { settings, updateSettings } = useSettings();
     const { user, logout } = useAuth();
     const pinProtection = usePinProtection();
     const checkPinStatus = pinProtection?.checkPinStatus || (async () => { });
@@ -35,26 +32,26 @@ export default function SettingsScreen() {
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAuthGate, setShowAuthGate] = useState(false);
 
-    useEffect(() => {
-        checkPin();
-        // Pre-fill with user's email if it exists
-        if (user?.email) {
-            setRecoveryEmail(user.email);
-        }
-    }, [user]);
-
-    // Check if email is set (not null and not empty)
-    const emailRecoverySetup = user?.email ? true : false;
-
     const checkAuth = async (): Promise<boolean> => {
         const token = await getAuthToken();
         return !!(token && user);
     };
 
-    const checkPin = async () => {
-        const exists = await hasPin(user?.userId);
-        setPinExists(exists);
-    };
+    useEffect(() => {
+        const checkPin = async () => {
+            const exists = await hasPin(user?.userId);
+            setPinExists(exists);
+        };
+
+        if (user) {
+            checkPin();
+            if (user.email) {
+                setRecoveryEmail(user.email);
+            }
+        }
+    }, [user]);
+
+    const emailRecoverySetup = user?.email ? true : false;
 
     const handleLogout = () => {
         Alert.alert(
@@ -70,7 +67,7 @@ export default function SettingsScreen() {
                         try {
                             await logout();
                             router.replace('/login');
-                        } catch (error) {
+                        } catch (_error) {
                             Alert.alert('Error', 'An error occurred while logging out. Please try again.');
                         } finally {
                             setIsLoggingOut(false);
@@ -82,7 +79,7 @@ export default function SettingsScreen() {
     };
 
     const handleDeleteAccount = async () => {
-        // Check authentication before allowing account deletion
+        
         const isAuth = await checkAuth();
         if (!isAuth) {
             setShowAuthGate(true);
@@ -90,7 +87,7 @@ export default function SettingsScreen() {
         }
 
         Alert.alert(
-            '⚠️ Delete Account',
+            'Delete Account',
             'All your account data, reports, and settings will be permanently deleted. However, any reports you have submitted to the blockchain will remain there permanently as they are immutable. This action cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
@@ -102,18 +99,12 @@ export default function SettingsScreen() {
                         try {
                             const result = await deleteUserAccount();
                             if (result.success) {
-                                // Clear all local data from device
                                 try {
-                                    // Delete all reports and health logs from SQLite
                                     await deleteAllReports();
                                     await deleteAllHealthLogs();
-
-                                    // Clear all async storage
                                     await AsyncStorage.clear();
-
-                                    // Clear auth context (handles SecureStore cleanup)
                                     await logout();
-                                } catch (cleanupError) {
+                                } catch (_cleanupError) {
                                 }
 
                                 Alert.alert(
@@ -123,7 +114,6 @@ export default function SettingsScreen() {
                                         {
                                             text: 'OK',
                                             onPress: () => {
-                                                // Redirect to home as guest
                                                 router.replace('/');
                                             },
                                         },
@@ -132,7 +122,7 @@ export default function SettingsScreen() {
                             } else {
                                 Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
                             }
-                        } catch (error) {
+                        } catch (_error) {
                             Alert.alert('Error', 'An error occurred. Please try again.');
                         } finally {
                             setIsClearing(false);
@@ -149,9 +139,7 @@ export default function SettingsScreen() {
             setPinExists(true);
             setShowSetPin(false);
             setShowVerifyPin(false);
-            // Refresh global PIN state
             await checkPinStatus();
-            const logStatus = user?.userId ? `✅ PIN set for user: ${user.userId}` : '✅ PIN set locally';
             Alert.alert('Success', 'PIN has been set successfully');
         } else {
             Alert.alert('Error', 'Failed to set PIN. Please try again.');
@@ -159,18 +147,15 @@ export default function SettingsScreen() {
     };
 
     const handleChangePin = () => {
-        // Show verification modal first
         setShowVerifyPin(true);
     };
 
     const handleVerificationSuccess = () => {
-        // After successful verification, show set PIN modal
         setShowVerifyPin(false);
         setShowSetPin(true);
     };
 
     const handleOpenEmailRecovery = async () => {
-        // Check authentication before allowing email recovery setup
         const isAuth = await checkAuth();
         if (!isAuth) {
             setShowAuthGate(true);
@@ -185,7 +170,6 @@ export default function SettingsScreen() {
             return;
         }
 
-        // Basic email validation
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recoveryEmail.trim())) {
             Alert.alert('Error', 'Please enter a valid email address');
             return;
@@ -195,7 +179,6 @@ export default function SettingsScreen() {
         try {
             const result = await setupEmailRecovery(recoveryEmail.trim());
             if (result.success) {
-                // Update local user info in SecureStore to reflect new email
                 if (user) {
                     const updatedUser = { ...user, email: recoveryEmail.trim() };
                     await SecureStore.setItemAsync('salama_auth_user', JSON.stringify(updatedUser));
@@ -205,7 +188,7 @@ export default function SettingsScreen() {
             } else {
                 Alert.alert('Error', result.error || 'Failed to setup email recovery');
             }
-        } catch (error) {
+        } catch (_error) {
             Alert.alert('Error', 'An error occurred while setting up email recovery');
         } finally {
             setIsSettingUpEmail(false);
@@ -223,7 +206,6 @@ export default function SettingsScreen() {
             </View>
 
             <ScrollView style={styles.content}>
-                {/* Background Recording Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Background Recording</Text>
                     <Text style={styles.sectionDescription}>
@@ -282,11 +264,10 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* App Lock Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>🔒 App Lock</Text>
                     <Text style={styles.sectionDescription}>
-                        Protect your data with a PIN. When enabled, you'll need to enter your PIN to access your library.
+                        Protect your data with a PIN. When enabled, you&apos;ll need to enter your PIN to access your library.
                     </Text>
 
                     {!pinExists ? (
@@ -308,7 +289,6 @@ export default function SettingsScreen() {
                     )}
                 </View>
 
-                {/* Safety Features Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Safety Features</Text>
                     <Text style={styles.sectionDescription}>
@@ -332,10 +312,8 @@ export default function SettingsScreen() {
 
                 </View>
 
-                {/* Emergency Contacts Section */}
                 <EmergencyContactsSection />
 
-                {/* Account Security Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>🔐 Account Security</Text>
                     <Text style={styles.sectionDescription}>
@@ -377,7 +355,6 @@ export default function SettingsScreen() {
                     )}
                 </View>
 
-                {/* Session Section - Only show if logged in */}
                 {user && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Session</Text>
@@ -398,7 +375,6 @@ export default function SettingsScreen() {
                     </View>
                 )}
 
-                {/* Data Management Section - Only show if logged in */}
                 {user && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Data Management</Text>
@@ -419,7 +395,6 @@ export default function SettingsScreen() {
                     </View>
                 )}
 
-                {/* Privacy Notice */}
                 <View style={styles.privacyNotice}>
                     <Feather name="shield" size={20} color="#8B5CF6" />
                     <Text style={styles.privacyText}>
@@ -429,7 +404,6 @@ export default function SettingsScreen() {
                 </View>
             </ScrollView>
 
-            {/* PIN Verification Modal (for changing PIN) */}
             <Modal visible={showVerifyPin} animationType="slide" transparent={false}>
                 <LockScreen
                     mode="verify"
@@ -445,7 +419,6 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
             </Modal>
 
-            {/* PIN Setup Modal */}
             <Modal visible={showSetPin} animationType="slide" transparent={false}>
                 <LockScreen
                     mode="set"
@@ -461,7 +434,6 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
             </Modal>
 
-            {/* Email Recovery Modal */}
             <Modal visible={showEmailRecoveryModal} animationType="slide" transparent={true}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
@@ -513,7 +485,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Auth gate for unauthenticated users */}
             <AuthGateModal
                 visible={showAuthGate}
                 onClose={() => {

@@ -1,7 +1,4 @@
-/**
- * Signup Screen
- * 2-step signup flow: phone + email → OTP verification
- */
+
 
 import React, { useState } from 'react';
 import {
@@ -38,7 +35,6 @@ export default function SignupScreen() {
     try {
       const result = await initiateSignupFlow(phone.trim());
       if (result.success) {
-        setTestOtp(result._testOTP); // For dev mode
         setStep('otp');
       } else {
         Alert.alert('Error', result.error || 'Failed to initiate signup');
@@ -62,13 +58,11 @@ export default function SignupScreen() {
     try {
       const result = await signup(phone.trim(), otp.trim());
       if (result.success) {
-        // Navigate immediately, then show success message
-        // This ensures navigation happens first before any modal shows
+        
         setTimeout(() => {
           router.replace('/');
         }, 100);
 
-        // Show brief success alert
         Alert.alert('Success', 'Account created successfully');
       } else {
         Alert.alert('Error', result.error || 'Failed to verify OTP');

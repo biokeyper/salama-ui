@@ -13,7 +13,6 @@ export default function DetailedReportScreen() {
   const { user } = useAuth();
   const [showAuthGate, setShowAuthGate] = useState(false);
 
-  // Check if user is logged in - if not, show auth gate
   useEffect(() => {
     if (!user) {
       setShowAuthGate(true);
@@ -23,11 +22,11 @@ export default function DetailedReportScreen() {
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        {/* Show auth gate - user must log in to continue */}
+        
         <AuthGateModal
           visible={showAuthGate}
           onClose={() => {
-            // Close modal and redirect back
+            
             router.back();
           }}
         />
@@ -74,7 +73,7 @@ export default function DetailedReportScreen() {
         {/* Decoy Apps Section - Positioned at bottom */}
         <View style={styles.decoyAppsSection}>
           <ThemedText style={styles.decoyAppsTitle}>
-            You don't feel safe? Launch an app
+            You don&#39;t feel safe? Launch an app
           </ThemedText>
           <View style={styles.decoyAppsRow}>
             <TouchableOpacity

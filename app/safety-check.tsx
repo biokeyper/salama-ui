@@ -10,7 +10,6 @@ export default function SafetyCheckScreen() {
   const { user } = useAuth();
   const [showAuthGate, setShowAuthGate] = useState(false);
 
-  // Check if user is logged in - if not, show auth gate
   useEffect(() => {
     if (!user) {
       setShowAuthGate(true);
@@ -18,7 +17,6 @@ export default function SafetyCheckScreen() {
   }, [user]);
 
   const handleYes = () => {
-    // Continue to detailed report (choose Voice or Text)
     router.push({
       pathname: '/detailed-report',
       params,
@@ -26,7 +24,6 @@ export default function SafetyCheckScreen() {
   };
 
   const handleNo = () => {
-    // Go back to home if not safe
     router.replace('/(tabs)');
   };
 
