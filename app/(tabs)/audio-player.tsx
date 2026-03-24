@@ -2,6 +2,7 @@ import LockScreen from "@/app/lock-screen";
 import AudioReportItem from "@/components/AudioReportItem";
 import AuthGateModal from "@/components/AuthGateModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import {
   getMySharedReports,
   getReportViewers,
@@ -58,6 +59,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function LibraryScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { refreshUnreadCount } = useNotifications();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -136,6 +138,7 @@ export default function LibraryScreen() {
         setShowSetPinModal(false);
 
         if (user) {
+          // Logged-in user: check PIN from account
           const hasPinSet = await hasPin(user?.pin);
           if (hasPinSet) {
             setShowPinVerify(true);
@@ -146,8 +149,18 @@ export default function LibraryScreen() {
           }
           setIsAuthenticated(false);
         } else {
+          // Guest user: check if they have a guest PIN set
+          const hasPinSet = await hasPin();
+          if (hasPinSet) {
+            // Guest has PIN - need to verify it
+            setShowPinVerify(true);
+            setShowSetPinModal(false);
+          } else {
+            // Guest without PIN - need to set one
+            setShowSetPinModal(true);
+            setShowPinVerify(false);
+          }
           setIsAuthenticated(false);
-          await loadReports();
         }
         setIsCheckingAuth(false);
       };
@@ -519,6 +532,7 @@ export default function LibraryScreen() {
                   onPress: async () => {
                     setIsSubmittingReportId(null);
                     await loadReports();
+                    await refreshUnreadCount();
                   },
                 },
               ]);
@@ -953,14 +967,23 @@ export default function LibraryScreen() {
   const loadSharedReports = async () => {
     setIsLoadingShared(true);
     try {
+      const token = await getAuthToken();
+      // If not logged in, just show empty - no error alert
+      if (!token) {
+        setSharedReports([]);
+        setIsLoadingShared(false);
+        return;
+      }
+
       const result = await getSharedWithMe();
       if (result.success) {
         setSharedReports(result.reports || []);
       } else {
-        Alert.alert("Error", result.error || "Failed to load shared reports");
+        // For authenticated users, show errors; for unauthenticated, show empty
+        setSharedReports([]);
       }
     } catch (error) {
-      Alert.alert("Error", "An error occurred");
+      setSharedReports([]);
     } finally {
       setIsLoadingShared(false);
     }
@@ -969,17 +992,23 @@ export default function LibraryScreen() {
   const loadMySharedReports = async () => {
     setIsLoadingMyShared(true);
     try {
+      const token = await getAuthToken();
+      // If not logged in, just show empty - no error alert
+      if (!token) {
+        setMySharedReports([]);
+        setIsLoadingMyShared(false);
+        return;
+      }
+
       const result = await getMySharedReports();
       if (result.success) {
         setMySharedReports(result.reports || []);
       } else {
-        Alert.alert(
-          "Error",
-          result.error || "Failed to load your shared reports",
-        );
+        // For authenticated users, show errors; for unauthenticated, show empty
+        setMySharedReports([]);
       }
     } catch (error) {
-      Alert.alert("Error", "An error occurred");
+      setMySharedReports([]);
     } finally {
       setIsLoadingMyShared(false);
     }
@@ -1022,8 +1051,8 @@ export default function LibraryScreen() {
     );
   }
 
-  // Show PIN modals for logged-in users
-  if ((showPinVerify || showSetPinModal) && user) {
+  // Show PIN modals for all users (logged-in and guests)
+  if (showPinVerify || showSetPinModal) {
     return (
       <Modal
         visible={showPinVerify || showSetPinModal}
@@ -1129,6 +1158,7 @@ export default function LibraryScreen() {
                   activeTab === "audio" &&
                   styles.activeTabText,
               ]}
+              numberOfLines={1}
             >
               Audio
             </Text>
@@ -1179,7 +1209,7 @@ export default function LibraryScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, showSharedWithMeTab && styles.activeTab]}
+            style={[styles.tab, showSharedWithMeTab && styles.activeTab, { paddingHorizontal: 16 }]}
             onPress={() => {
               setShowSharedWithMeTab(!showSharedWithMeTab);
               if (!showSharedWithMeTab) {
@@ -1684,8 +1714,7 @@ export default function LibraryScreen() {
                         </View>
                         <Text
                           style={styles.textReportContent}
-                          numberOfLines={1}
-                        >
+                                    >
                           {report.textContent
                             ? report.textContent.length > 40
                               ? report.textContent.slice(0, 40) + "…"
@@ -2709,7 +2738,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tab: {
-    flex: 1,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     alignItems: "center",
     borderRadius: 20,

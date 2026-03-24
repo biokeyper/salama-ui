@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/ThemedText";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   Platform,
   StyleSheet,
@@ -11,32 +11,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
-import AuthGateModal from "@/components/AuthGateModal";
 
 export default function DetailedReportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user } = useAuth();
-  const [showAuthGate, setShowAuthGate] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      setShowAuthGate(true);
-    }
-  }, [user]);
-
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <AuthGateModal
-          visible={showAuthGate}
-          onClose={() => {
-            router.back();
-          }}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

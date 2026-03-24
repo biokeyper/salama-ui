@@ -5,6 +5,7 @@
 
 import { Report } from '@/types/report';
 import {
+  dbClaimGuestReports,
   dbDeleteAllHealthLogs,
   dbDeleteAllReports,
   dbDeleteHealthLog,
@@ -34,6 +35,7 @@ export const getHealthLogs = dbGetHealthLogs;
 export const saveHealthLog = dbSaveHealthLog;
 export const deleteHealthLog = dbDeleteHealthLog;
 export const deleteAllHealthLogs = dbDeleteAllHealthLogs;
+export const claimGuestReports = (userId: string) => dbClaimGuestReports(userId);
 
 /**
  * Update report status

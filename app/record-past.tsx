@@ -8,7 +8,6 @@ import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, w
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { saveReport } from '../services/storage';
 import { useAuth } from '@/contexts/AuthContext';
-import AuthGateModal from '@/components/AuthGateModal';
 
 export default function RecordPastScreen() {
   const router = useRouter();
@@ -18,15 +17,7 @@ export default function RecordPastScreen() {
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false); // Prevent multiple stop calls
-  const [showAuthGate, setShowAuthGate] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
-
-  
-  useEffect(() => {
-    if (!user) {
-      setShowAuthGate(true);
-    }
-  }, [user]);
 
   // Animation value for pulsing effect
   const pulseScale = useSharedValue(1);
@@ -118,11 +109,6 @@ export default function RecordPastScreen() {
   };
 
   const handleEmergencyExit = async () => {
-    if (!user) {
-      setShowAuthGate(true);
-      return;
-    }
-
     // 1. Stop recording if active (use stopRecording to avoid duplicate stop calls)
     if (isRecording && !isStopping) {
       try {
@@ -186,19 +172,6 @@ export default function RecordPastScreen() {
       }
     });
   };
-
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <AuthGateModal
-          visible={showAuthGate}
-          onClose={() => {
-            router.back();
-          }}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>

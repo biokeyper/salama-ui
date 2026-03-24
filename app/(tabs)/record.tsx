@@ -1,4 +1,3 @@
-import AuthGateModal from "@/components/AuthGateModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBackgroundRecording } from "@/contexts/BackgroundRecordingContext";
 import { submitReportToBackend } from "@/services/api";
@@ -48,7 +47,6 @@ export default function RecordScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [isPlayingRecording, setIsPlayingRecording] = useState(false);
-  const [showAuthGate, setShowAuthGate] = useState(false);
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Audio player - must call hooks unconditionally
@@ -64,12 +62,6 @@ export default function RecordScreen() {
       transform: [{ scale: pulseScale.value }],
     };
   });
-
-  useEffect(() => {
-    if (!user) {
-      setShowAuthGate(true);
-    }
-  }, [user]);
 
   useEffect(() => {
     (async () => {
@@ -202,12 +194,6 @@ export default function RecordScreen() {
   };
 
   const handleEmergencyExit = async () => {
-    // Check if user is logged in before allowing emergency exit
-    if (!user) {
-      setShowAuthGate(true);
-      return;
-    }
-
     if (isExiting) return;
     setIsExiting(true);
 
@@ -240,11 +226,6 @@ export default function RecordScreen() {
   };
 
   const handleSaveDraft = async () => {
-    if (!user) {
-      setShowAuthGate(true);
-      return;
-    }
-
     if (!recordedUri) {
       Alert.alert("Error", "No recording available");
       return;
@@ -303,7 +284,23 @@ export default function RecordScreen() {
     // Check authentication BEFORE allowing submission
     const token = await getAuthToken();
     if (!token || !user) {
-      setShowAuthGate(true);
+      Alert.alert(
+        "Sign In Required",
+        "You need to sign in to submit reports.",
+        [
+          {
+            text: "Cancel",
+            onPress: () => {},
+            style: "cancel",
+          },
+          {
+            text: "Sign In",
+            onPress: () => {
+              router.push("/login");
+            },
+          },
+        ],
+      );
       return;
     }
 
@@ -480,19 +477,6 @@ export default function RecordScreen() {
       },
     });
   };
-
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <AuthGateModal
-          visible={showAuthGate}
-          onClose={() => {
-            router.back();
-          }}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>

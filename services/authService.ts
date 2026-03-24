@@ -147,6 +147,14 @@ export async function verifySignup(
       const user: User = userData as User;
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
 
+      // Sync guest data after successful signup
+      if (userId) {
+        const { syncGuestDataAfterLogin } = await import("./syncService");
+        syncGuestDataAfterLogin(userId).catch((error) => {
+          console.log("[Auth] Sync during signup completed (errors non-blocking)");
+        });
+      }
+
       return { success: true, user };
     }
 
@@ -286,6 +294,14 @@ export async function verifyLogin(
       // Save user info
       const user: User = userData as User;
       await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
+
+      // Sync guest data after successful login
+      if (userId) {
+        const { syncGuestDataAfterLogin } = await import("./syncService");
+        syncGuestDataAfterLogin(userId).catch((error) => {
+          console.log("[Auth] Sync during login completed (errors non-blocking)");
+        });
+      }
 
       return { success: true, user };
     }

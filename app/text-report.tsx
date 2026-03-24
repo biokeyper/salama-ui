@@ -10,7 +10,6 @@ import { Report, ReportType } from '@/types/report';
 import { getAvailableActions } from '@/utils/reportActions';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAuthToken } from '@/services/authService';
-import AuthGateModal from '@/components/AuthGateModal';
 import * as Location from 'expo-location';
 
 export default function TextReportScreen() {
@@ -18,21 +17,13 @@ export default function TextReportScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingLocally, setIsSavingLocally] = useState(false);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
-  const [showAuthGate, setShowAuthGate] = useState(false);
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user } = useAuth();
   const audioUri = params.audioUri as string | undefined;
   const editReportId = params.editReportId as string | undefined;
 
- 
-  useEffect(() => {
-    if (!user) {
-      setShowAuthGate(true);
-    }
-  }, [user]);
 
-  
   useEffect(() => {
     if (editReportId) {
       loadReportForEditing(editReportId);
@@ -90,12 +81,6 @@ export default function TextReportScreen() {
   };
 
   const handleSaveDraft = async () => {
-   
-    if (!user) {
-      setShowAuthGate(true);
-      return;
-    }
-
     if (!report.trim()) {
       Alert.alert('Please enter your report or details.');
       return;
@@ -140,10 +125,25 @@ export default function TextReportScreen() {
       return;
     }
 
-   
     const token = await getAuthToken();
     if (!token || !user) {
-      setShowAuthGate(true);
+      Alert.alert(
+        'Sign In Required',
+        'You need to sign in to submit reports.',
+        [
+          {
+            text: 'Cancel',
+            onPress: () => {},
+            style: 'cancel',
+          },
+          {
+            text: 'Sign In',
+            onPress: () => {
+              router.push('/login');
+            },
+          },
+        ],
+      );
       return;
     }
 
@@ -262,19 +262,6 @@ export default function TextReportScreen() {
       setIsSubmitting(false);
     }
   };
-
-  if (!user) {
-    return (
-      <View style={{ flex: 1 }}>
-        <AuthGateModal
-          visible={showAuthGate}
-          onClose={() => {
-            router.back();
-          }}
-        />
-      </View>
-    );
-  }
 
   return (
     <>

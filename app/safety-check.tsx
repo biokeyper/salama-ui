@@ -1,20 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import AuthGateModal from '@/components/AuthGateModal';
 
 export default function SafetyCheckScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { user } = useAuth();
-  const [showAuthGate, setShowAuthGate] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      setShowAuthGate(true);
-    }
-  }, [user]);
 
   const handleYes = () => {
     router.push({
@@ -26,21 +16,6 @@ export default function SafetyCheckScreen() {
   const handleNo = () => {
     router.replace('/(tabs)');
   };
-
-  if (!user) {
-    return (
-      <View style={styles.container}>
-        {/* Show auth gate - user must log in to continue */}
-        <AuthGateModal
-          visible={showAuthGate}
-          onClose={() => {
-            // Close modal and redirect back
-            router.back();
-          }}
-        />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>

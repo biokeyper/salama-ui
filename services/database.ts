@@ -286,6 +286,23 @@ export async function dbSaveReport(report: Report): Promise<void> {
 }
 
 /**
+ * Claim guest reports - associate all reports with user_id = NULL to a specific user
+ * Used during login/signup to sync guest recordings to the user's account
+ */
+export async function dbClaimGuestReports(userId: string): Promise<number> {
+    try {
+        const database = getDb();
+        const result = await database.runAsync(
+            'UPDATE reports SET user_id = ? WHERE user_id IS NULL',
+            [userId]
+        );
+        return result.changes || 0;
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
  * Convert database row to Report object
  */
 function rowToReport(row: any): Report {

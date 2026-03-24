@@ -3,8 +3,8 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import EmailRecoveryModal from '@/components/EmailRecoveryModal';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Animated, Easing, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -12,8 +12,15 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, refreshUnreadCount } = useNotifications();
   const { showEmailRecoveryModal, setupEmailRecovery, skipEmailRecovery } = useAuth();
+
+  // Refresh notification count whenever this page comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      refreshUnreadCount();
+    }, [refreshUnreadCount])
+  );
 
   useEffect(() => {
   }, [showEmailRecoveryModal]);
