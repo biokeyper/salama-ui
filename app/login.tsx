@@ -10,26 +10,33 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  FlatList,
+  Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
+import { COUNTRIES, normalizePhoneNumber } from '@/utils/countries';
 import {
   initiateForgotPhone,
   verifyRecoveryEmail,
   initiatePhoneChangeRecovery,
   verifyPhoneChangeRecovery,
-} from '@/services/authService';
+} from '@/services/authService'; // Keep these for recovery flow
 
 export default function LoginScreen() {
   const [step, setStep] = useState<'phone' | 'otp' | 'forgot-email' | 'forgot-token' | 'forgot-newphone' | 'forgot-otp'>('phone');
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[1]); // Uganda by default
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [selectedCountryRecovery, setSelectedCountryRecovery] = useState(COUNTRIES[0]);
   const router = useRouter();
   const { login, initiateLoginFlow } = useAuth();
 
@@ -41,7 +48,8 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const result = await initiateLoginFlow(phone.trim());
+      const normalizedPhone = normalizePhoneNumber(selectedCountry.code, phone.trim());
+      const result = await initiateLoginFlow(normalizedPhone);
       if (result.success) {
         setStep('otp');
       } else {
@@ -64,9 +72,10 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const result = await login(phone.trim(), otp.trim());
+      const normalizedPhone = normalizePhoneNumber(selectedCountry.code, phone.trim());
+      const result = await login(normalizedPhone, otp.trim());
       if (result.success) {
-        
+
         setTimeout(() => {
           router.replace('/');
         }, 100);
@@ -133,9 +142,18 @@ export default function LoginScreen() {
       return;
     }
 
+    if (!isValidPhoneLength(selectedCountryRecovery.code, newPhone)) {
+      Alert.alert(
+        'Invalid Phone Number',
+        `${selectedCountryRecovery.name} phone numbers should have ${selectedCountryRecovery.phoneLength} digits`
+      );
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const result = await initiatePhoneChangeRecovery(recoveryEmail.trim(), newPhone.trim());
+      const normalizedNewPhone = normalizePhoneNumber(selectedCountryRecovery.code, newPhone);
+      const result = await initiatePhoneChangeRecovery(recoveryEmail.trim(), normalizedNewPhone);
       if (result.success) {
         setStep('forgot-otp');
       } else {
@@ -217,15 +235,67 @@ export default function LoginScreen() {
         <View style={styles.formContainer}>
           {step === 'phone' ? (
             <>
-              <TextInput
-                style={styles.input}
-                placeholder="Phone number (e.g., +254712345678)"
-                placeholderTextColor="#aaa"
-                value={phone}
-                onChangeText={setPhone}
-                editable={!isLoading}
-                keyboardType="phone-pad"
-              />
+              <View style={styles.phoneInputRow}>
+                <TouchableOpacity
+                  style={[styles.input, styles.countryCodeDropdown]}
+                  onPress={() => setShowCountryDropdown(!showCountryDropdown)}
+                >
+                  <ThemedText style={styles.countryCodeText}>{selectedCountry.code}</ThemedText>
+                </TouchableOpacity>
+                <TextInput
+                  style={[styles.input, styles.phoneNumberInput]}
+                  placeholder="Phone digits only"
+                  placeholderTextColor="#aaa"
+                  value={phone}
+                  onChangeText={setPhone}
+                  editable={!isLoading}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              {showCountryDropdown && (
+                <Modal
+                  visible={showCountryDropdown}
+                  animationType="slide"
+                  transparent={false}
+                  onRequestClose={() => setShowCountryDropdown(false)}
+                >
+                  <SafeAreaView style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                      <TouchableOpacity onPress={() => setShowCountryDropdown(false)}>
+                        <ThemedText style={styles.closeButton}>Done</ThemedText>
+                      </TouchableOpacity>
+                      <ThemedText style={styles.modalTitle}>Select Country</ThemedText>
+                      <View style={{ width: 40 }} />
+                    </View>
+                    <FlatList
+                      data={COUNTRIES}
+                      keyExtractor={(item) => `${item.code}-${item.name}`}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.countryOption,
+                            selectedCountry.code === item.code && styles.countryOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setSelectedCountry(item);
+                            setShowCountryDropdown(false);
+                          }}
+                        >
+                          <ThemedText style={styles.countryOptionFlag}>{item.flag}</ThemedText>
+                          <View style={styles.countryOptionContent}>
+                            <ThemedText style={styles.countryOptionName}>{item.name}</ThemedText>
+                            <ThemedText style={styles.countryOptionCode}>{item.code}</ThemedText>
+                          </View>
+                          {selectedCountry.code === item.code && (
+                            <ThemedText style={styles.checkmark}>✓</ThemedText>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    />
+                  </SafeAreaView>
+                </Modal>
+              )}
               <TouchableOpacity
                 style={[styles.button, styles.primaryButton, isLoading && styles.buttonDisabled]}
                 onPress={handleInitiateLogin}
@@ -347,15 +417,27 @@ export default function LoginScreen() {
             </>
           ) : step === 'forgot-newphone' ? (
             <>
-              <TextInput
-                style={styles.input}
-                placeholder="New phone number"
-                placeholderTextColor="#aaa"
-                value={newPhone}
-                onChangeText={setNewPhone}
-                editable={!isLoading}
-                keyboardType="phone-pad"
+              <CountryPicker
+                selectedCountry={selectedCountryRecovery}
+                onSelectCountry={setSelectedCountryRecovery}
               />
+              <View style={styles.phoneInputRow}>
+                <TextInput
+                  style={[styles.input, styles.countryCodeInput]}
+                  value={selectedCountryRecovery.code}
+                  editable={false}
+                  keyboardType="phone-pad"
+                />
+                <TextInput
+                  style={[styles.input, styles.phoneNumberInput]}
+                  placeholder={`New phone (${selectedCountryRecovery.phoneLength} digits)`}
+                  placeholderTextColor="#aaa"
+                  value={newPhone}
+                  onChangeText={setNewPhone}
+                  editable={!isLoading}
+                  keyboardType="phone-pad"
+                />
+              </View>
               <TouchableOpacity
                 style={[styles.button, styles.primaryButton, isLoading && styles.buttonDisabled]}
                 onPress={handleChangePhoneRecovery}
@@ -457,6 +539,82 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#faf8ff',
     color: '#222',
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  countryCodeDropdown: {
+    flex: 0.25,
+    marginBottom: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countryCodeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#222',
+  },
+  phoneNumberInput: {
+    flex: 0.75,
+    marginBottom: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  closeButton: {
+    color: '#8A4FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  countryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  countryOptionSelected: {
+    backgroundColor: '#f5f3ff',
+  },
+  countryOptionFlag: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  countryOptionContent: {
+    flex: 1,
+  },
+  countryOptionName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#222',
+  },
+  countryOptionCode: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
+  },
+  checkmark: {
+    fontSize: 18,
+    color: '#8A4FFF',
+    fontWeight: '600',
   },
   button: {
     paddingVertical: 16,

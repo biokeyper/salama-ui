@@ -24,6 +24,7 @@ export interface NotificationResponse {
     total: number;
     limit: number;
     offset: number;
+    unreadCount?: number;
   };
 }
 
@@ -37,7 +38,7 @@ export async function getNotifications(
     limit?: number;
     offset?: number;
   }
-): Promise<{ success: boolean; notifications?: Notification[]; pagination?: any; error?: string }> {
+): Promise<{ success: boolean; notifications?: Notification[]; pagination?: any; unreadCount?: number; error?: string }> {
   try {
     const apiClient = getApiClient();
     const response = await apiClient.get(apiConfig.endpoints.notifications, {
@@ -57,6 +58,7 @@ export async function getNotifications(
         success: true,
         notifications,
         pagination: response.data.data?.pagination,
+        unreadCount: response.data.data?.pagination?.unreadCount,
       };
     }
 

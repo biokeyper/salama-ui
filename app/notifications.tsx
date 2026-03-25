@@ -59,6 +59,11 @@ export default function NotificationsScreen() {
           await playNotificationSound();
         }
 
+        // Update unread count from the notification response
+        if (result.unreadCount !== undefined) {
+          await refreshUnreadCount();
+        }
+
         setPreviousNotificationCount(newCount);
         if (!hasInitialized) {
           setHasInitialized(true);
