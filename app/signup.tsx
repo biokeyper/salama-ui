@@ -46,7 +46,7 @@ export default function SignupScreen() {
     setIsLoading(true);
     try {
       const normalized = normalizePhoneNumber(selectedCountry.code, phone);
-      const result = await initiateSignupFlow(normalized);
+      const result = await initiateSignupFlow(normalized, selectedCountry.name);
       if (result.success) {
         setNormalizedPhone(normalized);
         setStep('otp');
@@ -70,7 +70,7 @@ export default function SignupScreen() {
 
     setIsLoading(true);
     try {
-      const result = await signup(normalizedPhone, otp.trim());
+      const result = await signup(normalizedPhone, otp.trim(), selectedCountry.name);
       if (result.success) {
 
         setTimeout(() => {

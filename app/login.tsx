@@ -49,7 +49,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const normalizedPhone = normalizePhoneNumber(selectedCountry.code, phone.trim());
-      const result = await initiateLoginFlow(normalizedPhone);
+      const result = await initiateLoginFlow(normalizedPhone, selectedCountry.name);
       if (result.success) {
         setStep('otp');
       } else {
@@ -73,7 +73,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const normalizedPhone = normalizePhoneNumber(selectedCountry.code, phone.trim());
-      const result = await login(normalizedPhone, otp.trim());
+      const result = await login(normalizedPhone, otp.trim(), selectedCountry.name);
       if (result.success) {
 
         setTimeout(() => {
