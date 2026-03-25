@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -17,6 +18,11 @@ export default function TextReportScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingLocally, setIsSavingLocally] = useState(false);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user } = useAuth();
@@ -34,7 +40,7 @@ export default function TextReportScreen() {
     try {
       const existingReport = await getReportById(reportId);
       if (!existingReport) {
-        Alert.alert('Error', 'Report not found');
+        setAlert({ visible: true, type: 'error', title: 'Error', message: 'Report not found' });
         router.back();
         return;
       }
@@ -42,7 +48,7 @@ export default function TextReportScreen() {
       // Can only edit draft/saved reports
       const actions = getAvailableActions(existingReport);
       if (!actions.canEdit) {
-        Alert.alert('Error', 'Only draft and saved reports can be edited');
+        setAlert({ visible: true, type: 'error', title: 'Error', message: 'Only draft and saved reports can be edited' });
         router.back();
         return;
       }
@@ -50,14 +56,14 @@ export default function TextReportScreen() {
       setEditingReport(existingReport);
       setReport(existingReport.textContent || '');
     } catch (error) {
-      Alert.alert('Error', 'Failed to load report');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to load report' });
       router.back();
     }
   };
 
   const handleUpdate = async () => {
     if (!report.trim()) {
-      Alert.alert('Please enter your report or details.');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your report or details.' });
       return;
     }
 
@@ -71,10 +77,10 @@ export default function TextReportScreen() {
         updatedAt: new Date().toISOString(),
       });
 
-      Alert.alert('Success', 'Report updated successfully');
+      setAlert({ visible: true, type: 'success', title: 'Success', message: 'Report updated successfully' });
       router.back();
     } catch (error) {
-      Alert.alert('Error', 'Failed to update report');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to update report' });
     } finally {
       setIsSubmitting(false);
     }
@@ -82,7 +88,7 @@ export default function TextReportScreen() {
 
   const handleSaveDraft = async () => {
     if (!report.trim()) {
-      Alert.alert('Please enter your report or details.');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your report or details.' });
       return;
     }
 
@@ -103,17 +109,22 @@ export default function TextReportScreen() {
         updatedAt: now,
       });
 
-      Alert.alert('Success', 'Your draft has been saved.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            
-            setReport('');
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Success',
+        message: 'Your draft has been saved.',
+        buttons: [
+          {
+            text: 'OK',
+            onPress: () => {
+              setReport('');
+            },
           },
-        },
-      ]);
+        ],
+      });
     } catch (error) {
-      Alert.alert('Error', 'Failed to save your report. Please try again.');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to save your report. Please try again.' });
     } finally {
       setIsSavingLocally(false);
     }
@@ -121,19 +132,20 @@ export default function TextReportScreen() {
 
   const handleSubmitToBackend = async () => {
     if (!report.trim()) {
-      Alert.alert('Please enter your report or details.');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your report or details.' });
       return;
     }
 
     const token = await getAuthToken();
     if (!token || !user) {
-      Alert.alert(
-        'Sign In Required',
-        'You need to sign in to submit reports.',
-        [
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Sign In Required',
+        message: 'You need to sign in to submit reports.',
+        buttons: [
           {
             text: 'Cancel',
-            onPress: () => {},
             style: 'cancel',
           },
           {
@@ -143,30 +155,29 @@ export default function TextReportScreen() {
             },
           },
         ],
-      );
+      });
       return;
     }
 
-    
-    Alert.alert(
-      'Submit Report?',
-      'Are you sure you want to submit this report?',
-      [
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Submit Report?',
+      message: 'Are you sure you want to submit this report?',
+      buttons: [
         {
           text: 'Cancel',
-          onPress: () => {
-          },
           style: 'cancel',
         },
         {
           text: 'Submit',
+          style: 'destructive',
           onPress: async () => {
             await performSubmission();
           },
-          style: 'destructive',
         },
-      ]
-    );
+      ],
+    });
   };
 
   const performSubmission = async () => {
@@ -219,45 +230,51 @@ export default function TextReportScreen() {
 
 
       if (result.success) {
-        Alert.alert(
-          'Success',
-          'Your report has been submitted successfully.',
-          [
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Success',
+          message: 'Your report has been submitted successfully.',
+          buttons: [
             {
               text: 'OK',
               onPress: async () => {
                 router.replace('/');
               },
             },
-          ]
-        );
+          ],
+        });
       } else {
-        Alert.alert(
-          'Submission Error',
-          result.error || 'Failed to submit to backend. Your report has been saved locally and can be submitted later.',
-          [
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Submission Error',
+          message: result.error || 'Failed to submit to backend. Your report has been saved locally and can be submitted later.',
+          buttons: [
             {
               text: 'OK',
               onPress: () => {
                 router.replace('/(tabs)');
               },
             },
-          ]
-        );
+          ],
+        });
       }
     } catch (error) {
-      Alert.alert(
-        'Error',
-        'An unexpected error occurred. Your report has been saved locally.',
-        [
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'An unexpected error occurred. Your report has been saved locally.',
+        buttons: [
           {
             text: 'OK',
             onPress: () => {
               router.replace('/(tabs)');
             },
           },
-        ]
-      );
+        ],
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -348,6 +365,15 @@ export default function TextReportScreen() {
           </View>
         </ThemedView>
       </KeyboardAvoidingView>
+
+      <AlertModal
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={() => setAlert({ ...alert, visible: false })}
+      />
     </>
   );
 }

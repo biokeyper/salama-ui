@@ -4,9 +4,9 @@ import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AlertModal, type AlertType } from '@/components/AlertModal';
+import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 
 import { hasPin, setPin as savePin } from '@/services/security';
 import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
@@ -32,7 +32,7 @@ export default function SettingsScreen() {
     const [isSettingUpEmail, setIsSettingUpEmail] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAuthGate, setShowAuthGate] = useState(false);
-    const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string }>({
+    const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
         visible: false,
         type: 'info',
         title: '',
@@ -60,83 +60,108 @@ export default function SettingsScreen() {
     const emailRecoverySetup = user?.email ? true : false;
 
     const handleLogout = () => {
-        Alert.alert(
-            'Logout',
-            'Are you sure you want to logout?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Logout',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setIsLoggingOut(true);
-                        try {
-                            await logout();
-                            router.replace('/login');
-                        } catch (_error) {
-                            Alert.alert('Error', 'An error occurred while logging out. Please try again.');
-                        } finally {
-                            setIsLoggingOut(false);
-                        }
-                    },
+        const buttons: AlertButton[] = [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Logout',
+                style: 'destructive',
+                onPress: async () => {
+                    setIsLoggingOut(true);
+                    try {
+                        await logout();
+                        router.replace('/login');
+                    } catch (_error) {
+                        setAlert({
+                            visible: true,
+                            type: 'error',
+                            title: 'Error',
+                            message: 'An error occurred while logging out. Please try again.',
+                        });
+                    } finally {
+                        setIsLoggingOut(false);
+                    }
                 },
-            ]
-        );
+            },
+        ];
+
+        setAlert({
+            visible: true,
+            type: 'warning',
+            title: 'Logout',
+            message: 'Are you sure you want to logout?',
+            buttons,
+        });
     };
 
     const handleDeleteAccount = async () => {
-        
+
         const isAuth = await checkAuth();
         if (!isAuth) {
             setShowAuthGate(true);
             return;
         }
 
-        Alert.alert(
-            'Delete Account',
-            'All your account data, reports, and settings will be permanently deleted. However, any reports you have submitted to the blockchain will remain there permanently as they are immutable. This action cannot be undone.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete My Account',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setIsClearing(true);
-                        try {
-                            const result = await deleteUserAccount();
-                            if (result.success) {
-                                try {
-                                    await deleteAllReports();
-                                    await deleteAllHealthLogs();
-                                    await AsyncStorage.clear();
-                                    await logout();
-                                } catch (_cleanupError) {
-                                }
-
-                                Alert.alert(
-                                    'Account Deleted',
-                                    'Your account and all local data have been permanently deleted.',
-                                    [
-                                        {
-                                            text: 'OK',
-                                            onPress: () => {
-                                                router.replace('/');
-                                            },
-                                        },
-                                    ]
-                                );
-                            } else {
-                                Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
+        const buttons: AlertButton[] = [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete My Account',
+                style: 'destructive',
+                onPress: async () => {
+                    setIsClearing(true);
+                    try {
+                        const result = await deleteUserAccount();
+                        if (result.success) {
+                            try {
+                                await deleteAllReports();
+                                await deleteAllHealthLogs();
+                                await AsyncStorage.clear();
+                                await logout();
+                            } catch (_cleanupError) {
                             }
-                        } catch (_error) {
-                            Alert.alert('Error', 'An error occurred. Please try again.');
-                        } finally {
-                            setIsClearing(false);
+
+                            setAlert({
+                                visible: true,
+                                type: 'success',
+                                title: 'Account Deleted',
+                                message: 'Your account and all local data have been permanently deleted.',
+                                buttons: [
+                                    {
+                                        text: 'OK',
+                                        onPress: () => {
+                                            router.replace('/');
+                                        },
+                                    },
+                                ],
+                            });
+                        } else {
+                            setAlert({
+                                visible: true,
+                                type: 'error',
+                                title: 'Error',
+                                message: result.error || 'Failed to delete account. Please try again.',
+                            });
                         }
-                    },
+                    } catch (_error) {
+                        setAlert({
+                            visible: true,
+                            type: 'error',
+                            title: 'Error',
+                            message: 'An error occurred. Please try again.',
+                        });
+                    } finally {
+                        setIsClearing(false);
+                    }
                 },
-            ]
-        );
+            },
+        ];
+
+        setAlert({
+            visible: true,
+            type: 'warning',
+            title: 'Delete Account',
+            message: 'All your account data, reports, and settings will be permanently deleted. However, any reports you have submitted to the blockchain will remain there permanently as they are immutable. This action cannot be undone.',
+            buttons,
+        });
     };
 
     const handleSetPin = async (pin: string) => {
@@ -146,9 +171,19 @@ export default function SettingsScreen() {
             setShowSetPin(false);
             setShowVerifyPin(false);
             await checkPinStatus();
-            Alert.alert('Success', 'PIN has been set successfully');
+            setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Success',
+                message: 'PIN has been set successfully',
+            });
         } else {
-            Alert.alert('Error', 'Failed to set PIN. Please try again.');
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Failed to set PIN. Please try again.',
+            });
         }
     };
 
@@ -172,12 +207,22 @@ export default function SettingsScreen() {
 
     const handleSetupEmailRecovery = async () => {
         if (!recoveryEmail.trim()) {
-            Alert.alert('Error', 'Please enter your email address');
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Please enter your email address',
+            });
             return;
         }
 
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recoveryEmail.trim())) {
-            Alert.alert('Error', 'Please enter a valid email address');
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: 'Please enter a valid email address',
+            });
             return;
         }
 
@@ -190,12 +235,27 @@ export default function SettingsScreen() {
                     await SecureStore.setItemAsync('salama_auth_user', JSON.stringify(updatedUser));
                 }
                 setShowEmailRecoveryModal(false);
-                Alert.alert('Success', emailRecoverySetup ? 'Email has been updated successfully' : 'Email recovery has been set up successfully');
+                setAlert({
+                    visible: true,
+                    type: 'success',
+                    title: 'Success',
+                    message: emailRecoverySetup ? 'Email has been updated successfully' : 'Email recovery has been set up successfully',
+                });
             } else {
-                Alert.alert('Error', result.error || 'Failed to setup email recovery');
+                setAlert({
+                    visible: true,
+                    type: 'error',
+                    title: 'Error',
+                    message: result.error || 'Failed to setup email recovery',
+                });
             }
         } catch (_error) {
-            Alert.alert('Error', 'An error occurred while setting up email recovery');
+            setAlert({
+                visible: true,
+                type: 'error',
+                title: 'Error',
+                message: 'An error occurred while setting up email recovery',
+            });
         } finally {
             setIsSettingUpEmail(false);
         }
@@ -478,6 +538,15 @@ export default function SettingsScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <AlertModal
+                visible={alert.visible}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                buttons={alert.buttons}
+                onDismiss={() => setAlert({ ...alert, visible: false })}
+            />
 
             <AuthGateModal
                 visible={showAuthGate}

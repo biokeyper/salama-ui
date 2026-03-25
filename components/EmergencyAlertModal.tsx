@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -16,6 +15,7 @@ import { getEmergencyContacts } from '@/services/emergencyContactService';
 import { getAuthToken } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGateModal from './AuthGateModal';
+import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 
 interface EmergencyAlertModalProps {
   visible: boolean;
@@ -28,6 +28,11 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
   const [tapCount, setTapCount] = useState(0);
   const [isSending, setIsSending] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTap = async () => {
@@ -65,10 +70,12 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
         const hasContacts = contactsResult.success && (contactsResult.data?.length ?? 0) > 0;
 
         if (!hasContacts) {
-          Alert.alert(
-            'No Emergency Contacts',
-            'You haven\'t added emergency contacts. Your panic alert will be recorded but no SMS will be sent to contacts.',
-            [
+          setAlert({
+            visible: true,
+            type: 'warning',
+            title: 'No Emergency Contacts',
+            message: 'You haven\'t added emergency contacts. Your panic alert will be recorded but no SMS will be sent to contacts.',
+            buttons: [
               {
                 text: 'Go to Settings',
                 onPress: () => {
@@ -79,17 +86,22 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
               },
               {
                 text: 'Continue',
-                onPress: () => sendAlert(),
                 style: 'destructive',
+                onPress: () => sendAlert(),
               },
-            ]
-          );
+            ],
+          });
           return;
         }
 
         await sendAlert();
       } catch (error) {
-        Alert.alert('Error', 'An error occurred');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'An error occurred',
+        });
         setIsSending(false);
       }
     }
@@ -123,21 +135,37 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
       const result = await sendPanicAlert(locationData);
 
       if (result.success) {
-        Alert.alert('Alert Sent', 'Your emergency alert has been sent successfully.', [
-          {
-            text: 'OK',
-            onPress: () => {
-              setIsSending(false);
-              onClose();
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Alert Sent',
+          message: 'Your emergency alert has been sent successfully.',
+          buttons: [
+            {
+              text: 'OK',
+              onPress: () => {
+                setIsSending(false);
+                onClose();
+              },
             },
-          },
-        ]);
+          ],
+        });
       } else {
-        Alert.alert('Error', result.error || 'Failed to send emergency alert');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: result.error || 'Failed to send emergency alert',
+        });
         setIsSending(false);
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred while sending the alert');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'An error occurred while sending the alert',
+      });
       setIsSending(false);
     }
   };
@@ -220,6 +248,15 @@ export default function EmergencyAlertModal({ visible, onClose }: EmergencyAlert
         onClose={() => {
           setShowAuthGate(false);
         }}
+      />
+
+      <AlertModal
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={() => setAlert({ ...alert, visible: false })}
       />
     </>
   );

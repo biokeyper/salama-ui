@@ -16,12 +16,12 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { AlertModal, type AlertType, type AlertButton } from "@/components/AlertModal";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -47,6 +47,11 @@ export default function RecordScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [isPlayingRecording, setIsPlayingRecording] = useState(false);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+    visible: false,
+    type: "info",
+    title: "",
+  });
   const { enterDecoyMode } = useBackgroundRecording();
 
   // Audio player - must call hooks unconditionally
@@ -67,10 +72,12 @@ export default function RecordScreen() {
     (async () => {
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        Alert.alert(
-          "Permission needed",
-          "Please grant microphone permission to record audio.",
-        );
+        setAlert({
+          visible: true,
+          type: "warning",
+          title: "Permission needed",
+          message: "Please grant microphone permission to record audio.",
+        });
       }
     })();
   }, []);
@@ -143,7 +150,12 @@ export default function RecordScreen() {
       setRecordingStartTime(Date.now());
       setIsRecording(true);
     } catch (err) {
-      Alert.alert("Error", "Failed to start recording");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Failed to start recording",
+      });
     }
   };
 
@@ -187,7 +199,12 @@ export default function RecordScreen() {
         } catch (error) {}
       }
     } catch (err) {
-      Alert.alert("Error", "Failed to save recording");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Failed to save recording",
+      });
     } finally {
       setIsStopping(false);
     }
@@ -227,22 +244,33 @@ export default function RecordScreen() {
 
   const handleSaveDraft = async () => {
     if (!recordedUri) {
-      Alert.alert("Error", "No recording available");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "No recording available",
+      });
       return;
     }
 
     setIsSavingDraft(true);
     try {
       if (reportId) {
-        Alert.alert("Success", "Your draft has been saved.", [
-          {
-            text: "OK",
-            onPress: () => {
-              setRecordedUri(null);
-              setReportId(null);
+        setAlert({
+          visible: true,
+          type: "success",
+          title: "Success",
+          message: "Your draft has been saved.",
+          buttons: [
+            {
+              text: "OK",
+              onPress: () => {
+                setRecordedUri(null);
+                setReportId(null);
+              },
             },
-          },
-        ]);
+          ],
+        });
         setIsSavingDraft(false);
         return;
       }
@@ -259,17 +287,28 @@ export default function RecordScreen() {
         updatedAt: now,
       });
 
-      Alert.alert("Success", "Your draft has been saved.", [
-        {
-          text: "OK",
-          onPress: () => {
-            setRecordedUri(null);
-            setReportId(null);
+      setAlert({
+        visible: true,
+        type: "success",
+        title: "Success",
+        message: "Your draft has been saved.",
+        buttons: [
+          {
+            text: "OK",
+            onPress: () => {
+              setRecordedUri(null);
+              setReportId(null);
+            },
           },
-        },
-      ]);
+        ],
+      });
     } catch (error) {
-      Alert.alert("Error", "Failed to save draft");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Failed to save draft",
+      });
     } finally {
       setIsSavingDraft(false);
     }
@@ -277,20 +316,26 @@ export default function RecordScreen() {
 
   const handleSubmitReport = async () => {
     if (!recordedUri || !reportId) {
-      Alert.alert("Error", "Recording not available");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Recording not available",
+      });
       return;
     }
 
     // Check authentication BEFORE allowing submission
     const token = await getAuthToken();
     if (!token || !user) {
-      Alert.alert(
-        "Sign In Required",
-        "You need to sign in to submit reports.",
-        [
+      setAlert({
+        visible: true,
+        type: "warning",
+        title: "Sign In Required",
+        message: "You need to sign in to submit reports.",
+        buttons: [
           {
             text: "Cancel",
-            onPress: () => {},
             style: "cancel",
           },
           {
@@ -300,28 +345,29 @@ export default function RecordScreen() {
             },
           },
         ],
-      );
+      });
       return;
     }
 
-    Alert.alert(
-      "Submit Report?",
-      "Are you sure you want to submit this report?",
-      [
+    setAlert({
+      visible: true,
+      type: "warning",
+      title: "Submit Report?",
+      message: "Are you sure you want to submit this report?",
+      buttons: [
         {
           text: "Cancel",
-          onPress: () => {},
           style: "cancel",
         },
         {
           text: "Submit",
+          style: "destructive",
           onPress: async () => {
             await performSubmission();
           },
-          style: "destructive",
         },
       ],
-    );
+    });
   };
 
   const performSubmission = async () => {
@@ -332,7 +378,12 @@ export default function RecordScreen() {
       const report = await getReportById(reportId);
 
       if (!report) {
-        Alert.alert("Error", "Report not found");
+        setAlert({
+          visible: true,
+          type: "error",
+          title: "Error",
+          message: "Report not found",
+        });
         return;
       }
 
@@ -367,10 +418,12 @@ export default function RecordScreen() {
       const result = await submitReportToBackend(report);
 
       if (result.success) {
-        Alert.alert(
-          "Success",
-          "Your recording has been submitted to the backend securely.",
-          [
+        setAlert({
+          visible: true,
+          type: "success",
+          title: "Success",
+          message: "Your recording has been submitted to the backend securely.",
+          buttons: [
             {
               text: "OK",
               onPress: async () => {
@@ -389,13 +442,15 @@ export default function RecordScreen() {
               },
             },
           ],
-        );
+        });
       } else if (result.requiresAuth) {
         // Authentication required - redirect to login
-        Alert.alert(
-          "Login Required",
-          "You need to be logged in to submit reports.",
-          [
+        setAlert({
+          visible: true,
+          type: "warning",
+          title: "Login Required",
+          message: "You need to be logged in to submit reports.",
+          buttons: [
             {
               text: "Login",
               onPress: () => {
@@ -410,16 +465,17 @@ export default function RecordScreen() {
             },
             {
               text: "Cancel",
-              onPress: () => {},
+              style: "cancel",
             },
           ],
-        );
+        });
       } else {
-        Alert.alert(
-          "Submission Error",
-          result.error ||
-            "Failed to submit. Your recording has been saved locally.",
-          [
+        setAlert({
+          visible: true,
+          type: "error",
+          title: "Submission Error",
+          message: result.error || "Failed to submit. Your recording has been saved locally.",
+          buttons: [
             {
               text: "OK",
               onPress: () => {
@@ -427,13 +483,15 @@ export default function RecordScreen() {
               },
             },
           ],
-        );
+        });
       }
     } catch (error) {
-      Alert.alert(
-        "Error",
-        "An error occurred. Your recording has been saved locally.",
-        [
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "An error occurred. Your recording has been saved locally.",
+        buttons: [
           {
             text: "OK",
             onPress: () => {
@@ -441,7 +499,7 @@ export default function RecordScreen() {
             },
           },
         ],
-      );
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -610,6 +668,15 @@ export default function RecordScreen() {
       >
         <Text style={styles.emergencyText}>EXIT NOW</Text>
       </TouchableOpacity>
+
+      <AlertModal
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={() => setAlert({ ...alert, visible: false })}
+      />
     </SafeAreaView>
   );
 }

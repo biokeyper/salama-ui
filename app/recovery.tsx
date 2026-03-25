@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -16,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import axios from 'axios';
 import { apiConfig } from '@/config/api';
+import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 
 export default function RecoveryScreen() {
   const router = useRouter();
@@ -25,10 +25,15 @@ export default function RecoveryScreen() {
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
 
   useEffect(() => {
     if (!token) {
-      Alert.alert('Error', 'Invalid recovery link');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Invalid recovery link' });
       router.replace('/');
     }
   }, [token]);
@@ -61,7 +66,7 @@ export default function RecoveryScreen() {
       }
 
       setError(message);
-      Alert.alert('Error', message);
+      setAlert({ visible: true, type: 'error', title: 'Error', message });
     } finally {
       setIsLoading(false);
     }
@@ -99,18 +104,20 @@ export default function RecoveryScreen() {
       );
 
       if (response.status === 200) {
-        Alert.alert(
-          'Success',
-          'Your PIN has been reset successfully!',
-          [
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Success',
+          message: 'Your PIN has been reset successfully!',
+          buttons: [
             {
               text: 'Continue to Login',
               onPress: () => {
                 router.replace('/login');
               },
             },
-          ]
-        );
+          ],
+        });
       }
     } catch (error) {
       let message = 'Failed to reset PIN. Please try again.';
@@ -122,7 +129,7 @@ export default function RecoveryScreen() {
       }
 
       setError(message);
-      Alert.alert('Error', message);
+      setAlert({ visible: true, type: 'error', title: 'Error', message });
     } finally {
       setIsLoading(false);
     }
@@ -244,6 +251,15 @@ export default function RecoveryScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <AlertModal
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={() => setAlert({ ...alert, visible: false })}
+      />
     </SafeAreaView>
   );
 }

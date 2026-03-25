@@ -15,7 +15,6 @@ import * as Contacts from "expo-contacts";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Keyboard,
   Modal,
@@ -26,6 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AlertModal, type AlertType, type AlertButton } from "@/components/AlertModal";
 
 export default function EmergencyContactsSection() {
   const { user } = useAuth();
@@ -53,6 +53,11 @@ export default function EmergencyContactsSection() {
   const [pendingAction, setPendingAction] = useState<
     "add" | "edit" | "panic" | null
   >(null);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+    visible: false,
+    type: "info",
+    title: "",
+  });
 
   const editPhoneRef = useRef<TextInput>(null);
   const editNameRef = useRef<TextInput>(null);
@@ -155,7 +160,12 @@ export default function EmergencyContactsSection() {
         setShowDeviceContacts(true);
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to load device contacts");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Failed to load device contacts",
+      });
     }
   };
 
@@ -168,7 +178,12 @@ export default function EmergencyContactsSection() {
 
   const handleAddContact = async () => {
     if (!newPhone.trim() || !newName.trim() || !newRelationship.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Please fill in all fields",
+      });
       return;
     }
 
@@ -180,27 +195,44 @@ export default function EmergencyContactsSection() {
         newRelationship,
       );
       if (result.success) {
-        Alert.alert("Success", "Emergency contact added");
+        setAlert({
+          visible: true,
+          type: "success",
+          title: "Success",
+          message: "Emergency contact added",
+        });
         setNewPhone("");
         setNewName("");
         setNewRelationship("");
         setShowAddModal(false);
         await loadContacts();
       } else {
-        Alert.alert("Error", result.error || "Failed to add contact");
+        setAlert({
+          visible: true,
+          type: "error",
+          title: "Error",
+          message: result.error || "Failed to add contact",
+        });
       }
     } catch (error) {
-      Alert.alert("Error", "An error occurred while adding contact");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "An error occurred while adding contact",
+      });
     } finally {
       setIsAdding(false);
     }
   };
 
   const handleRemoveContact = (contactId: number, name: string) => {
-    Alert.alert(
-      "Remove Contact",
-      `Are you sure you want to remove ${name} from emergency contacts?`,
-      [
+    setAlert({
+      visible: true,
+      type: "warning",
+      title: "Remove Contact",
+      message: `Are you sure you want to remove ${name} from emergency contacts?`,
+      buttons: [
         { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
@@ -209,26 +241,43 @@ export default function EmergencyContactsSection() {
             try {
               const result = await removeEmergencyContact(contactId);
               if (result.success) {
-                Alert.alert("Success", "Contact removed");
+                setAlert({
+                  visible: true,
+                  type: "success",
+                  title: "Success",
+                  message: "Contact removed",
+                });
                 await loadContacts();
               } else {
-                Alert.alert(
-                  "Error",
-                  result.error || "Failed to remove contact",
-                );
+                setAlert({
+                  visible: true,
+                  type: "error",
+                  title: "Error",
+                  message: result.error || "Failed to remove contact",
+                });
               }
             } catch (error) {
-              Alert.alert("Error", "An error occurred while removing contact");
+              setAlert({
+                visible: true,
+                type: "error",
+                title: "Error",
+                message: "An error occurred while removing contact",
+              });
             }
           },
         },
       ],
-    );
+    });
   };
 
   const handleSavePanicMessage = async () => {
     if (!panicMessage.trim()) {
-      Alert.alert("Error", "Please enter a panic message");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Please enter a panic message",
+      });
       return;
     }
 
@@ -241,13 +290,28 @@ export default function EmergencyContactsSection() {
       if (result.success) {
         const savedMessage = result?.data?.panicMessage || panicMessage;
         setPanicMsg(savedMessage);
-        Alert.alert("Success", "Panic message saved");
+        setAlert({
+          visible: true,
+          type: "success",
+          title: "Success",
+          message: "Panic message saved",
+        });
         setShowPanicMessageModal(false);
       } else {
-        Alert.alert("Error", result.error || "Failed to save panic message");
+        setAlert({
+          visible: true,
+          type: "error",
+          title: "Error",
+          message: result.error || "Failed to save panic message",
+        });
       }
     } catch (error) {
-      Alert.alert("Error", "An error occurred while saving panic message");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "An error occurred while saving panic message",
+      });
     } finally {
       setIsSavingMessage(false);
     }
@@ -264,7 +328,12 @@ export default function EmergencyContactsSection() {
     }
 
     if (!editName.trim() || !editPhone.trim() || !editRelationship.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "Please fill in all fields",
+      });
       return;
     }
 
@@ -283,7 +352,12 @@ export default function EmergencyContactsSection() {
       );
 
       if (result.success) {
-        Alert.alert("Success", "Contact updated successfully");
+        setAlert({
+          visible: true,
+          type: "success",
+          title: "Success",
+          message: "Contact updated successfully",
+        });
         setShowEditModal(false);
         setEditingContact(null);
         setEditPhone("");
@@ -291,10 +365,20 @@ export default function EmergencyContactsSection() {
         setEditRelationship("");
         await loadContacts();
       } else {
-        Alert.alert("Error", result.error || "Failed to update contact");
+        setAlert({
+          visible: true,
+          type: "error",
+          title: "Error",
+          message: result.error || "Failed to update contact",
+        });
       }
     } catch (error) {
-      Alert.alert("Error", "An error occurred while updating contact");
+      setAlert({
+        visible: true,
+        type: "error",
+        title: "Error",
+        message: "An error occurred while updating contact",
+      });
     } finally {
       setIsEditing(false);
     }
@@ -630,6 +714,15 @@ export default function EmergencyContactsSection() {
       </Modal>
 
       <AuthGateModal visible={showAuthGate} onClose={handleAuthGateClosed} />
+
+      <AlertModal
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }

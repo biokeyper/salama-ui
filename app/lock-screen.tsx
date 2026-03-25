@@ -3,8 +3,9 @@ import { ThemedView } from '@/components/ThemedView';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 
 import { verifyPin, hasPin, setPin as savePinToBackend } from '@/services/security';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +23,11 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
     const [confirmPin, setConfirmPin] = useState('');
     const [isConfirming, setIsConfirming] = useState(false);
     const [showAuthGate, setShowAuthGate] = useState(false);
+    const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+        visible: false,
+        type: 'info',
+        title: '',
+    });
     const router = useRouter();
     const { user } = useAuth();
 
@@ -61,7 +67,7 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                 if (pin.length >= 4) {
                     setIsConfirming(true);
                 } else {
-                    Alert.alert('Error', 'PIN must be at least 4 digits');
+                    setAlert({ visible: true, type: 'error', title: 'Error', message: 'PIN must be at least 4 digits' });
                 }
             } else {
                 if (pin === confirmPin) {
@@ -71,19 +77,19 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                         if (success) {
                             onSetPin?.(pin);
                         } else {
-                            Alert.alert('Error', 'Failed to set PIN. Please try again.');
+                            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to set PIN. Please try again.' });
                             setPin('');
                             setConfirmPin('');
                             setIsConfirming(false);
                         }
                     } catch (_error) {
-                        Alert.alert('Error', 'An error occurred while setting PIN');
+                        setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred while setting PIN' });
                         setPin('');
                         setConfirmPin('');
                         setIsConfirming(false);
                     }
                 } else {
-                    Alert.alert('Error', 'PINs do not match');
+                    setAlert({ visible: true, type: 'error', title: 'Error', message: 'PINs do not match' });
                     setPin('');
                     setConfirmPin('');
                     setIsConfirming(false);
@@ -96,7 +102,7 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
               const pinSet = await hasPin(user?.pin || null);
 
               if (!pinSet) {
-                Alert.alert('Set PIN First', 'Please set a PIN first to access your library.');
+                setAlert({ visible: true, type: 'warning', title: 'Set PIN First', message: 'Please set a PIN first to access your library.' });
                 setPin('');
                 return;
               }
@@ -106,11 +112,11 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
               if (isValid) {
                 onUnlock?.();
               } else {
-                Alert.alert('Incorrect PIN', 'Please try again');
+                setAlert({ visible: true, type: 'error', title: 'Incorrect PIN', message: 'Please try again' });
                 setPin('');
               }
             } catch (_error) {
-              Alert.alert('Error', 'An error occurred. Please try again.');
+              setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred. Please try again.' });
               setPin('');
             }
         }
@@ -225,6 +231,15 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                     setShowAuthGate(false);
                     router.back();
                 }}
+            />
+
+            <AlertModal
+                visible={alert.visible}
+                type={alert.type}
+                title={alert.title}
+                message={alert.message}
+                buttons={alert.buttons}
+                onDismiss={() => setAlert({ ...alert, visible: false })}
             />
         </SafeAreaView>
     );

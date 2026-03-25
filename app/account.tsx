@@ -2,9 +2,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Clipboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Clipboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { initiateChangePhone, verifyChangePhone, getAuthToken } from '@/services/authService';
+import { AlertModal, type AlertType } from '@/components/AlertModal';
 import AuthGateModal from '@/components/AuthGateModal';
 
 export default function AccountScreen() {
@@ -16,6 +17,11 @@ export default function AccountScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
 
   // Check authentication on mount
   useEffect(() => {
@@ -68,7 +74,12 @@ export default function AccountScreen() {
         setStep('info');
         setNewPhone('');
         setOtp('');
-        Alert.alert('Success', 'Your phone number has been updated successfully');
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Success',
+          message: 'Your phone number has been updated successfully',
+        });
       } else {
         setError(result.error || 'Failed to verify phone change');
       }
@@ -89,7 +100,12 @@ export default function AccountScreen() {
   const handleCopyUserId = async () => {
     if (user?.userId) {
       await Clipboard.setString(user.userId);
-      Alert.alert('Success', 'User ID copied to clipboard');
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Success',
+        message: 'User ID copied to clipboard',
+      });
     }
   };
 
@@ -233,6 +249,14 @@ export default function AccountScreen() {
           </View>
         )}
       </ScrollView>
+
+      <AlertModal
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onDismiss={() => setAlert({ ...alert, visible: false })}
+      />
 
       <AuthGateModal
         visible={showAuthGate}

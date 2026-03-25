@@ -1,6 +1,6 @@
 /**
  * Custom Alert Modal Component
- * Replaces React Native's basic Alert.alert()
+ * Replaces React Native's basic Alert.alert() with action buttons
  */
 
 import React from 'react';
@@ -13,14 +13,21 @@ import {
 import { ThemedText } from './ThemedText';
 
 export type AlertType = 'success' | 'error' | 'info' | 'warning';
+export type ButtonStyle = 'default' | 'cancel' | 'destructive';
+
+export interface AlertButton {
+  text: string;
+  style?: ButtonStyle;
+  onPress?: () => void;
+}
 
 interface AlertModalProps {
   visible: boolean;
   type: AlertType;
   title: string;
   message?: string;
-  buttonText?: string;
-  onPress: () => void;
+  buttons?: AlertButton[];
+  onDismiss?: () => void;
 }
 
 export function AlertModal({
@@ -28,8 +35,8 @@ export function AlertModal({
   type,
   title,
   message,
-  buttonText = 'OK',
-  onPress,
+  buttons = [{ text: 'OK', style: 'default' }],
+  onDismiss,
 }: AlertModalProps) {
   const getIcon = () => {
     switch (type) {
@@ -59,6 +66,25 @@ export function AlertModal({
     }
   };
 
+  const getButtonColor = (style?: ButtonStyle, accentColor?: string) => {
+    switch (style) {
+      case 'cancel':
+        return { bg: '#f3f4f6', text: '#6b7280' };
+      case 'destructive':
+        return { bg: '#fecaca', text: '#dc2626' };
+      case 'default':
+      default:
+        return { bg: accentColor || '#8A4FFF', text: '#fff' };
+    }
+  };
+
+  const handleButtonPress = (button: AlertButton) => {
+    if (button.onPress) {
+      button.onPress();
+    }
+    onDismiss?.();
+  };
+
   const colors = getColors();
   const icon = getIcon();
 
@@ -67,7 +93,7 @@ export function AlertModal({
       visible={visible}
       transparent={true}
       animationType="fade"
-      onRequestClose={onPress}
+      onRequestClose={onDismiss}
     >
       <View style={styles.overlay}>
         <View style={styles.alertBox}>
@@ -79,12 +105,26 @@ export function AlertModal({
 
           {message && <ThemedText style={styles.message}>{message}</ThemedText>}
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.accent }]}
-            onPress={onPress}
-          >
-            <ThemedText style={styles.buttonText}>{buttonText}</ThemedText>
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            {buttons.map((button, index) => {
+              const btnColor = getButtonColor(button.style, colors.accent);
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.button,
+                    { backgroundColor: btnColor.bg },
+                    buttons.length > 1 && styles.multiButton,
+                  ]}
+                  onPress={() => handleButtonPress(button)}
+                >
+                  <ThemedText style={[styles.buttonText, { color: btnColor.text }]}>
+                    {button.text}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       </View>
     </Modal>
@@ -140,6 +180,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 19,
   },
+  buttonContainer: {
+    width: '100%',
+    gap: 8,
+  },
   button: {
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -147,8 +191,10 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
+  multiButton: {
+    paddingVertical: 8,
+  },
   buttonText: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Modal, Linking } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Modal, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { getPanicAlertHistory, PanicAlertHistoryItem } from '@/services/panicService';
+import { AlertModal, type AlertType } from '@/components/AlertModal';
 
 export default function PanicAlertDetailsScreen() {
   const router = useRouter();
@@ -13,6 +14,11 @@ export default function PanicAlertDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapLink, setMapLink] = useState<string | null>(null);
+  const [modalAlert, setModalAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
 
   useEffect(() => {
     loadAlertDetails();
@@ -124,7 +130,7 @@ export default function PanicAlertDetailsScreen() {
                             setShowMapModal(true);
                             setTimeout(() => {
                               Linking.openURL(locationObj.mapLink).catch(() => {
-                                Alert.alert("Error", "Could not open map");
+                                setModalAlert({ visible: true, type: 'error', title: 'Error', message: 'Could not open map' });
                               });
                               setShowMapModal(false);
                             }, 1500);
@@ -198,6 +204,14 @@ export default function PanicAlertDetailsScreen() {
           </View>
         </View>
       </Modal>
+
+      <AlertModal
+        visible={modalAlert.visible}
+        type={modalAlert.type}
+        title={modalAlert.title}
+        message={modalAlert.message}
+        onDismiss={() => setModalAlert({ ...modalAlert, visible: false })}
+      />
     </SafeAreaView>
   );
 }

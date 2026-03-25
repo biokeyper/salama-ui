@@ -3,7 +3,8 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { saveReport } from '../services/storage';
@@ -17,7 +18,13 @@ export default function RecordPastScreen() {
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false); // Prevent multiple stop calls
-  const { enterDecoyMode } = useBackgroundRecording();
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
+
+    const { enterDecoyMode } = useBackgroundRecording();
 
   // Animation value for pulsing effect
   const pulseScale = useSharedValue(1);
@@ -47,7 +54,7 @@ export default function RecordPastScreen() {
     (async () => {
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        Alert.alert('Permission to access microphone was denied');
+        setAlert({ visible: true, type: 'error', title: 'Error', message: 'Permission to access microphone was denied' });
       }
     })();
     // No manual cleanup needed - expo-audio handles it
@@ -60,7 +67,7 @@ export default function RecordPastScreen() {
       setIsRecording(true);
       setReportId(null); // Reset report ID for new recording
     } catch (err) {
-      Alert.alert('Error', 'Failed to start recording');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to start recording' });
     }
   };
 
@@ -102,7 +109,7 @@ export default function RecordPastScreen() {
         }
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to save recording');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to save recording' });
     } finally {
       setIsStopping(false);
     }
@@ -174,6 +181,7 @@ export default function RecordPastScreen() {
   };
 
   return (
+    <>
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={navigateToDetailedReport} style={styles.skipButton}>
@@ -245,6 +253,16 @@ export default function RecordPastScreen() {
         <Text style={styles.emergencyText}>EXIT NOW</Text>
       </TouchableOpacity>
     </SafeAreaView>
+
+    <AlertModal
+      visible={alert.visible}
+      type={alert.type}
+      title={alert.title}
+      message={alert.message}
+      buttons={alert.buttons}
+      onDismiss={() => setAlert({ ...alert, visible: false })}
+    />
+    </>
   );
 }
 

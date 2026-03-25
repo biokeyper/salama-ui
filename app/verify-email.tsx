@@ -1,16 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import axios from 'axios';
 import { apiConfig } from '@/config/api';
+import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const { email, userId } = useLocalSearchParams();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string; buttons?: AlertButton[] }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
 
   useEffect(() => {
     verifyEmail();
@@ -35,18 +41,20 @@ export default function VerifyEmailScreen() {
 
       if (response.status === 200) {
         setIsVerifying(false);
-        Alert.alert(
-          'Success',
-          'Your email has been verified successfully!',
-          [
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Success',
+          message: 'Your email has been verified successfully!',
+          buttons: [
             {
               text: 'Continue',
               onPress: () => {
                 router.replace('/(tabs)');
               },
             },
-          ]
-        );
+          ],
+        });
       }
     } catch (error) {
       let message = 'Failed to verify email. Please try again.';
@@ -107,6 +115,15 @@ export default function VerifyEmailScreen() {
           </>
         ) : null}
       </View>
+
+      <AlertModal
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+        onDismiss={() => setAlert({ ...alert, visible: false })}
+      />
     </SafeAreaView>
   );
 }
