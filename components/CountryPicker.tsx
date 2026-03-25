@@ -1,6 +1,6 @@
 /**
  * Country Picker Component
- * Searchable country picker with inline dropdown
+ * Tap to open modal with searchable country list
  */
 
 import React, { useState } from 'react';
@@ -8,8 +8,10 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
+  Modal,
   FlatList,
   TextInput,
+  SafeAreaView,
 } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { Country, COUNTRIES } from '@/utils/countries';
@@ -20,8 +22,8 @@ interface CountryPickerProps {
 }
 
 export function CountryPicker({ selectedCountry, onSelectCountry }: CountryPickerProps) {
+  const [showModal, setShowModal] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
 
   const filteredCountries = COUNTRIES.filter((country) =>
     country.name.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -31,120 +33,154 @@ export function CountryPicker({ selectedCountry, onSelectCountry }: CountryPicke
 
   const handleSelectCountry = (country: Country) => {
     onSelectCountry(country);
+    setShowModal(false);
     setSearchText('');
-    setShowDropdown(false);
   };
 
   return (
-    <View>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search country (Uganda, +256, 256)"
-        placeholderTextColor="#aaa"
-        value={searchText}
-        onChangeText={setSearchText}
-        onFocus={() => setShowDropdown(true)}
-        keyboardType="default"
-      />
+    <>
+      <TouchableOpacity
+        style={styles.pickerButton}
+        onPress={() => setShowModal(true)}
+      >
+        <ThemedText style={styles.flagText}>{selectedCountry.flag}</ThemedText>
+        <ThemedText style={styles.countryName}>{selectedCountry.name}</ThemedText>
+        <ThemedText style={styles.chevron}>›</ThemedText>
+      </TouchableOpacity>
 
-      {showDropdown && searchText && filteredCountries.length > 0 && (
-        <View style={styles.dropdown}>
+      <Modal
+        visible={showModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => {
+          setShowModal(false);
+          setSearchText('');
+        }}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => { setShowModal(false); setSearchText(''); }}>
+              <ThemedText style={styles.closeButton}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <ThemedText style={styles.modalTitle}>Select Country</ThemedText>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search country..."
+            placeholderTextColor="#aaa"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+
           <FlatList
             data={filteredCountries}
             keyExtractor={(item) => `${item.code}-${item.name}`}
-            scrollEnabled={filteredCountries.length > 5}
-            nestedScrollEnabled={true}
-            style={styles.list}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.dropdownItem}
+                style={styles.countryRow}
                 onPress={() => handleSelectCountry(item)}
               >
-                <ThemedText style={styles.itemFlag}>{item.flag}</ThemedText>
-                <View style={styles.itemContent}>
-                  <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                  <ThemedText style={styles.itemCode}>{item.code}</ThemedText>
+                <ThemedText style={styles.rowFlag}>{item.flag}</ThemedText>
+                <View style={styles.rowContent}>
+                  <ThemedText style={styles.rowName}>{item.name}</ThemedText>
+                  <ThemedText style={styles.rowCode}>{item.code}</ThemedText>
                 </View>
               </TouchableOpacity>
             )}
+            scrollEnabled={true}
           />
-        </View>
-      )}
-
-      {!searchText && (
-        <View style={styles.selectedDisplay}>
-          <ThemedText style={styles.selectedText}>
-            {selectedCountry.flag} {selectedCountry.name} • {selectedCountry.code}
-          </ThemedText>
-        </View>
-      )}
-    </View>
+        </SafeAreaView>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  searchInput: {
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderColor: '#8A4FFF',
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 14,
-    fontSize: 16,
     marginBottom: 16,
+    backgroundColor: '#faf8ff',
+  },
+  flagText: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  countryName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#222',
+    flex: 1,
+  },
+  chevron: {
+    fontSize: 20,
+    color: '#8A4FFF',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  closeButton: {
+    color: '#8A4FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  searchInput: {
+    borderColor: '#8A4FFF',
+    borderWidth: 1,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
     backgroundColor: '#faf8ff',
     color: '#222',
   },
-  dropdown: {
-    borderColor: '#8A4FFF',
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    backgroundColor: '#fff',
-    marginTop: -16,
-    marginBottom: 16,
-    maxHeight: 220,
-    zIndex: 1000,
-  },
-  list: {
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  dropdownItem: {
+  countryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  itemFlag: {
-    fontSize: 18,
-    marginRight: 10,
+  rowFlag: {
+    fontSize: 20,
+    marginRight: 12,
   },
-  itemContent: {
+  rowContent: {
     flex: 1,
   },
-  itemName: {
-    fontSize: 15,
+  rowName: {
+    fontSize: 16,
     fontWeight: '500',
     color: '#222',
   },
-  itemCode: {
+  rowCode: {
     fontSize: 12,
     color: '#888',
-    marginTop: 2,
-  },
-  selectedDisplay: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#f5f3ff',
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  selectedText: {
-    fontSize: 14,
-    color: '#8A4FFF',
-    fontWeight: '500',
+    marginTop: 4,
   },
 });
