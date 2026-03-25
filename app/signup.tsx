@@ -15,48 +15,59 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
+import { AlertModal, type AlertType } from '@/components/AlertModal';
 import { CountryPicker } from '@/components/CountryPicker';
 import { COUNTRIES, normalizePhoneNumber, isValidPhoneLength } from '@/utils/countries';
 
 export default function SignupScreen() {
   const [step, setStep] = useState<'details' | 'otp'>('details');
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]); // Kenya by default
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[1]); // Uganda by default
   const [phone, setPhone] = useState('');
   const [normalizedPhone, setNormalizedPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [testOtp, setTestOtp] = useState<string | undefined>();
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
   const router = useRouter();
   const { signup, initiateSignupFlow } = useAuth();
 
   const handleInitiateSignup = async () => {
     if (!phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your phone number' });
       return;
     }
 
     if (!isValidPhoneLength(selectedCountry.code, phone)) {
-      Alert.alert(
-        'Invalid Phone Number',
-        `${selectedCountry.name} phone numbers should have ${selectedCountry.phoneLength} digits`
-      );
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Invalid Phone Number',
+        message: `${selectedCountry.name} phone numbers should have ${selectedCountry.phoneLength} digits`,
+      });
       return;
     }
 
     setIsLoading(true);
     try {
       const normalized = normalizePhoneNumber(selectedCountry.code, phone);
+      console.log('[Signup] Sending:', { phone: normalized, country: selectedCountry.name });
       const result = await initiateSignupFlow(normalized, selectedCountry.name);
+      console.log('[Signup] Response:', result);
       if (result.success) {
         setNormalizedPhone(normalized);
         setStep('otp');
       } else {
-        Alert.alert('Error', result.error || 'Failed to initiate signup');
+        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to initiate signup' });
       }
     } catch (error) {
+      console.log('[Signup] Error:', error);
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      Alert.alert('Error', message);
+      setAlert({ visible: true, type: 'error', title: 'Error', message });
     } finally {
       setIsLoading(false);
     }
@@ -64,27 +75,28 @@ export default function SignupScreen() {
 
   const handleVerifyOtp = async () => {
     if (!otp.trim()) {
-      Alert.alert('Error', 'Please enter the OTP');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter the OTP' });
       return;
     }
 
     setIsLoading(true);
     try {
+      console.log('[OTP Verify] Sending:', { phone: normalizedPhone, otp: otp.trim(), country: selectedCountry.name });
       const result = await signup(normalizedPhone, otp.trim(), selectedCountry.name);
+      console.log('[OTP Verify] Response:', result);
       if (result.success) {
-
+        setAlert({ visible: true, type: 'success', title: 'Success', message: 'Account created successfully' });
         setTimeout(() => {
           router.replace('/');
         }, 100);
-
-        Alert.alert('Success', 'Account created successfully');
       } else {
-        Alert.alert('Error', result.error || 'Failed to verify OTP');
+        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to verify OTP' });
       }
     } catch (error) {
+      console.log('[OTP Verify] Error:', error);
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      Alert.alert('Error', message);
+      setAlert({ visible: true, type: 'error', title: 'Error', message });
     } finally {
       setIsLoading(false);
     }
@@ -198,6 +210,14 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <AlertModal
+          visible={alert.visible}
+          type={alert.type}
+          title={alert.title}
+          message={alert.message}
+          onPress={() => setAlert({ ...alert, visible: false })}
+        />
       </ThemedView>
     </KeyboardAvoidingView>
   );

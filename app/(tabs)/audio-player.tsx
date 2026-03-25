@@ -637,6 +637,8 @@ export default function LibraryScreen() {
               });
 
               Alert.alert("Success", "Report archived successfully");
+              // Reload to ensure consistency
+              await loadReports();
             } catch (error) {
               Alert.alert("Error", "Failed to archive report");
             } finally {
@@ -688,6 +690,8 @@ export default function LibraryScreen() {
               });
 
               Alert.alert("Success", "Report restored successfully");
+              // Reload to ensure consistency
+              await loadReports();
             } catch (error) {
               Alert.alert("Error", "Failed to unarchive report");
             } finally {

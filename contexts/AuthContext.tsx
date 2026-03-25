@@ -27,8 +27,8 @@ export interface AuthContextType {
   isLoading: boolean;
   showEmailRecoveryModal: boolean;
   login: (phone: string, otp: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (phone: string, otp: string) => Promise<{ success: boolean; error?: string }>;
-  initiateSignupFlow: (phone: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (phone: string, otp: string, country?: string) => Promise<{ success: boolean; error?: string }>;
+  initiateSignupFlow: (phone: string, country?: string) => Promise<{ success: boolean; error?: string }>;
   initiateLoginFlow: (phone: string) => Promise<{ success: boolean; error?: string; _testOTP?: string }>;
   changePhone: (newPhone: string, otp: string) => Promise<{ success: boolean; error?: string }>;
   setupEmailRecovery: (email: string) => Promise<void>;
@@ -76,10 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (
     phone: string,
-    otp: string
+    otp: string,
+    country?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const result = await verifySignup(phone, otp);
+      const result = await verifySignup(phone, otp, country);
       if (result.success && result.user) {
         setUser(result.user);
         setIsLoggedIn(true);

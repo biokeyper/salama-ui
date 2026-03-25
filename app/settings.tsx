@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AlertModal, type AlertType } from '@/components/AlertModal';
 
 import { hasPin, setPin as savePin } from '@/services/security';
 import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
@@ -31,6 +32,11 @@ export default function SettingsScreen() {
     const [isSettingUpEmail, setIsSettingUpEmail] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAuthGate, setShowAuthGate] = useState(false);
+    const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string }>({
+        visible: false,
+        type: 'info',
+        title: '',
+    });
 
     const checkAuth = async (): Promise<boolean> => {
         const token = await getAuthToken();

@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
+import { AlertModal, type AlertType } from '@/components/AlertModal';
 import { COUNTRIES, normalizePhoneNumber } from '@/utils/countries';
 import {
   initiateForgotPhone,
@@ -37,28 +38,33 @@ export default function LoginScreen() {
   const [recoveryToken, setRecoveryToken] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [selectedCountryRecovery, setSelectedCountryRecovery] = useState(COUNTRIES[0]);
+  const [alert, setAlert] = useState<{ visible: boolean; type: AlertType; title: string; message?: string }>({
+    visible: false,
+    type: 'info',
+    title: '',
+  });
   const router = useRouter();
   const { login, initiateLoginFlow } = useAuth();
 
   const handleInitiateLogin = async () => {
     if (!phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your phone number' });
       return;
     }
 
     setIsLoading(true);
     try {
       const normalizedPhone = normalizePhoneNumber(selectedCountry.code, phone.trim());
-      const result = await initiateLoginFlow(normalizedPhone, selectedCountry.name);
+      const result = await initiateLoginFlow(normalizedPhone);
       if (result.success) {
         setStep('otp');
       } else {
-        Alert.alert('Error', result.error || 'Failed to initiate login');
+        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to initiate login' });
       }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      Alert.alert('Error', message);
+      setAlert({ visible: true, type: 'error', title: 'Error', message });
     } finally {
       setIsLoading(false);
     }
@@ -66,28 +72,26 @@ export default function LoginScreen() {
 
   const handleVerifyOtp = async () => {
     if (!otp.trim()) {
-      Alert.alert('Error', 'Please enter the OTP');
+      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter the OTP' });
       return;
     }
 
     setIsLoading(true);
     try {
       const normalizedPhone = normalizePhoneNumber(selectedCountry.code, phone.trim());
-      const result = await login(normalizedPhone, otp.trim(), selectedCountry.name);
+      const result = await login(normalizedPhone, otp.trim());
       if (result.success) {
-
+        setAlert({ visible: true, type: 'success', title: 'Success', message: 'You are now logged in' });
         setTimeout(() => {
           router.replace('/');
         }, 100);
-
-        Alert.alert('Success', 'You are now logged in');
       } else {
-        Alert.alert('Error', result.error || 'Failed to verify OTP');
+        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to verify OTP' });
       }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      Alert.alert('Error', message);
+      setAlert({ visible: true, type: 'error', title: 'Error', message });
     } finally {
       setIsLoading(false);
     }
@@ -505,6 +509,14 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <AlertModal
+          visible={alert.visible}
+          type={alert.type}
+          title={alert.title}
+          message={alert.message}
+          onPress={() => setAlert({ ...alert, visible: false })}
+        />
       </ThemedView>
     </KeyboardAvoidingView>
   );

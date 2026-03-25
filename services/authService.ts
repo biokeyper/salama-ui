@@ -38,13 +38,17 @@ export interface AuthResponse {
 }
 
 /**
- * Initiate signup process with phone
+ * Initiate signup process with phone and country
  * Sends OTP to phone number
  */
 export async function initiateSignup(
   phone: string,
+  country?: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const payload = { phone };
+  const payload: { phone: string; country?: string } = { phone };
+  if (country) {
+    payload.country = country;
+  }
 
   try {
     const response = await axios.post(
@@ -96,8 +100,12 @@ export async function initiateSignup(
 export async function verifySignup(
   phone: string,
   otp: string,
+  country?: string,
 ): Promise<{ success: boolean; error?: string; user?: User }> {
-  const payload = { phone, otp };
+  const payload: { phone: string; otp: string; country?: string } = { phone, otp };
+  if (country) {
+    payload.country = country;
+  }
 
   try {
     const response = await axios.post(

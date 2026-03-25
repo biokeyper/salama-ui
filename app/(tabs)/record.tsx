@@ -121,8 +121,8 @@ export default function RecordScreen() {
       playerStatus.currentTime >= playerStatus.duration
     ) {
       try {
-        audioPlayer.pause();
         audioPlayer.seekTo(0);
+        audioPlayer.pause();
         setIsPlayingRecording(false);
       } catch (err) {
         setIsPlayingRecording(false);

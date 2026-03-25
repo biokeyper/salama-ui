@@ -36,26 +36,26 @@ export function AlertModal({
       case 'success':
         return '✓';
       case 'error':
-        return '✕';
+        return '•';
       case 'warning':
-        return '⚠';
+        return '!';
       case 'info':
       default:
-        return 'ℹ';
+        return '•';
     }
   };
 
   const getColors = () => {
     switch (type) {
       case 'success':
-        return { bg: '#f0fdf4', icon: '#22c55e', border: '#86efac' };
+        return { accent: '#22c55e', text: '#16a34a' };
       case 'error':
-        return { bg: '#fef2f2', icon: '#ef4444', border: '#fca5a5' };
+        return { accent: '#ef4444', text: '#dc2626' };
       case 'warning':
-        return { bg: '#fffbeb', icon: '#f59e0b', border: '#fcd34d' };
+        return { accent: '#f59e0b', text: '#d97706' };
       case 'info':
       default:
-        return { bg: '#f0f9ff', icon: '#3b82f6', border: '#93c5fd' };
+        return { accent: '#8A4FFF', text: '#7c3aed' };
     }
   };
 
@@ -70,9 +70,9 @@ export function AlertModal({
       onRequestClose={onPress}
     >
       <View style={styles.overlay}>
-        <View style={[styles.alertBox, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-          <View style={[styles.iconContainer, { backgroundColor: colors.icon }]}>
-            <ThemedText style={styles.icon}>{icon}</ThemedText>
+        <View style={styles.alertBox}>
+          <View style={[styles.iconContainer, { borderColor: colors.accent }]}>
+            <ThemedText style={[styles.icon, { color: colors.accent }]}>{icon}</ThemedText>
           </View>
 
           <ThemedText style={styles.title}>{title}</ThemedText>
@@ -80,7 +80,7 @@ export function AlertModal({
           {message && <ThemedText style={styles.message}>{message}</ThemedText>}
 
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.icon }]}
+            style={[styles.button, { backgroundColor: colors.accent }]}
             onPress={onPress}
           >
             <ThemedText style={styles.buttonText}>{buttonText}</ThemedText>
@@ -94,57 +94,62 @@ export function AlertModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   alertBox: {
-    borderRadius: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
+    borderRadius: 14,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
     alignItems: 'center',
-    borderWidth: 2,
+    backgroundColor: '#fff',
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   icon: {
-    fontSize: 28,
-    color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
   },
   title: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   message: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
+    marginBottom: 16,
+    lineHeight: 19,
   },
   button: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
 });
