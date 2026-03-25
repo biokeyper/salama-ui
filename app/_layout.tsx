@@ -17,6 +17,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { initDatabase } from '@/services/database';
 import FloatingEmergencyButton from '@/components/FloatingEmergencyButton';
 import EmergencyAlertModal from '@/components/EmergencyAlertModal';
+import { ToastProvider } from '@/components/ToastProvider';
 
 interface RootNavigatorProps {
   emergencyModalVisible: boolean;
@@ -217,6 +218,7 @@ export default function RootLayout() {
                     onOpenEmergencyModal={() => setEmergencyModalVisible(true)}
                     onCloseEmergencyModal={() => setEmergencyModalVisible(false)}
                   />
+                  <ToastProvider />
                 </BackgroundRecordingProvider>
               </SettingsProvider>
             </PinProtectionProvider>

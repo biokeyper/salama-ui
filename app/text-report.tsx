@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -77,7 +78,7 @@ export default function TextReportScreen() {
         updatedAt: new Date().toISOString(),
       });
 
-      setAlert({ visible: true, type: 'success', title: 'Success', message: 'Report updated successfully' });
+      showToast.success('Report updated successfully');
       router.back();
     } catch (error) {
       setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to update report' });

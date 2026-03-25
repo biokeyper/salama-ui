@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 
 import { hasPin, setPin as savePin } from '@/services/security';
 import { deleteAllHealthLogs, deleteAllReports } from '@/services/storage';
@@ -171,12 +172,7 @@ export default function SettingsScreen() {
             setShowSetPin(false);
             setShowVerifyPin(false);
             await checkPinStatus();
-            setAlert({
-                visible: true,
-                type: 'success',
-                title: 'Success',
-                message: 'PIN has been set successfully',
-            });
+            showToast.success('PIN has been set successfully');
         } else {
             setAlert({
                 visible: true,
@@ -235,12 +231,7 @@ export default function SettingsScreen() {
                     await SecureStore.setItemAsync('salama_auth_user', JSON.stringify(updatedUser));
                 }
                 setShowEmailRecoveryModal(false);
-                setAlert({
-                    visible: true,
-                    type: 'success',
-                    title: 'Success',
-                    message: emailRecoverySetup ? 'Email has been updated successfully' : 'Email recovery has been set up successfully',
-                });
+                showToast.success(emailRecoverySetup ? 'Email updated successfully' : 'Email recovery set up successfully');
             } else {
                 setAlert({
                     visible: true,

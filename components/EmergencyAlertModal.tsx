@@ -16,6 +16,7 @@ import { getAuthToken } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGateModal from './AuthGateModal';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 
 interface EmergencyAlertModalProps {
   visible: boolean;

@@ -15,6 +15,7 @@ import {
   
  } from 'react-native';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 import { Feather } from '@expo/vector-icons';
 
 interface EmailRecoveryModalProps {
@@ -39,13 +40,13 @@ export default function EmailRecoveryModal({
 
   const handleSave = async () => {
     if (!email.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your email address' });
+      showToast.error('Please enter your email address');
       return;
     }
 
     // Basic email validation
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter a valid email address' });
+      showToast.error('Please enter a valid email address');
       return;
     }
 

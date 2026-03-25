@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
-
+import { showToast } from '@/utils/toast';
 import { verifyPin, hasPin, setPin as savePinToBackend } from '@/services/security';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGateModal from '@/components/AuthGateModal';
@@ -67,7 +67,7 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                 if (pin.length >= 4) {
                     setIsConfirming(true);
                 } else {
-                    setAlert({ visible: true, type: 'error', title: 'Error', message: 'PIN must be at least 4 digits' });
+                    showToast.error('PIN must be at least 4 digits');
                 }
             } else {
                 if (pin === confirmPin) {
@@ -77,19 +77,19 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
                         if (success) {
                             onSetPin?.(pin);
                         } else {
-                            setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to set PIN. Please try again.' });
+                            showToast.error('Failed to set PIN. Please try again.');
                             setPin('');
                             setConfirmPin('');
                             setIsConfirming(false);
                         }
                     } catch (_error) {
-                        setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred while setting PIN' });
+                        showToast.error('An error occurred while setting PIN');
                         setPin('');
                         setConfirmPin('');
                         setIsConfirming(false);
                     }
                 } else {
-                    setAlert({ visible: true, type: 'error', title: 'Error', message: 'PINs do not match' });
+                    showToast.error('PINs do not match');
                     setPin('');
                     setConfirmPin('');
                     setIsConfirming(false);
@@ -102,7 +102,7 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
               const pinSet = await hasPin(user?.pin || null);
 
               if (!pinSet) {
-                setAlert({ visible: true, type: 'warning', title: 'Set PIN First', message: 'Please set a PIN first to access your library.' });
+                showToast.error('Please set a PIN first to access your library');
                 setPin('');
                 return;
               }
@@ -112,11 +112,11 @@ export default function LockScreen({ onUnlock, mode = 'verify', onSetPin, onClos
               if (isValid) {
                 onUnlock?.();
               } else {
-                setAlert({ visible: true, type: 'error', title: 'Incorrect PIN', message: 'Please try again' });
+                showToast.error('Incorrect PIN. Please try again');
                 setPin('');
               }
             } catch (_error) {
-              setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred. Please try again.' });
+              showToast.error('An error occurred. Please try again.');
               setPin('');
             }
         }

@@ -16,6 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import axios from 'axios';
 import { apiConfig } from '@/config/api';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 
 export default function RecoveryScreen() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function RecoveryScreen() {
 
   useEffect(() => {
     if (!token) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Invalid recovery link' });
+      showToast.error('Invalid recovery link');
       router.replace('/');
     }
   }, [token]);
@@ -66,7 +67,7 @@ export default function RecoveryScreen() {
       }
 
       setError(message);
-      setAlert({ visible: true, type: 'error', title: 'Error', message });
+      showToast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -74,17 +75,17 @@ export default function RecoveryScreen() {
 
   const handleSetNewPin = async () => {
     if (!newPin || !confirmPin) {
-      setError('Please enter both PIN fields');
+      showToast.error('Please enter both PIN fields');
       return;
     }
 
     if (newPin.length < 4) {
-      setError('PIN must be at least 4 digits');
+      showToast.error('PIN must be at least 4 digits');
       return;
     }
 
     if (newPin !== confirmPin) {
-      setError('PINs do not match');
+      showToast.error('PINs do not match');
       return;
     }
 
@@ -129,7 +130,7 @@ export default function RecoveryScreen() {
       }
 
       setError(message);
-      setAlert({ visible: true, type: 'error', title: 'Error', message });
+      showToast.error(message);
     } finally {
       setIsLoading(false);
     }

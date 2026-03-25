@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { getPanicAlertHistory, PanicAlertHistoryItem } from '@/services/panicService';
 import { AlertModal, type AlertType } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 
 export default function PanicAlertDetailsScreen() {
   const router = useRouter();

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { saveReport } from '../services/storage';
@@ -54,7 +55,7 @@ export default function RecordPastScreen() {
     (async () => {
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: 'Permission to access microphone was denied' });
+        showToast.error('Permission to access microphone was denied');
       }
     })();
     // No manual cleanup needed - expo-audio handles it
@@ -67,7 +68,7 @@ export default function RecordPastScreen() {
       setIsRecording(true);
       setReportId(null); // Reset report ID for new recording
     } catch (err) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to start recording' });
+      showToast.error('Failed to start recording');
     }
   };
 
@@ -109,7 +110,7 @@ export default function RecordPastScreen() {
         }
       }
     } catch (err) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to save recording' });
+      showToast.error('Failed to save recording');
     } finally {
       setIsStopping(false);
     }

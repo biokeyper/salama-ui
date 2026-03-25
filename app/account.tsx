@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { initiateChangePhone, verifyChangePhone, getAuthToken } from '@/services/authService';
 import { AlertModal, type AlertType } from '@/components/AlertModal';
 import AuthGateModal from '@/components/AuthGateModal';
+import { showToast } from '@/utils/toast';
 
 export default function AccountScreen() {
   const router = useRouter();
@@ -74,12 +75,7 @@ export default function AccountScreen() {
         setStep('info');
         setNewPhone('');
         setOtp('');
-        setAlert({
-          visible: true,
-          type: 'success',
-          title: 'Success',
-          message: 'Your phone number has been updated successfully',
-        });
+        showToast.success('Phone number updated successfully');
       } else {
         setError(result.error || 'Failed to verify phone change');
       }
@@ -100,12 +96,7 @@ export default function AccountScreen() {
   const handleCopyUserId = async () => {
     if (user?.userId) {
       await Clipboard.setString(user.userId);
-      setAlert({
-        visible: true,
-        type: 'success',
-        title: 'Success',
-        message: 'User ID copied to clipboard',
-      });
+      showToast.success('User ID copied to clipboard');
     }
   };
 

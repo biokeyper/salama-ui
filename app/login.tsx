@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
 import { COUNTRIES, normalizePhoneNumber, isValidPhoneLength } from '@/utils/countries';
+import { showToast } from '@/utils/toast';
 import {
   initiateForgotPhone,
   verifyRecoveryEmail,
@@ -80,7 +81,7 @@ export default function LoginScreen() {
       const normalizedPhone = normalizePhoneNumber(selectedCountry.code, phone.trim());
       const result = await login(normalizedPhone, otp.trim());
       if (result.success) {
-        setAlert({ visible: true, type: 'success', title: 'Success', message: 'You are now logged in' });
+        showToast.success('Logged in successfully');
         setTimeout(() => {
           router.replace('/');
         }, 100);
@@ -106,7 +107,7 @@ export default function LoginScreen() {
     try {
       const result = await initiateForgotPhone(recoveryEmail.trim());
       if (result.success) {
-        setAlert({ visible: true, type: 'success', title: 'Check your email', message: 'A recovery link has been sent to your email address' });
+        showToast.success('Recovery link sent to your email');
         setStep('forgot-token');
       } else {
         setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to initiate recovery' });

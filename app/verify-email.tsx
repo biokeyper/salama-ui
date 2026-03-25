@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import axios from 'axios';
 import { apiConfig } from '@/config/api';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 
 export default function VerifyEmailScreen() {
   const router = useRouter();

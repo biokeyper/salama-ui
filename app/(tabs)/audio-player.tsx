@@ -276,7 +276,7 @@ export default function LibraryScreen() {
         (r) => r.status === "failed",
       ).length;
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "Failed to load reports" });
+      showToast.error("Failed to load reports" );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -828,7 +828,7 @@ export default function LibraryScreen() {
     setOpenMenuReportId(null);
 
     if (!report.submissionId) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "This report has not been submitted yet" });
+      showToast.error("This report has not been submitted yet" );
       return;
     }
 
@@ -841,11 +841,11 @@ export default function LibraryScreen() {
       if (result.success && result.data) {
         setDecryptedContent(result.data);
       } else {
-        setAlert({ visible: true, type: "error", title: "Error", message: result.error || "Failed to decrypt report" });
+        showToast.error(result.error || "Failed to decrypt report" );
         setShowDecryptedModal(false);
       }
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "An error occurred while decrypting the report" });
+      showToast.error("An error occurred while decrypting the report" );
       setShowDecryptedModal(false);
     } finally {
       setIsLoadingDecrypt(false);
@@ -856,7 +856,7 @@ export default function LibraryScreen() {
     setOpenMenuReportId(null);
 
     if (!report.submissionId) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "Only submitted reports can be shared" });
+      showToast.error("Only submitted reports can be shared" );
       return;
     }
     setSelectedReport(report);
@@ -884,7 +884,7 @@ export default function LibraryScreen() {
         setSearchOffset(0);
       }
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "Failed to load reports" });
+      showToast.error("Failed to load reports" );
     } finally {
       setIsLoadingSearch(false);
     }
@@ -905,7 +905,7 @@ export default function LibraryScreen() {
         setSearchOffset(searchOffset + searchLimit);
       }
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "Failed to load more reports" });
+      showToast.error("Failed to load more reports" );
     }
   };
 
@@ -919,7 +919,7 @@ export default function LibraryScreen() {
         setPanicAlerts([]);
       }
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "Failed to load panic alerts" });
+      showToast.error("Failed to load panic alerts" );
       setPanicAlerts([]);
     } finally {
       setIsLoadingPanicAlerts(false);
@@ -928,7 +928,7 @@ export default function LibraryScreen() {
 
   const handleGrantAccess = async () => {
     if (!selectedReport || !shareUserId.trim()) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "Please enter a user ID" });
+      showToast.error("Please enter a user ID" );
       return;
     }
 
@@ -941,7 +941,7 @@ export default function LibraryScreen() {
       );
 
       if (expiresInSeconds <= 0) {
-        setAlert({ visible: true, type: "error", title: "Error", message: "Expiration date must be in the future" });
+        showToast.error("Expiration date must be in the future" );
         setIsLoadingShare(false);
         return;
       }
@@ -964,10 +964,10 @@ export default function LibraryScreen() {
         setExpirationDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // Reset to 7 days
         setSelectedReport(null);
       } else {
-        setAlert({ visible: true, type: "error", title: "Error", message: result.error || "Failed to grant access" });
+        showToast.error(result.error || "Failed to grant access" );
       }
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "An unexpected error occurred" });
+      showToast.error("An unexpected error occurred" );
     } finally {
       setIsLoadingShare(false);
     }
@@ -977,7 +977,7 @@ export default function LibraryScreen() {
     setOpenMenuReportId(null);
 
     if (!report.submissionId) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "This report has not been submitted yet" });
+      showToast.error("This report has not been submitted yet" );
       return;
     }
 
@@ -990,11 +990,11 @@ export default function LibraryScreen() {
       if (result.success) {
         setViewers(result.viewers || []);
       } else {
-        setAlert({ visible: true, type: "error", title: "Error", message: result.error || "Failed to fetch viewers" });
+        showToast.error(result.error || "Failed to fetch viewers" );
         setShowViewersModal(false);
       }
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "An error occurred while fetching viewers" });
+      showToast.error("An error occurred while fetching viewers" );
       setShowViewersModal(false);
     } finally {
       setIsLoadingViewers(false);
@@ -1003,7 +1003,7 @@ export default function LibraryScreen() {
 
   const handleRevokeAccess = async (userId: string) => {
     if (!selectedReport) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "Report not selected" });
+      showToast.error("Report not selected" );
       return;
     }
 
@@ -1035,10 +1035,10 @@ export default function LibraryScreen() {
                   setViewers(viewersResult.viewers || []);
                 }
               } else {
-                setAlert({ visible: true, type: "error", title: "Error", message: result.error || "Failed to revoke access" });
+                showToast.error(result.error || "Failed to revoke access" );
               }
             } catch (error) {
-              setAlert({ visible: true, type: "error", title: "Error", message: "An error occurred" });
+              showToast.error("An error occurred" );
             } finally {
               setIsRevokingUserId(null);
             }
@@ -1107,10 +1107,10 @@ export default function LibraryScreen() {
         setDecryptedContent(result.data);
         setShowSharedWithMeDetailsModal(true);
       } else {
-        setAlert({ visible: true, type: "error", title: "Error", message: result.error || "Failed to load report details" });
+        showToast.error(result.error || "Failed to load report details" );
       }
     } catch (error) {
-      setAlert({ visible: true, type: "error", title: "Error", message: "An error occurred while loading report details" });
+      showToast.error("An error occurred while loading report details" );
     } finally {
       setIsLoadingSharedWithMeDetails(false);
     }
@@ -1469,10 +1469,10 @@ export default function LibraryScreen() {
                             setViewers(result.viewers || []);
                             setShowViewersModal(true);
                           } else {
-                            setAlert({ visible: true, type: "error", title: "Error", message: result.error || "Failed to load viewers" });
+                            showToast.error(result.error || "Failed to load viewers" );
                           }
                         } catch (error) {
-                          setAlert({ visible: true, type: "error", title: "Error", message: "Failed to load viewers" });
+                          showToast.error("Failed to load viewers" );
                         } finally {
                           setIsLoadingViewers(false);
                         }
@@ -1944,7 +1944,7 @@ export default function LibraryScreen() {
                                                   Linking.openURL(
                                                     location.mapLink,
                                                   ).catch(() => {
-                                                    setAlert({ visible: true, type: "error", title: "Error", message: "Could not open map" });
+                                                    showToast.error("Could not open map" );
                                                   });
                                                   setShowMapModal(false);
                                                 }, 1500);
@@ -2061,7 +2061,7 @@ export default function LibraryScreen() {
                             selectedReport?.audioGatewayUrl ||
                             selectedReport?.audioUri;
                           if (!audioUrl) {
-                            setAlert({ visible: true, type: "error", title: "Error", message: "No audio available for this report" });
+                            showToast.error("No audio available for this report" );
                             return;
                           }
                           setIsLoadingDetailAudio(true);
@@ -2084,7 +2084,7 @@ export default function LibraryScreen() {
                               setDetailAudioUri(audioUrl);
                             }
                           } catch (_) {
-                            setAlert({ visible: true, type: "error", title: "Error", message: "Failed to load audio" });
+                            showToast.error("Failed to load audio" );
                           } finally {
                             setIsLoadingDetailAudio(false);
                           }
@@ -2664,7 +2664,7 @@ export default function LibraryScreen() {
                                 setShowPanicMapModal(true);
                                 setTimeout(() => {
                                   Linking.openURL(locationObj.mapLink).catch(() => {
-                                    setAlert({ visible: true, type: "error", title: "Error", message: "Could not open map" });
+                                    showToast.error("Could not open map" );
                                   });
                                   setShowPanicMapModal(false);
                                 }, 1500);

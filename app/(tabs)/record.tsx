@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { AlertModal, type AlertType, type AlertButton } from "@/components/AlertModal";
+import { showToast } from '@/utils/toast';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
