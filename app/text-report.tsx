@@ -41,7 +41,7 @@ export default function TextReportScreen() {
     try {
       const existingReport = await getReportById(reportId);
       if (!existingReport) {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: 'Report not found' });
+        showToast.error('Report not found');
         router.back();
         return;
       }
@@ -49,7 +49,7 @@ export default function TextReportScreen() {
       // Can only edit draft/saved reports
       const actions = getAvailableActions(existingReport);
       if (!actions.canEdit) {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: 'Only draft and saved reports can be edited' });
+        showToast.error('Only draft and saved reports can be edited');
         router.back();
         return;
       }
@@ -57,14 +57,14 @@ export default function TextReportScreen() {
       setEditingReport(existingReport);
       setReport(existingReport.textContent || '');
     } catch (error) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to load report' });
+      showToast.error('Failed to load report');
       router.back();
     }
   };
 
   const handleUpdate = async () => {
     if (!report.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your report or details.' });
+      showToast.error('Please enter your report or details');
       return;
     }
 
@@ -81,7 +81,7 @@ export default function TextReportScreen() {
       showToast.success('Report updated successfully');
       router.back();
     } catch (error) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to update report' });
+      showToast.error('Failed to update report');
     } finally {
       setIsSubmitting(false);
     }
@@ -89,7 +89,7 @@ export default function TextReportScreen() {
 
   const handleSaveDraft = async () => {
     if (!report.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your report or details.' });
+      showToast.error('Please enter your report or details');
       return;
     }
 
@@ -110,22 +110,10 @@ export default function TextReportScreen() {
         updatedAt: now,
       });
 
-      setAlert({
-        visible: true,
-        type: 'success',
-        title: 'Success',
-        message: 'Your draft has been saved.',
-        buttons: [
-          {
-            text: 'OK',
-            onPress: () => {
-              setReport('');
-            },
-          },
-        ],
-      });
+      showToast.success('Your draft has been saved.');
+      setReport('');
     } catch (error) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Failed to save your report. Please try again.' });
+      showToast.error('Failed to save your report. Please try again');
     } finally {
       setIsSavingLocally(false);
     }
@@ -133,7 +121,7 @@ export default function TextReportScreen() {
 
   const handleSubmitToBackend = async () => {
     if (!report.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your report or details.' });
+      showToast.error('Please enter your report or details');
       return;
     }
 
@@ -231,51 +219,15 @@ export default function TextReportScreen() {
 
 
       if (result.success) {
-        setAlert({
-          visible: true,
-          type: 'success',
-          title: 'Success',
-          message: 'Your report has been submitted successfully.',
-          buttons: [
-            {
-              text: 'OK',
-              onPress: async () => {
-                router.replace('/');
-              },
-            },
-          ],
-        });
+        showToast.success('Your report has been submitted successfully.');
+        router.replace('/');
       } else {
-        setAlert({
-          visible: true,
-          type: 'error',
-          title: 'Submission Error',
-          message: result.error || 'Failed to submit to backend. Your report has been saved locally and can be submitted later.',
-          buttons: [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace('/(tabs)');
-              },
-            },
-          ],
-        });
+        showToast.error(result.error || 'Failed to submit to backend. Your report has been saved locally and can be submitted later.');
+        router.replace('/(tabs)');
       }
     } catch (error) {
-      setAlert({
-        visible: true,
-        type: 'error',
-        title: 'Error',
-        message: 'An unexpected error occurred. Your report has been saved locally.',
-        buttons: [
-          {
-            text: 'OK',
-            onPress: () => {
-              router.replace('/(tabs)');
-            },
-          },
-        ],
-      });
+      showToast.error('An unexpected error occurred. Your report has been saved locally.');
+      router.replace('/(tabs)');
     } finally {
       setIsSubmitting(false);
     }

@@ -161,12 +161,7 @@ export default function EmergencyContactsSection() {
         setShowDeviceContacts(true);
       }
     } catch (error) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "Failed to load device contacts",
-      });
+      showToast.error("Failed to load device contacts");
     }
   };
 
@@ -179,12 +174,7 @@ export default function EmergencyContactsSection() {
 
   const handleAddContact = async () => {
     if (!newPhone.trim() || !newName.trim() || !newRelationship.trim()) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "Please fill in all fields",
-      });
+      showToast.error("Please fill in all fields");
       return;
     }
 
@@ -196,32 +186,17 @@ export default function EmergencyContactsSection() {
         newRelationship,
       );
       if (result.success) {
-        setAlert({
-          visible: true,
-          type: "success",
-          title: "Success",
-          message: "Emergency contact added",
-        });
+        showToast.success("Emergency contact added");
         setNewPhone("");
         setNewName("");
         setNewRelationship("");
         setShowAddModal(false);
         await loadContacts();
       } else {
-        setAlert({
-          visible: true,
-          type: "error",
-          title: "Error",
-          message: result.error || "Failed to add contact",
-        });
+        showToast.error(result.error || "Failed to add contact");
       }
     } catch (error) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "An error occurred while adding contact",
-      });
+      showToast.error("An error occurred while adding contact");
     } finally {
       setIsAdding(false);
     }
@@ -242,28 +217,13 @@ export default function EmergencyContactsSection() {
             try {
               const result = await removeEmergencyContact(contactId);
               if (result.success) {
-                setAlert({
-                  visible: true,
-                  type: "success",
-                  title: "Success",
-                  message: "Contact removed",
-                });
+                showToast.success("Contact removed");
                 await loadContacts();
               } else {
-                setAlert({
-                  visible: true,
-                  type: "error",
-                  title: "Error",
-                  message: result.error || "Failed to remove contact",
-                });
+                showToast.error(result.error || "Failed to remove contact");
               }
             } catch (error) {
-              setAlert({
-                visible: true,
-                type: "error",
-                title: "Error",
-                message: "An error occurred while removing contact",
-              });
+              showToast.error("An error occurred while removing contact");
             }
           },
         },
@@ -273,12 +233,7 @@ export default function EmergencyContactsSection() {
 
   const handleSavePanicMessage = async () => {
     if (!panicMessage.trim()) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "Please enter a panic message",
-      });
+      showToast.error("Please enter a panic message");
       return;
     }
 
@@ -291,28 +246,13 @@ export default function EmergencyContactsSection() {
       if (result.success) {
         const savedMessage = result?.data?.panicMessage || panicMessage;
         setPanicMsg(savedMessage);
-        setAlert({
-          visible: true,
-          type: "success",
-          title: "Success",
-          message: "Panic message saved",
-        });
+        showToast.success("Panic message saved");
         setShowPanicMessageModal(false);
       } else {
-        setAlert({
-          visible: true,
-          type: "error",
-          title: "Error",
-          message: result.error || "Failed to save panic message",
-        });
+        showToast.error(result.error || "Failed to save panic message");
       }
     } catch (error) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "An error occurred while saving panic message",
-      });
+      showToast.error("An error occurred while saving panic message");
     } finally {
       setIsSavingMessage(false);
     }
@@ -329,12 +269,7 @@ export default function EmergencyContactsSection() {
     }
 
     if (!editName.trim() || !editPhone.trim() || !editRelationship.trim()) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "Please fill in all fields",
-      });
+      showToast.error("Please fill in all fields");
       return;
     }
 
@@ -353,12 +288,7 @@ export default function EmergencyContactsSection() {
       );
 
       if (result.success) {
-        setAlert({
-          visible: true,
-          type: "success",
-          title: "Success",
-          message: "Contact updated successfully",
-        });
+        showToast.success("Contact updated successfully");
         setShowEditModal(false);
         setEditingContact(null);
         setEditPhone("");
@@ -366,20 +296,10 @@ export default function EmergencyContactsSection() {
         setEditRelationship("");
         await loadContacts();
       } else {
-        setAlert({
-          visible: true,
-          type: "error",
-          title: "Error",
-          message: result.error || "Failed to update contact",
-        });
+        showToast.error(result.error || "Failed to update contact");
       }
     } catch (error) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "An error occurred while updating contact",
-      });
+      showToast.error("An error occurred while updating contact");
     } finally {
       setIsEditing(false);
     }

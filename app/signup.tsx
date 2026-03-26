@@ -6,7 +6,6 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -16,6 +15,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertModal, type AlertType } from '@/components/AlertModal';
+import { showToast } from '@/utils/toast';
 import { CountryPicker } from '@/components/CountryPicker';
 import { COUNTRIES, normalizePhoneNumber, isValidPhoneLength } from '@/utils/countries';
 
@@ -37,17 +37,12 @@ export default function SignupScreen() {
 
   const handleInitiateSignup = async () => {
     if (!phone.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your phone number' });
+      showToast.error('Please enter your phone number');
       return;
     }
 
     if (!isValidPhoneLength(selectedCountry.code, phone)) {
-      setAlert({
-        visible: true,
-        type: 'error',
-        title: 'Invalid Phone Number',
-        message: `${selectedCountry.name} phone numbers should have ${selectedCountry.phoneLength} digits`,
-      });
+      showToast.error(`${selectedCountry.name} phone numbers should have ${selectedCountry.phoneLength} digits`);
       return;
     }
 
@@ -61,13 +56,13 @@ export default function SignupScreen() {
         setNormalizedPhone(normalized);
         setStep('otp');
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to initiate signup' });
+        showToast.error(result.error || 'Failed to initiate signup');
       }
     } catch (error) {
       console.log('[Signup] Error:', error);
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      setAlert({ visible: true, type: 'error', title: 'Error', message });
+      showToast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +70,7 @@ export default function SignupScreen() {
 
   const handleVerifyOtp = async () => {
     if (!otp.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter the OTP' });
+      showToast.error('Please enter the OTP');
       return;
     }
 
@@ -85,18 +80,18 @@ export default function SignupScreen() {
       const result = await signup(normalizedPhone, otp.trim(), selectedCountry.name);
       console.log('[OTP Verify] Response:', result);
       if (result.success) {
-        setAlert({ visible: true, type: 'success', title: 'Success', message: 'Account created successfully' });
+        showToast.success('Account created successfully');
         setTimeout(() => {
           router.replace('/');
         }, 100);
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to verify OTP' });
+        showToast.error(result.error || 'Failed to verify OTP');
       }
     } catch (error) {
       console.log('[OTP Verify] Error:', error);
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      setAlert({ visible: true, type: 'error', title: 'Error', message });
+      showToast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -216,7 +211,7 @@ export default function SignupScreen() {
           type={alert.type}
           title={alert.title}
           message={alert.message}
-          onPress={() => setAlert({ ...alert, visible: false })}
+          onDismiss={() => setAlert({ ...alert, visible: false })}
         />
       </ThemedView>
     </KeyboardAvoidingView>

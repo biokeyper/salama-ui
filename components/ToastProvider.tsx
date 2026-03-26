@@ -8,7 +8,7 @@ export function ToastProvider() {
         success: (props) => (
           <BaseToast
             {...props}
-            style={{ borderLeftColor: '#22c55e' }}
+            style={{ borderLeftColor: '#8B5CF6' }}
             contentContainerStyle={{ paddingHorizontal: 15 }}
             text1Style={{
               fontSize: 15,

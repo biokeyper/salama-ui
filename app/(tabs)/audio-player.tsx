@@ -30,6 +30,7 @@ import {
 } from "@/services/storage";
 import { Report } from "@/types/report";
 import { getAvailableActions } from "@/utils/reportActions";
+import { showToast } from "@/utils/toast";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { BlurView } from "expo-blur";
@@ -229,7 +230,7 @@ export default function LibraryScreen() {
                   }
                 }
               } else {
-                allReports.push({
+                const newReport = {
                   id: reportId,
                   submissionId: reportId,
                   userId: userId,
@@ -248,7 +249,12 @@ export default function LibraryScreen() {
                   audioIpfsHash: backendReport.metadata?.audioIpfsHash,
                   audioGatewayUrl: backendReport.metadata?.audioGatewayUrl,
                   audioDuration: backendReport.metadata?.audioDuration,
-                });
+                  isArchived: backendReport.isArchived || false,
+                };
+                allReports.push(newReport);
+
+                // Save backend report to local storage so archive operations work
+                await saveReport(newReport);
               }
             }
           }
@@ -418,12 +424,7 @@ export default function LibraryScreen() {
         await saveReport({ ...report, audioUri: localUri });
         setPlayingReportId(report.id);
       } catch (error) {
-        setAlert({
-          visible: true,
-          type: "error",
-          title: "Error",
-          message: "Failed to download audio from IPFS.",
-        });
+        showToast.error("Failed to download audio from IPFS.");
       } finally {
         setIsFetchingAudio(null);
       }
@@ -446,13 +447,7 @@ export default function LibraryScreen() {
     const actions = getAvailableActions(report);
 
     if (!actions.canDelete) {
-      setAlert({
-        visible: true,
-        type: "warning",
-        title: "Cannot Delete",
-        message: actions.message || "This report cannot be deleted. You can archive it instead.",
-        buttons: [{ text: "OK" }],
-      });
+      showToast.error(actions.message || "This report cannot be deleted. You can archive it instead.");
       return;
     }
 
@@ -485,19 +480,9 @@ export default function LibraryScreen() {
 
               await loadReports();
 
-              setAlert({
-                visible: true,
-                type: "success",
-                title: "Success",
-                message: "Report deleted successfully",
-              });
+              showToast.success("Report deleted successfully");
             } catch (error) {
-              setAlert({
-                visible: true,
-                type: "error",
-                title: "Error",
-                message: "Failed to delete report",
-              });
+              showToast.error("Failed to delete report");
             }
           },
         },
@@ -557,22 +542,10 @@ export default function LibraryScreen() {
               if (result.success) {
                 await deleteReport(report.id);
 
-                setAlert({
-                  visible: true,
-                  type: "success",
-                  title: "Success",
-                  message: "Report submitted successfully!",
-                  buttons: [
-                    {
-                      text: "OK",
-                      onPress: async () => {
-                        setIsSubmittingReportId(null);
-                        await loadReports();
-                        await refreshUnreadCount();
-                      },
-                    },
-                  ],
-                });
+                showToast.success("Report submitted successfully!");
+                setIsSubmittingReportId(null);
+                await loadReports();
+                await refreshUnreadCount();
               } else if (result.requiresAuth) {
                 setAlert({
                   visible: true,
@@ -678,29 +651,12 @@ export default function LibraryScreen() {
               // Archive locally
               await archiveReport(report.id, "User archived");
 
-              // Optimistically update: mark as archived immediately
-              setReports((prev) => {
-                const updated = prev.map((r) =>
-                  r.id === report.id ? { ...r, isArchived: true } : r,
-                );
-                return updated;
-              });
+              // Optimistically remove from current view (since we're viewing non-archived reports)
+              setReports((prev) => prev.filter((r) => r.id !== report.id));
 
-              setAlert({
-                visible: true,
-                type: "success",
-                title: "Success",
-                message: "Report archived successfully",
-              });
-              // Reload to ensure consistency
-              await loadReports();
+              showToast.success("Report archived successfully");
             } catch (error) {
-              setAlert({
-                visible: true,
-                type: "error",
-                title: "Error",
-                message: "Failed to archive report",
-              });
+              showToast.error("Failed to archive report");
             } finally {
               setIsArchivingReportId(null);
             }
@@ -753,21 +709,11 @@ export default function LibraryScreen() {
                 return updated;
               });
 
-              setAlert({
-                visible: true,
-                type: "success",
-                title: "Success",
-                message: "Report restored successfully",
-              });
+              showToast.success("Report restored successfully");
               // Reload to ensure consistency
               await loadReports();
             } catch (error) {
-              setAlert({
-                visible: true,
-                type: "error",
-                title: "Error",
-                message: "Failed to unarchive report",
-              });
+              showToast.error("Failed to unarchive report");
             } finally {
               setIsArchivingReportId(null);
             }
@@ -953,12 +899,7 @@ export default function LibraryScreen() {
       );
 
       if (result.success) {
-        setAlert({
-          visible: true,
-          type: "success",
-          title: "Success",
-          message: `Access granted until ${expirationDate.toLocaleDateString()}`,
-        });
+        showToast.success(`Access granted until ${expirationDate.toLocaleDateString()}`);
         setShowShareModal(false);
         setShareUserId("");
         setExpirationDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // Reset to 7 days
@@ -1028,7 +969,7 @@ export default function LibraryScreen() {
               const result = await revokeAccess(reportId!, userId);
 
               if (result.success) {
-                setAlert({ visible: true, type: "success", title: "Success", message: "Access revoked successfully" });
+                showToast.success("Access revoked successfully");
                 // Refresh viewers list
                 const viewersResult = await getReportViewers(reportId!);
                 if (viewersResult.success) {
@@ -2038,6 +1979,15 @@ export default function LibraryScreen() {
                             if (detailPlayerStatus?.playing) {
                               detailPlayer.pause();
                             } else {
+                              // If audio finished, reset to beginning
+                              if (
+                                detailPlayerStatus?.currentTime >=
+                                (detailPlayerStatus?.duration || 0)
+                              ) {
+                                try {
+                                  detailPlayer.seekTo(0);
+                                } catch (_) {}
+                              }
                               detailPlayer.play();
                             }
                           }
@@ -2320,7 +2270,7 @@ export default function LibraryScreen() {
                       style={styles.viewerIdContainer}
                       onPress={() => {
                         Clipboard.setString(viewer.viewerId);
-                        setAlert({ visible: true, type: "success", title: "Copied", message: "Viewer ID copied to clipboard" });
+                        showToast.success("Viewer ID copied to clipboard");
                       }}
                     >
                       <Text style={styles.viewerIdLabel}>ID</Text>

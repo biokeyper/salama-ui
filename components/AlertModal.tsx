@@ -55,7 +55,7 @@ export function AlertModal({
   const getColors = () => {
     switch (type) {
       case 'success':
-        return { accent: '#22c55e', text: '#16a34a' };
+        return { accent: '#8B5CF6', text: '#7c3aed' };
       case 'error':
         return { accent: '#ef4444', text: '#dc2626' };
       case 'warning':

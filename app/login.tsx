@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertModal, type AlertType, type AlertButton } from '@/components/AlertModal';
+import { CountryPicker } from '@/components/CountryPicker';
 import { COUNTRIES, normalizePhoneNumber, isValidPhoneLength } from '@/utils/countries';
 import { showToast } from '@/utils/toast';
 import {
@@ -48,7 +49,7 @@ export default function LoginScreen() {
 
   const handleInitiateLogin = async () => {
     if (!phone.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your phone number' });
+      showToast.error('Please enter your phone number');
       return;
     }
 
@@ -59,12 +60,12 @@ export default function LoginScreen() {
       if (result.success) {
         setStep('otp');
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to initiate login' });
+        showToast.error(result.error || 'Failed to initiate login');
       }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      setAlert({ visible: true, type: 'error', title: 'Error', message });
+      showToast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +73,7 @@ export default function LoginScreen() {
 
   const handleVerifyOtp = async () => {
     if (!otp.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter the OTP' });
+      showToast.error('Please enter the OTP');
       return;
     }
 
@@ -86,12 +87,12 @@ export default function LoginScreen() {
           router.replace('/');
         }, 100);
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to verify OTP' });
+        showToast.error(result.error || 'Failed to verify OTP');
       }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'An error occurred';
-      setAlert({ visible: true, type: 'error', title: 'Error', message });
+      showToast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +100,7 @@ export default function LoginScreen() {
 
   const handleForgotPhone = async () => {
     if (!recoveryEmail.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your email' });
+      showToast.error('Please enter your email');
       return;
     }
 
@@ -110,10 +111,10 @@ export default function LoginScreen() {
         showToast.success('Recovery link sent to your email');
         setStep('forgot-token');
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to initiate recovery' });
+        showToast.error(result.error || 'Failed to initiate recovery');
       }
     } catch (_error) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred' });
+      showToast.error('An error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +122,7 @@ export default function LoginScreen() {
 
   const handleVerifyRecoveryToken = async () => {
     if (!recoveryToken.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter the recovery token from your email' });
+      showToast.error('Please enter the recovery token from your email');
       return;
     }
 
@@ -131,10 +132,10 @@ export default function LoginScreen() {
       if (result.success) {
         setStep('forgot-newphone');
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Invalid token' });
+        showToast.error(result.error || 'Invalid token');
       }
     } catch (_error) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred' });
+      showToast.error('An error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -142,12 +143,12 @@ export default function LoginScreen() {
 
   const handleChangePhoneRecovery = async () => {
     if (!newPhone.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter your new phone number' });
+      showToast.error('Please enter your new phone number');
       return;
     }
 
     if (!isValidPhoneLength(selectedCountryRecovery.code, newPhone)) {
-      setAlert({ visible: true, type: 'error', title: 'Invalid Phone Number', message: `${selectedCountryRecovery.name} phone numbers should have ${selectedCountryRecovery.phoneLength} digits` });
+      showToast.error(`${selectedCountryRecovery.name} phone numbers should have ${selectedCountryRecovery.phoneLength} digits`);
       return;
     }
 
@@ -158,10 +159,10 @@ export default function LoginScreen() {
       if (result.success) {
         setStep('forgot-otp');
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to initiate phone change' });
+        showToast.error(result.error || 'Failed to initiate phone change');
       }
     } catch (_error) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred' });
+      showToast.error('An error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -169,7 +170,7 @@ export default function LoginScreen() {
 
   const handleVerifyPhoneChangeRecovery = async () => {
     if (!otp.trim()) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'Please enter the OTP' });
+      showToast.error('Please enter the OTP');
       return;
     }
 
@@ -177,30 +178,18 @@ export default function LoginScreen() {
     try {
       const result = await verifyPhoneChangeRecovery(recoveryEmail.trim(), newPhone.trim(), otp.trim());
       if (result.success) {
-        setAlert({
-          visible: true,
-          type: 'success',
-          title: 'Success',
-          message: 'Your phone number has been updated. You can now login with your new phone.',
-          buttons: [
-            {
-              text: 'OK',
-              onPress: () => {
-                setStep('phone');
-                setPhone(newPhone);
-                setRecoveryEmail('');
-                setRecoveryToken('');
-                setNewPhone('');
-                setOtp('');
-              },
-            },
-          ],
-        });
+        showToast.success('Your phone number has been updated. You can now login with your new phone.');
+        setStep('phone');
+        setPhone(newPhone);
+        setRecoveryEmail('');
+        setRecoveryToken('');
+        setNewPhone('');
+        setOtp('');
       } else {
-        setAlert({ visible: true, type: 'error', title: 'Error', message: result.error || 'Failed to verify phone change' });
+        showToast.error(result.error || 'Failed to verify phone change');
       }
     } catch (_error) {
-      setAlert({ visible: true, type: 'error', title: 'Error', message: 'An error occurred' });
+      showToast.error('An error occurred');
     } finally {
       setIsLoading(false);
     }

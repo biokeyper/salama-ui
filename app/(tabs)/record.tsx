@@ -22,7 +22,6 @@ import {
   View,
 } from "react-native";
 import { AlertModal, type AlertType, type AlertButton } from "@/components/AlertModal";
-import { showToast } from '@/utils/toast';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -257,21 +256,9 @@ export default function RecordScreen() {
     setIsSavingDraft(true);
     try {
       if (reportId) {
-        setAlert({
-          visible: true,
-          type: "success",
-          title: "Success",
-          message: "Your draft has been saved.",
-          buttons: [
-            {
-              text: "OK",
-              onPress: () => {
-                setRecordedUri(null);
-                setReportId(null);
-              },
-            },
-          ],
-        });
+        showToast.success("Your draft has been saved.");
+        setRecordedUri(null);
+        setReportId(null);
         setIsSavingDraft(false);
         return;
       }
@@ -288,28 +275,11 @@ export default function RecordScreen() {
         updatedAt: now,
       });
 
-      setAlert({
-        visible: true,
-        type: "success",
-        title: "Success",
-        message: "Your draft has been saved.",
-        buttons: [
-          {
-            text: "OK",
-            onPress: () => {
-              setRecordedUri(null);
-              setReportId(null);
-            },
-          },
-        ],
-      });
+      showToast.success("Your draft has been saved.");
+      setRecordedUri(null);
+      setReportId(null);
     } catch (error) {
-      setAlert({
-        visible: true,
-        type: "error",
-        title: "Error",
-        message: "Failed to save draft",
-      });
+      showToast.error("Failed to save draft");
     } finally {
       setIsSavingDraft(false);
     }

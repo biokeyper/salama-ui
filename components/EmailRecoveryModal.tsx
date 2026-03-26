@@ -53,25 +53,13 @@ export default function EmailRecoveryModal({
     setIsLoading(true);
     try {
       await onSave(email.trim());
-      setAlert({
-        visible: true,
-        type: 'success',
-        title: 'Success',
-        message: 'Email recovery has been set up',
-        buttons: [
-          {
-            text: 'OK',
-            onPress: () => {
-              setEmail('');
-              onSkip();
-            },
-          },
-        ],
-      });
+      showToast.success('Email recovery has been set up');
+      setEmail('');
+      onSkip();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to save email';
-      setAlert({ visible: true, type: 'error', title: 'Error', message });
+      showToast.error(message);
     } finally {
       setIsLoading(false);
     }
